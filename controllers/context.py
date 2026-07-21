@@ -2,70 +2,89 @@
 
 Refacto SOLID / FastAPI Best Practices :
 - Suppression totale des variables globales mutables (legacy).
-- Injection de dépendances via `request.app.state.context`.
+- Injection de dépendances via ``request.app.state.context``.
 - Responsabilité unique : fournir des dépendances typées aux contrôleurs.
+
+Le typage de retour des helpers d'injection est **inféré** depuis les
+attributs de :class:`AppContext` (single source of truth des types de
+services). Annoter explicitement ici dupliquerait l'information et créerait
+un second point de maintenance.
 """
-import logging
-import os
 
-from fastapi import FastAPI, Request
+from __future__ import annotations
 
-from config.constants import VERSION, STATIC_DIR
-from controllers.di import AppContext
-from controllers.middlewares import _setup_middlewares
-from controllers.warmup import lifespan
+from fastapi import Depends, FastAPI, Request
 
-_logger = logging.getLogger("jarvis.context")
+from config.constants import STATIC_DIR, VERSION
+
+from .di import AppContext
+from .middlewares import _setup_middlewares
+from .warmup import lifespan
 
 
 def build_app() -> FastAPI:
-    """Composition Root : Crée l'application et attache le lifespan.
-    
-    Note : L'initialisation réelle des services (_ctx.initialize()) est 
-    déléguée au `lifespan` (controllers/warmup.py) pour garantir un 
-    démarrage/arrêt propre (startup/shutdown events).
+    """Composition Root : crée l'application et attache le lifespan.
+
+    L'initialisation réelle des services (``_ctx.initialize()``) est déléguée
+    au ``lifespan`` (controllers/warmup.py) pour garantir un démarrage/arrêt
+    propre (startup/shutdown events).
     """
     app = FastAPI(
         title="JARVIS Portable Edition",
         version=VERSION,
-        lifespan=lifespan
+        lifespan=lifespan,
     )
-    
+
     _setup_middlewares(app)
-    
-    # Montage propre des fichiers statiques (gère nativement la sécurité et le cache)
-    if STATIC_DIR and os.path.exists(STATIC_DIR):
-        from controllers.static_cache import CachedStaticFiles
+
+    # Montage propre des fichiers statiques (sécurité + cache gérés nativement).
+    if STATIC_DIR.exists():
+        from .static_cache import CachedStaticFiles
         app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
-        
+
     return app
 
 
 # ==============================================================================
-# DÉPENDANCES FASTAPI (À utiliser avec `Depends()` dans les routeurs)
+# DÉPENDANCES FASTAPI (à utiliser avec ``Depends()`` dans les routeurs)
 # ==============================================================================
 
 def get_app_context(request: Request) -> AppContext:
-    """Dépendance principale : retourne le contexte de l'application."""
-    # Le lifespan de l'app est responsable d'initialiser et d'attacher ceci à app.state
+    """Dépendance racine : contexte applicatif attaché par le lifespan."""
     return request.app.state.context
 
 
-# Helpers pour une injection granulaire (recommandé pour le TDD et la clarté)
-# Exemple d'usage dans une route : 
-# def my_route(inf: InferenceService = Depends(get_inference_service)):
-
 def get_inference_service(context: AppContext = Depends(get_app_context)):
+    """Dépendance granulaire : service d'inférence (LLM)."""
     return context.inference
 
+
 def get_memory_service(context: AppContext = Depends(get_app_context)):
+    """Dépendance granulaire : service de mémoire (habitudes)."""
     return context.memory
 
+
 def get_vector_service(context: AppContext = Depends(get_app_context)):
+    """Dépendance granulaire : service vectoriel (RAG)."""
     return context.vector
 
+
 def get_agents_registry(context: AppContext = Depends(get_app_context)):
+    """Dépendance granulaire : registre des 5 agents."""
     return context.agents
 
+
 def get_orchestrator(context: AppContext = Depends(get_app_context)):
+    """Dépendance granulaire : orchestrateur (AgentGraph)."""
     return context.orchestrator
+
+
+__all__ = [
+    "build_app",
+    "get_app_context",
+    "get_inference_service",
+    "get_memory_service",
+    "get_vector_service",
+    "get_agents_registry",
+    "get_orchestrator",
+]
