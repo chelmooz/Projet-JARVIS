@@ -1,4 +1,10 @@
-"""Service conversations — Stockage et gestion des conversations sur disque."""
+"""Service conversations — Stockage et gestion des conversations sur disque.
+
+Responsabilité unique (SRP) :
+- Persister les conversations (index + fichiers individuels).
+- Garantir la cohérence (fenêtre glissante, nettoyage orphelins).
+- Assurer la thread-safety (verrou sur les mutations).
+"""
 from __future__ import annotations
 
 import contextlib
@@ -9,6 +15,7 @@ import re
 import threading
 import time
 import uuid
+from typing import Any, Callable
 
 from config.constants import MAX_CONVERSATION_MESSAGES, PROJECT_DIR
 from ports import ConversationPort
@@ -16,7 +23,7 @@ from services.file_utils import write_json_atomic
 
 _logger = logging.getLogger("jarvis.conversation")
 
-# Sécurité : ID de conversation = uniquement alphanumérique + tirets
+# Sécurité : ID de conversation = uniquement alphanumérique + tirets (anti path-traversal)
 _VALID_CONV_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 ISO_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -25,11 +32,14 @@ CONV_ID_LENGTH = 8
 # Taille max du contenu d'un message (caractères)
 MAX_MESSAGE_LENGTH = 2000
 
+# Type du callback hook (conv_id, msg_id, role, content, ts)
+_MessageCallback = Callable[[str, str, str, str, float], None]
+
 
 class ConversationService(ConversationPort):
     """Stockage et gestion des conversations sur disque."""
 
-    def __init__(self, storage_dir: str = None):
+    def __init__(self, storage_dir: str | None = None) -> None:
         """Initialise le dossier de stockage et charge l'index des conversations.
 
         Args:
@@ -40,14 +50,16 @@ class ConversationService(ConversationPort):
         self._storage_dir = storage_dir
         self._conv_dir = os.path.join(storage_dir, "conversations")
         os.makedirs(self._conv_dir, exist_ok=True)
+        
         self._lock = threading.Lock()
-        self._on_message = None
+        self._on_message: _MessageCallback | None = None
         self._index_path = os.path.join(storage_dir, "conversations.json")
+        
         self._index = self._load_index()
         self._save_index()  # Persiste le nettoyage des orphelins
         self.backfill_message_ids()  # Attribution d'id aux messages existants
 
-    def _normalize_index(self, idx: dict) -> dict:
+    def _normalize_index(self, idx: dict[str, Any]) -> dict[str, Any]:
         """Normalise l'index : updated_at en string, msg_count garanti, nettoie les orphelins."""
         cleaned = []
         for c in idx.get("conversations", []):
@@ -61,17 +73,17 @@ class ConversationService(ConversationPort):
         idx["conversations"] = cleaned
         return idx
 
-    def _load_index(self) -> dict:
+    def _load_index(self) -> dict[str, Any]:
         """Charge l'index (liste des conversations avec métadonnées)."""
         try:
-            with open(self._index_path) as f:
+            with open(self._index_path, encoding="utf-8") as f:
                 idx = self._normalize_index(json.load(f))
             return idx
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             _logger.debug("conversations.json illisible/absent, index vide: %s", e)
             return {"conversations": []}
 
-    def _save_index(self):
+    def _save_index(self) -> None:
         write_json_atomic(self._index_path, self._index, indent=2)
 
     @staticmethod
@@ -97,22 +109,38 @@ class ConversationService(ConversationPort):
         """Valide le format de l'ID (protection contre les injections de chemin)."""
         return bool(_VALID_CONV_ID.match(conv_id))
 
-    def add_message(self, conv_id: str, role: str, content: str,
-                    agent: str = None, model: str = None,
-                    backend: str = None):
+    def add_message(
+        self,
+        conv_id: str,
+        role: str,
+        content: str,
+        agent: str | None = None,
+        model: str | None = None,
+        backend: str | None = None,
+    ) -> None:
         """Ajoute un message à une conversation. Crée la conversation si elle n'existe pas."""
         if not self._validate_conv_id(conv_id):
             raise ValueError(f"conv_id invalide: {conv_id!r}")
-        msg = self._build_message(role, content, agent, model)
+        
+        msg = self._build_message(role, content, agent, model, backend)
+        
         with self._lock:
             conv = self._load_or_create(conv_id)
             self._append_and_persist(conv_id, conv, msg)
             self._update_index(conv_id, len(conv["messages"]))
+        
+        # Hook appelé hors lock pour ne pas bloquer le service si le callback est lent
         if self._on_message:
             self._on_message(conv_id, msg["id"], role, content, msg["ts"])
 
-    def _build_message(self, role: str, content: str, agent: str = None,
-                       model: str = None) -> dict:
+    def _build_message(
+        self,
+        role: str,
+        content: str,
+        agent: str | None = None,
+        model: str | None = None,
+        backend: str | None = None,
+    ) -> dict[str, Any]:
         """Construit un message enrichi (id, ts, defaults, troncature)."""
         return {
             "id": uuid.uuid4().hex[:12],
@@ -120,31 +148,34 @@ class ConversationService(ConversationPort):
             "content": content[:MAX_MESSAGE_LENGTH],
             "agent": agent or "",
             "model": model or "",
+            "backend": backend or "",
             "ts": time.time(),
         }
 
-    def _load_or_create(self, conv_id: str) -> dict:
+    def _load_or_create(self, conv_id: str) -> dict[str, Any]:
         """Charge la conversation, la crée (vide) si illisible/absente."""
         conv_path = os.path.join(self._conv_dir, f"{conv_id}.json")
         try:
-            with open(conv_path) as f:
+            with open(conv_path, encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             _logger.debug("conversation %s illisible/absente, reinitialisee: %s", conv_id, e)
             self._register_missing(conv_id)
             return {"id": conv_id, "messages": []}
 
-    def _register_missing(self, conv_id: str):
+    def _register_missing(self, conv_id: str) -> None:
         """Ajoute l'entrée d'index et persiste le fichier d'une conversation neuve."""
         now = self._ts()
         self._index["conversations"].append({
             "id": conv_id, "title": f"Conversation {conv_id}",
             "created_at": now, "updated_at": now, "msg_count": 0,
         })
-        write_json_atomic(os.path.join(self._conv_dir, f"{conv_id}.json"),
-                          {"id": conv_id, "messages": []})
+        write_json_atomic(
+            os.path.join(self._conv_dir, f"{conv_id}.json"),
+            {"id": conv_id, "messages": []}
+        )
 
-    def _append_and_persist(self, conv_id: str, conv: dict, msg: dict):
+    def _append_and_persist(self, conv_id: str, conv: dict[str, Any], msg: dict[str, Any]) -> None:
         """Ajoute le message et persiste le fichier conversation.
 
         Fenêtre glissante : si la conversation dépasse MAX_CONVERSATION_MESSAGES,
@@ -157,7 +188,7 @@ class ConversationService(ConversationPort):
         conv_path = os.path.join(self._conv_dir, f"{conv_id}.json")
         write_json_atomic(conv_path, conv, indent=2)
 
-    def _update_index(self, conv_id: str, msg_count: int):
+    def _update_index(self, conv_id: str, msg_count: int) -> None:
         """Met à jour le compteur et la date de la conversation dans l'index."""
         for c in self._index["conversations"]:
             if c["id"] == conv_id:
@@ -166,23 +197,23 @@ class ConversationService(ConversationPort):
                 break
         self._save_index()
 
-    def get_conversation(self, conv_id: str) -> dict | None:
+    def get_conversation(self, conv_id: str) -> dict[str, Any] | None:
         """Récupère une conversation complète avec ses messages."""
         if not self._validate_conv_id(conv_id):
             return None
         conv_path = os.path.join(self._conv_dir, f"{conv_id}.json")
         try:
-            with open(conv_path) as f:
+            with open(conv_path, encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             _logger.debug("conversation %s illisible/absente: %s", conv_id, e)
             return None
 
-    def list_all(self) -> list[dict]:
+    def list_all(self) -> list[dict[str, Any]]:
         """Retourne la liste des conversations (métadonnées, sans les messages)."""
         return self._index.get("conversations", [])
 
-    def list_unindexed(self, limit: int | None = None) -> list[dict]:
+    def list_unindexed(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Retourne les conversations non encore indexées (indexed != True).
 
         Utilisé par la vectorisation pour ne traiter chaque conversation qu'une
@@ -193,7 +224,7 @@ class ConversationService(ConversationPort):
             items = items[:limit]
         return items
 
-    def mark_indexed(self, conv_id: str):
+    def mark_indexed(self, conv_id: str) -> None:
         """Marque une conversation comme indexée (vectorisée). Non destructive."""
         if not self._validate_conv_id(conv_id):
             return
@@ -204,11 +235,11 @@ class ConversationService(ConversationPort):
                     break
             self._save_index()
 
-    def set_on_message(self, callback):
-        """Enregistre un hook appele a chaque nouveau message (auto-ingest vectoriel)."""
+    def set_on_message(self, callback: _MessageCallback | None) -> None:
+        """Enregistre un hook appelé à chaque nouveau message (auto-ingest vectoriel)."""
         self._on_message = callback
 
-    def backfill_message_ids(self):
+    def backfill_message_ids(self) -> bool:
         """Attribue un `id` aux messages existants qui n'en ont pas (non destructif).
 
         Migration one-shot : comme `add_message` assigne toujours un `id`, un seul
@@ -218,13 +249,14 @@ class ConversationService(ConversationPort):
         """
         if self._index.get("_message_ids_backfilled"):
             return False
+        
         changed_any = False
         for entry in self._index.get("conversations", []):
             conv_path = os.path.join(self._conv_dir, f"{entry['id']}.json")
             if not os.path.exists(conv_path):
                 continue
             try:
-                with open(conv_path) as f:
+                with open(conv_path, encoding="utf-8") as f:
                     conv = json.load(f)
                 changed = False
                 for msg in conv.get("messages", []):
@@ -234,14 +266,15 @@ class ConversationService(ConversationPort):
                 if changed:
                     write_json_atomic(conv_path, conv, indent=2)
                     changed_any = True
-            except Exception as e:
+            except (OSError, json.JSONDecodeError) as e:
                 _logger.debug("backfill ignore conversation %s (illisible/corrompue): %s", entry.get("id"), e)
                 continue
+        
         self._index["_message_ids_backfilled"] = True
         self._save_index()
         return changed_any
 
-    def delete(self, conv_id: str):
+    def delete(self, conv_id: str) -> None:
         """Supprime une conversation (index + fichier)."""
         if not self._validate_conv_id(conv_id):
             return
@@ -251,19 +284,22 @@ class ConversationService(ConversationPort):
             ]
             self._save_index()
             conv_path = os.path.join(self._conv_dir, f"{conv_id}.json")
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError):
                 os.remove(conv_path)
 
-    def delete_all(self):
+    def delete_all(self) -> None:
         """Supprime toutes les conversations (index + tous les fichiers)."""
         with self._lock:
             self._index["conversations"] = []
             self._save_index()
             for f in os.listdir(self._conv_dir):
                 if f.endswith(".json"):
-                    with contextlib.suppress(Exception):
+                    with contextlib.suppress(OSError):
                         os.remove(os.path.join(self._conv_dir, f))
 
     def is_healthy(self) -> bool:
         """Vérifie que le dossier de stockage existe."""
         return os.path.exists(self._conv_dir)
+
+
+__all__ = ["ConversationService"]
