@@ -6,12 +6,16 @@ Refacto DevOps / KISS :
 - Health-check avec backoff exponentiel (remplace les time.sleep arbitraires).
 - Injection de dépendances pour la testabilité (TDD).
 """
+from __future__ import annotations
+
+import io
 import logging
 import os
 import socket
 import subprocess
 import time
-from typing import Callable, Optional
+import urllib.error
+import urllib.request
 
 from config.paths import OLLAMA_HOST, OLLAMA_PORT
 from services.port_manager import kill_existing
@@ -30,7 +34,7 @@ DEFAULT_MAX_RESTARTS = 3
 
 def wait_for_port_free(host: str, port: int, max_attempts: int = 10) -> bool:
     """Attend que le port soit libéré (évite les race conditions TIME_WAIT)."""
-    for attempt in range(max_attempts):
+    for _ in range(max_attempts):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(0.5)
@@ -51,17 +55,16 @@ def wait_for_ollama_ready(host: str, port: int, timeout: float = DEFAULT_POLL_TI
 
     while time.time() - start_time < timeout:
         try:
-            import urllib.request
             urllib.request.urlopen(url, timeout=2)
             return True
-        except Exception:
+        except (urllib.error.URLError, OSError):
             time.sleep(delay)
-            delay = min(delay * 1.5, 5.0) # Backoff exponentiel plafonné à 5s
+            delay = min(delay * 1.5, 5.0)  # Backoff exponentiel plafonné à 5s
             
     return False
 
 
-def _open_log(name: str):
+def _open_log(name: str) -> io.TextIOWrapper:
     """Ouvre un fichier de log en mode append."""
     os.makedirs(LOGS_DIR, exist_ok=True)
     path = os.path.join(LOGS_DIR, f"{name.lower().replace(' ', '_')}.log")
@@ -81,17 +84,17 @@ class ProcessManager:
         base_dir: str = BASE_DIR,
         system: str = SYSTEM,
         max_restarts: int = DEFAULT_MAX_RESTARTS,
-    ):
+    ) -> None:
         self._ollama_port = ollama_port
         self._base_dir = base_dir
         self._system = system
         self._max_restarts = max_restarts
         
-        self._procs: list[tuple[subprocess.Popen, str]] = []
+        self._procs: list[tuple[subprocess.Popen[bytes], str]] = []
         self._restart_counts: dict[str, int] = {}
         self._shutting_down = False
 
-    def start_ollama(self) -> Optional[subprocess.Popen]:
+    def start_ollama(self) -> subprocess.Popen[bytes] | None:
         """Démarre le serveur Ollama avec une configuration propre."""
         ollama_bin = get_ollama_path()
         if not ollama_bin:
@@ -123,7 +126,7 @@ class ProcessManager:
                     [ollama_bin, "serve"],
                     env=env,
                     stdout=log_file,
-                    stderr=subprocess.STDOUT, # Merge stderr into stdout
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 )
             
             self._procs.append((p, "Ollama"))
@@ -132,23 +135,23 @@ class ProcessManager:
             if wait_for_ollama_ready("127.0.0.1", self._ollama_port):
                 _logger.info("Ollama démarré avec succès sur le port %d", self._ollama_port)
                 return p
-            else:
-                _logger.error("Ollama n'a pas répondu au health-check dans le temps imparti.")
-                self._terminate_process(p, "Ollama")
-                return None
+            
+            _logger.error("Ollama n'a pas répondu au health-check dans le temps imparti.")
+            self._terminate_process(p, "Ollama")
+            return None
                 
         except Exception as e:
             _logger.exception("Échec critique au démarrage d'Ollama : %s", e)
             return None
 
-    def stop_all(self):
+    def stop_all(self) -> None:
         """Arrêt gracieux de tous les processus gérés."""
         self._shutting_down = True
         for p, name in reversed(self._procs):
             self._terminate_process(p, name)
         self._procs.clear()
 
-    def _terminate_process(self, p: subprocess.Popen, name: str):
+    def _terminate_process(self, p: subprocess.Popen[bytes], name: str) -> None:
         """Arrête un processus proprement (SIGTERM puis SIGKILL)."""
         try:
             p.terminate()
@@ -162,7 +165,7 @@ class ProcessManager:
     def monitor(self) -> bool:
         """Boucle de surveillance minimaliste avec relance limitée."""
         while not self._shutting_down:
-            time.sleep(2) # Polling interval pour le monitor
+            time.sleep(2)  # Polling interval pour le monitor
             
             dead_procs = [(p, name) for p, name in self._procs if p.poll() is not None]
             
@@ -185,3 +188,10 @@ class ProcessManager:
                 return False
 
         return True
+
+
+__all__ = [
+    "ProcessManager",
+    "wait_for_port_free",
+    "wait_for_ollama_ready",
+]
