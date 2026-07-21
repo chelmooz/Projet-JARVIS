@@ -16,7 +16,8 @@ from typing import Final
 
 ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 
-assert ROOT.exists(), f"Project root not found: {ROOT}"
+if not ROOT.exists():
+    raise FileNotFoundError(f"Project root not found: {ROOT}")
 
 # ---------------------------------------------------------------------------
 # Plateforme
@@ -96,6 +97,7 @@ PORTABLE_MAC: Final[Path] = PORTABLE_DIR / "mac"
 # Binaires plateforme-dépendants (fonctions pour testabilité)
 # ---------------------------------------------------------------------------
 
+
 def get_ollama_exe() -> Path:
     """Retourne le chemin du binaire Ollama pour la plateforme courante."""
     if IS_WINDOWS:
@@ -120,6 +122,8 @@ PORTABLE_PYTHON_EXE: Final[Path] = get_portable_python()
 
 # ---------------------------------------------------------------------------
 # Configuration réseau Ollama (port custom pour éviter conflit système)
+# NOTE: Présent ici car couplé au chemin du binaire. À terme, extraire
+# dans config/network.py si d'autres paramètres réseau apparaissent.
 # ---------------------------------------------------------------------------
 
 OLLAMA_PORT: Final[int] = 11436
@@ -173,11 +177,9 @@ __all__ = [
     "PORTABLE_WIN",
     "PORTABLE_LINUX",
     "PORTABLE_MAC",
-    # Binaires (fonctions + aliases compat)
+    # Binaires (fonctions uniquement — aliases compat hors __all__)
     "get_ollama_exe",
     "get_portable_python",
-    "OLLAMA_EXE",
-    "PORTABLE_PYTHON_EXE",
     # Réseau
     "OLLAMA_PORT",
     "OLLAMA_HOST",
