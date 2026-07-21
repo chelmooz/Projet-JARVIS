@@ -1,172 +1,151 @@
 #!/usr/bin/env python3
-"""JARVIS Portable — Entry point unique. Plug & play."""
-import argparse
-import contextlib
+"""JARVIS Portable — Point d'entrée unique (Composition Root).
+
+Refacto DevOps / SOLID / KISS :
+- Responsabilité unique : Vérification pré-vol (pre-flight), démarrage d'Ollama, 
+  et lancement natif d'Uvicorn (plus de subprocess Popen pour l'API).
+- Fail-Fast strict : Si une dépendance critique (Ollama) échoue, le programme s'arrête 
+  immédiatement avec un code d'erreur (exit 1). Pas d'état dégradé silencieux.
+- Gestion propre des signaux : Uvicorn gère nativement SIGINT/SIGTERM. Le bloc `finally` 
+  garantit l'arrêt propre du processus Ollama enfant.
+"""
 import logging
 import os
 import signal
 import sys
-import time
 import webbrowser
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
+import uvicorn
+from dotenv import load_dotenv
 
 from config.bootstrap import ensure_project_root
+from config.constants import DEFAULT_MODEL, JARVIS_PORT, VERSION
+from config.paths import OLLAMA_PORT
+from services.launcher import ProcessManager
+from services.ollama_installer import ensure_ollama_binary
+from services.system import BASE_DIR, SYSTEM
 
+# --- Configuration ---
+# Le projet_root est garanti par le bootstrap
 _PROJECT_ROOT = ensure_project_root()
 
-# Charger .env AVANT config.constants
-if load_dotenv is not None:
-    load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
-
-try:
-    from config.constants import DEFAULT_BACKEND, DEFAULT_MODEL, JARVIS_PORT, VERSION
-    from config.paths import OLLAMA_PORT
-    from services.launcher import ProcessManager, wait_for
-    from services.log import LogService
-    from services.ollama_installer import ensure_ollama_binary
-    from services.system import BASE_DIR, SYSTEM, ensure_venv
-except ImportError as e:
-    sys.stderr.write(
-        "Erreur: modules JARVIS introuvables.\n"
-        "Lancez jarvis.py depuis la racine du projet.\n"
-        f"Detail: {e}\n"
-    )
-    sys.exit(1)
-
-# --- Constantes ---
-OLLAMA_SYSTEM_PORT = 11434
-OLLAMA_WAIT = 3
-OLLAMA_TIMEOUT = 90
-CORE_WAIT = 2
+# Charger les variables d'environnement en premier
+load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 
 def setup_logging() -> logging.Logger:
-    """Configure et retourne le logger standard (élimine le besoin d'un wrapper custom)."""
+    """Configure un logger standard, lisible et sans dépendance circulaire."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S"
+        datefmt="%H:%M:%S",
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            # Optionnel : ajouter un FileHandler si la persistance des logs de démarrage est critique
+            # logging.FileHandler(os.path.join(BASE_DIR, "logs", "jarvis_startup.log"), encoding="utf-8")
+        ]
     )
     return logging.getLogger("JARVIS")
 
 
-def log_status(logger: logging.Logger, svc: str, msg: str, ok: bool = True):
-    """Log formaté pour la console et le fichier, sans état global."""
-    status = "OK" if ok else "**"
-    logger.info(f"[{svc}] {status} {msg}")
-
-
-def print_banner(info: dict):
-    be = info.get("backend", DEFAULT_BACKEND)
-    print("\n" + "=" * 58)
+def print_banner():
+    """Affiche les informations de démarrage de manière claire."""
+    print("\n" + "=" * 60)
     print(f"  JARVIS Portable Edition v{VERSION}")
-    print(f"  Interface : http://localhost:{JARVIS_PORT}")
-    if info.get("openwebui"):
-        print("  OpenWebUI : http://localhost:3000")
-    print(f"  Backend   : {be.upper()} ({DEFAULT_MODEL})")
-    print(f"  API       : http://localhost:{JARVIS_PORT}/api/jarvis")
-    print(f"  Statut    : http://localhost:{JARVIS_PORT}/api/status")
-    print("=" * 58)
-    print("  Ctrl+C pour tout arreter\n")
+    print(f"  Interface : http://127.0.0.1:{JARVIS_PORT}")
+    print(f"  Modèle par défaut : {DEFAULT_MODEL}")
+    print(f"  API Status  : http://127.0.0.1:{JARVIS_PORT}/api/status")
+    print("=" * 60)
+    print("  [Ctrl+C] pour arrêter proprement tous les services\n")
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="JARVIS Portable Edition")
-    parser.add_argument("--diag", action="store_true", help="Afficher le diagnostic systeme et quitter")
-    return parser.parse_args()
-
-
-def start_ollama_backend(pm: ProcessManager, logger: logging.Logger) -> str:
-    log_status(logger, "Ollama", "Demarrage force du binaire portable...")
+def preflight_check(logger: logging.Logger) -> bool:
+    """Vérifie et provisionne les dépendances critiques avant tout démarrage.
     
-    # Injection du logger via une lambda pour respecter la signature attendue
-    ollama_bin = ensure_ollama_binary(lambda svc, msg, ok=True: log_status(logger, svc, msg, ok))
+    Retourne True si tout est prêt, False sinon.
+    """
+    logger.info("Vérification du binaire Ollama portable...")
     
-    if not ollama_bin:
-        log_status(logger, "Ollama", "Installation impossible", ok=False)
-        return "absent"
+    # ensure_ollama_binary doit retourner le chemin du binaire ou None
+    ollama_bin = ensure_ollama_binary(logger)
+    
+    if not ollama_bin or not os.path.exists(ollama_bin):
+        logger.critical(
+            "ÉCHEC CRITIQUE : Le binaire Ollama est introuvable.\n"
+            "Veuillez exécuter le script d'installation : 'python scripts/install.py'\n"
+            "ou vérifier votre connexion Internet pour le téléchargement initial."
+        )
+        return False
         
-    pm.start_ollama()
-    time.sleep(OLLAMA_WAIT)
-    
-    if wait_for(f"http://localhost:{OLLAMA_PORT}/api/tags", "Ollama", 
-                lambda svc, msg, ok=True: log_status(logger, svc, msg, ok), 
-                timeout=OLLAMA_TIMEOUT):
-        return DEFAULT_BACKEND
-        
-    log_status(logger, "Ollama", "Echec demarrage", ok=False)
-    return "echec"
-
-
-def start_core_services(pm: ProcessManager, python: str, logger: logging.Logger) -> dict:
-    log_status(logger, "JARVIS", "Demarrage du core API...")
-    pm.start_jarvis(python)
-    time.sleep(CORE_WAIT)
-    pm.start_openwebui(python)
-    
-    jarvis_ok = wait_for(f"http://localhost:{JARVIS_PORT}/api/status", "JARVIS Core", 
-                         lambda svc, msg, ok=True: log_status(logger, svc, msg, ok))
-    owui_ok = pm.has_service("OpenWebUI") and wait_for("http://localhost:3000", "OpenWebUI", 
-                                                       lambda svc, msg, ok=True: log_status(logger, svc, msg, ok))
-    return {"jarvis": jarvis_ok, "openwebui": owui_ok}
-
-
-def run_diag():
-    from services.diagnostic import DiagnosticService
-    d = DiagnosticService()
-    d.run_full()
-    d.print_report()
-
-
-def shutdown(pm: ProcessManager, signum, frame):
-    print("  A bientot.")
-    try:
-        pm.stop_all()
-    finally:
-        sys.exit(0)
+    logger.info("Binaire Ollama trouvé : %s", ollama_bin)
+    return True
 
 
 def main():
+    """Point d'entrée principal de l'application."""
+    # 1. Initialisation de l'environnement
     os.chdir(BASE_DIR)
     os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
     
-    # Composition Root du launcher : instanciation explicite des dépendances
     logger = setup_logging()
+    logger.info("=== Démarrage de JARVIS Portable ===")
+    logger.info("Système : %s | Python : %s", SYSTEM, sys.version.split()[0])
+    logger.info("Répertoire de travail : %s", BASE_DIR)
+
+    # 2. Pre-flight check (Fail-Fast)
+    if not preflight_check(logger):
+        sys.exit(1)
+
+    # 3. Initialisation du gestionnaire de processus (uniquement pour Ollama)
     pm = ProcessManager()
 
-    signal.signal(signal.SIGINT, lambda s, f: shutdown(pm, s, f))
+    # 4. Gestion propre des signaux d'arrêt (Graceful Shutdown)
+    def cleanup_handler(signum, frame):
+        logger.info("\nSignal d'arrêt reçu (%d). Nettoyage en cours...", signum)
+        pm.stop_all()
+        logger.info("Arrêt terminé. À bientôt.")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, cleanup_handler)
     if hasattr(signal, "SIGTERM"):
-        with contextlib.suppress(ValueError):
-            signal.signal(signal.SIGTERM, lambda s, f: shutdown(pm, s, f))
+        signal.signal(signal.SIGTERM, cleanup_handler)
 
-    logger.info("=== JARVIS demarrage ===")
-    print(f"\n  JARVIS Portable Edition v{VERSION}")
-    print(f"  OS : {SYSTEM}")
-    print(f"  Python : {sys.version.split()[0]}")
-    print(f"  Repertoire : {BASE_DIR}\n")
+    # 5. Démarrage du moteur d'inférence (Ollama)
+    # Le nouveau ProcessManager inclut déjà un health-check avec backoff exponentiel.
+    # Plus besoin de time.sleep(3) arbitraire ici.
+    logger.info("Démarrage du moteur Ollama sur le port %d...", OLLAMA_PORT)
+    if not pm.start_ollama():
+        logger.critical("Échec du démarrage d'Ollama. Consultez logs/ollama.log pour les détails.")
+        pm.stop_all()
+        sys.exit(1)
 
-    python = ensure_venv(lambda svc, msg, ok=True: log_status(logger, svc, msg, ok))
-    log_status(logger, "Init", f"Python : {python}")
-
-    backend = start_ollama_backend(pm, logger)
-    svc_info = start_core_services(pm, python, logger)
-
-    info = {"backend": backend, **svc_info}
-    print_banner(info)
+    # 6. Lancement de l'API FastAPI (Uvicorn)
+    # KISS / DevOps : Uvicorn est exécuté de manière native dans le thread principal.
+    # Il gère lui-même les signaux, le pool de travailleurs et le graceful shutdown.
+    # C'est infiniment plus robuste que de le lancer via subprocess.Popen.
+    print_banner()
     
-    with contextlib.suppress(Exception):
-        webbrowser.open(f"http://localhost:{JARVIS_PORT}")
-        
-    pm.monitor()
+    # Ouverture du navigateur (silencieuse en cas d'échec, ex: environnement headless)
+    try:
+        webbrowser.open(f"http://127.0.0.1:{JARVIS_PORT}")
+    except Exception:
+        pass  # Ignoré : ne doit pas bloquer le démarrage en CLI/SSH
+
+    try:
+        logger.info("Lancement du serveur API sur http://127.0.0.1:%d", JARVIS_PORT)
+        uvicorn.run(
+            "controllers.router:app",
+            host="127.0.0.1",
+            port=JARVIS_PORT,
+            log_level="info",
+            reload=False,  # Mode production (portable)
+        )
+    finally:
+        # Ce bloc s'exécute toujours, même en cas d'exception non gérée dans Uvicorn
+        # ou lors d'un arrêt propre via Ctrl+C.
+        logger.info("Arrêt du serveur API. Nettoyage des processus enfants...")
+        pm.stop_all()
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    if args.diag:
-        run_diag()
-    else:
-        main()
+    main()
