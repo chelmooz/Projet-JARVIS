@@ -39,7 +39,7 @@ class GenericAgent(BaseAgent):
         domain_prompt: str | None = None,
     ) -> None:
         super().__init__()
-        self.model: _ModelProvider = model_provider
+        self.model_provider: _ModelProvider = model_provider
         # ``memory`` est injecté par la factory ; non exploité par run().
         self.memory: Any | None = memory
         self._profile_key: str = profile_key
@@ -52,11 +52,11 @@ class GenericAgent(BaseAgent):
         system, user = self._build_messages(
             self._profile_key, task, context, default_prompt=self._domain_prompt,
         )
-        response = self.model.query(user, model, system=system)
+        response = self.model_provider.query(user, model, system=system)
         return {
             "agent": self._profile_key,
             "model": model,
-            "backend": self.model.get_active_backend(),
+            "backend": self.model_provider.get_active_backend(),
             "response": response,
             "suggested_skill": self._suggest_skill(response),
         }
