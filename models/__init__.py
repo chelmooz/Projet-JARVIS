@@ -1,9 +1,4 @@
-"""Models — Entités métier et DTO (couche M).
-
-Chaque dataclass est une valeur immuable ou une entité identifiée.
-Les invariants sont validés dans ``__post_init__``.
-"""
-
+"""Models — Entités métier et DTO (couche M)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,38 +7,21 @@ from enum import Enum
 from typing import Any
 
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
-
 class OnError(str, Enum):
-    """Stratégie de gestion d'erreur dans un pipeline."""
-
     ABORT = "abort"
     SKIP = "skip"
     RETRY = "retry"
 
 
-# ---------------------------------------------------------------------------
-# Résultat d'inférence
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class Result:
-    """Résultat immuable d'un appel d'inférence.
-
-    Invariant : ``success=False`` implique ``error`` non-vide.
-    """
-
     success: bool
     data: dict[str, Any]
     agent: str
     model: str
     backend: str = "ollama"
     error: str | None = None
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc),
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         if not self.success and not self.error:
@@ -52,43 +30,20 @@ class Result:
             object.__setattr__(self, "error", None)
 
     @classmethod
-    def ok(
-        cls,
-        data: dict[str, Any],
-        agent: str,
-        model: str,
-        backend: str = "ollama",
-    ) -> Result:
-        return cls(
-            success=True, data=data, agent=agent, model=model, backend=backend,
-        )
+    def ok(cls, data: dict[str, Any], agent: str, model: str, backend: str = "ollama") -> Result:
+        return cls(success=True, data=data, agent=agent, model=model, backend=backend)
 
     @classmethod
-    def fail(
-        cls,
-        error: str,
-        agent: str = "unknown",
-        model: str = "unknown",
-        backend: str = "ollama",
-    ) -> Result:
-        return cls(
-            success=False, data={}, agent=agent, model=model,
-            backend=backend, error=error,
-        )
+    def fail(cls, error: str, agent: str = "unknown", model: str = "unknown", backend: str = "ollama") -> Result:
+        return cls(success=False, data={}, agent=agent, model=model, backend=backend, error=error)
 
     @property
     def is_success(self) -> bool:
         return self.success
 
 
-# ---------------------------------------------------------------------------
-# Agents
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class AgentProfile:
-    """Profil statique d'un agent (config, pas d'état runtime)."""
-
     key: str
     name: str
     title: str
@@ -102,19 +57,11 @@ class AgentProfile:
             raise ValueError("AgentProfile.model must not be empty")
 
 
-# ---------------------------------------------------------------------------
-# Conversations
-# ---------------------------------------------------------------------------
-
 @dataclass
 class Conversation:
-    """Conversation persistante identifiée par id."""
-
     id: str
     title: str = ""
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc),
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -123,30 +70,20 @@ class Conversation:
 
 @dataclass(frozen=True)
 class Message:
-    """Message immuable au sein d'une conversation."""
-
     role: str
     content: str
     agent: str = ""
     model: str = ""
     backend: str = "ollama"
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc),
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def __post_init__(self) -> None:
         if self.role not in ("user", "assistant", "system"):
             raise ValueError(f"Invalid role: {self.role!r}")
 
 
-# ---------------------------------------------------------------------------
-# Documents & Recherche vectorielle
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class Document:
-    """Document indexé pour la recherche vectorielle."""
-
     text: str
     metadata: dict[str, Any] = field(default_factory=dict)
     score: float = 0.0
@@ -156,14 +93,8 @@ class Document:
             raise ValueError("Document.text must not be empty")
 
 
-# ---------------------------------------------------------------------------
-# Pipeline (orchestration séquentielle)
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class PipeStep:
-    """Étape élémentaire d'un pipeline."""
-
     name: str
     agent_key: str
     prompt_template: str
@@ -178,8 +109,6 @@ class PipeStep:
 
 @dataclass(frozen=True)
 class Pipeline:
-    """Pipeline séquentiel d'étapes agentiques."""
-
     id: str
     steps: tuple[PipeStep, ...] = ()
     on_error: OnError = OnError.ABORT
@@ -189,19 +118,8 @@ class Pipeline:
             raise ValueError("Pipeline.id must not be empty")
 
 
-# ---------------------------------------------------------------------------
-# DTO Entrée / Sortie (API ↔ Services)
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class AgentInput:
-    """DTO d'entrée : requête utilisateur vers un agent.
-
-    Remplace l'ancien Task (fusion KISS).
-    Le champ ``text`` est un alias legacy conservé pour compatibilité
-    avec les tests existants (test_agent_router.py).
-    """
-
     task: str = ""
     text: str | None = None
     image: str | None = None
@@ -210,7 +128,6 @@ class AgentInput:
     model: str | None = None
 
     def __post_init__(self) -> None:
-        # Compat legacy : si text est fourni et task est vide, utiliser text.
         if self.text and not self.task:
             object.__setattr__(self, "task", self.text)
         if not self.task:
@@ -219,8 +136,6 @@ class AgentInput:
 
 @dataclass(frozen=True)
 class AgentOutput:
-    """DTO de sortie : réponse d'un agent vers l'API."""
-
     response: str
     agent: str
     model: str
@@ -234,11 +149,7 @@ class AgentOutput:
         return self.error is None
 
 
-# ---------------------------------------------------------------------------
-# Compat ascendante (deprecated — utiliser AgentInput directement)
-# ---------------------------------------------------------------------------
 Task = AgentInput
-
 
 __all__ = [
     "OnError",
