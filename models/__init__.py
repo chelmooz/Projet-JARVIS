@@ -228,6 +228,12 @@ class AgentOutput:
         return self.error is None
 
 
+# ---------------------------------------------------------------------------
+# Compat ascendante (deprecated — utiliser AgentInput directement)
+# ---------------------------------------------------------------------------
+Task = AgentInput  # Alias legacy pour tests/test_router.py
+
+
 __all__ = [
     "OnError",
     "Result",
@@ -239,4 +245,5 @@ __all__ = [
     "Pipeline",
     "AgentInput",
     "AgentOutput",
+    "Task",
 ]
