@@ -58,3 +58,4 @@ ruff_output.txt
 Modelfile.*
 *.bak.ps1
 scripts/*.bak.ps1
+build/
