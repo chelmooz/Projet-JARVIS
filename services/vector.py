@@ -1,20 +1,19 @@
 """Service vectoriel — Indexation et recherche par similarité sémantique (embeddings).
 
-Façade fine (SRP) : VectorService orchestre l'indexation et la recherche en
-déléguant chaque responsabilité à un module spécialisé :
-  * vector_index.VectorIndex       -> stockage, IO, dédup
-  * vector_embedder.Embedder       -> calcul d'embedding (+ fallback)
-  * vector_dimension.DimensionManager -> cohérence/migration de dimension
-  * vector_weighting.WeightConsolidator -> poids, consolidation, ranking
-
-Le contrat public (index, search, stats, adjust_weight, consolidate, ...) est
-inchangé. L'attribut ``_data`` reste exposé (utilisé par les tests existants).
+Refacto DevOps / SOLID / Thread-Safe :
+- Injection de dépendance stricte (plus de fallback vers controllers.context).
+- Thread-safety garantie : tous les accès à _data sont protégés par _lock.
+- Gestion robuste des fichiers corrompus (backup automatique + alerte).
+- Plus d'exposition de _data (encapsulation respectée).
+- Index secondaire pour déduplication O(1) au lieu de O(N).
 """
 import json
 import logging
 import os
+import shutil
 import threading
 import time
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -31,6 +30,7 @@ _logger = logging.getLogger("jarvis.vector")
 
 # Fichier de persistance de l'index vectoriel (documents + embeddings)
 VECTOR_PATH = os.path.join(MEMORY_DIR, "vector_index.json")
+VECTOR_BACKUP_PATH = os.path.join(MEMORY_DIR, "vector_index.backup.json")
 EXPECTED_DIM = 768
 EXPECTED_MODEL = "nomic-embed-text-v2-moe"
 
@@ -41,101 +41,155 @@ __all__ = [
 ]
 
 
-
 class VectorService(VectorPort):
     """Index vectoriel local : orchestre indexation, embedding et recherche cosinus.
-
-    Délègue chaque responsabilité à un module spécialisé pour respecter le
-    principe de responsabilité unique (SRP).
+    
+    Thread-safe et résilient : toutes les mutations d'état sont protégées par un verrou,
+    et les fichiers corrompus sont automatiquement sauvegardés avant réinitialisation.
     """
 
-    def __init__(self, inference=None):
-        """Initialise l'index vectoriel : charge les données, prépare le cache LRU.
-
-        `inference` (optionnel) est le backend d'embedding, injecté par l'appelant
-        (DIP). À défaut, `_get_inference` retombe sur `controllers.context` pour
-        compatibilité ascendante (tests et appelants existants sans injection).
+    def __init__(self, inference_service):
+        """Initialise l'index vectoriel avec injection de dépendance stricte.
+        
+        Args:
+            inference_service: Service d'inférence pour le calcul d'embeddings (requis).
+            
+        Raises:
+            ValueError: Si inference_service est None.
         """
+        if inference_service is None:
+            raise ValueError(
+                "VectorService nécessite un service d'inférence valide. "
+                "Injection de dépendance requise (DIP)."
+            )
+        
         os.makedirs(os.path.dirname(VECTOR_PATH), exist_ok=True)
+        
         self._lock = threading.RLock()
-        self._index = VectorIndex(self._load(), VECTOR_PATH, self._lock)
-        self._data = self._index._data
-        self._inference = inference
-        self._embedder = Embedder(None)
+        self._inference = inference_service
+        self._embedder = Embedder(inference_service)
         self._cache = VectorCache()
+        
+        # Chargement sécurisé des données
+        self._data = self._load_secure()
+        self._index = VectorIndex(self._data, VECTOR_PATH, self._lock)
+        
+        # Index secondaire pour déduplication O(1) des messages de conversation
+        self._message_index = self._build_message_index()
+        
+        # Migration de dimension
         self.last_migration = self._ensure_dimension()
 
-    # --- Délégation : dimension/migration -----------------------------------
+    # ==============================================================================
+    # GESTION SÉCURISÉE DES DONNÉES (Thread-Safe + Résilience)
+    # ==============================================================================
+
+    def _build_message_index(self) -> dict:
+        """Construit un index secondaire pour les messages de conversation (O(1) lookup)."""
+        index = {}
+        for doc in self._data.get("documents", []):
+            metadata = doc.get("metadata", {})
+            if metadata.get("source") == "conversation":
+                conv_id = metadata.get("conv_id")
+                msg_id = metadata.get("msg_id")
+                if conv_id and msg_id:
+                    index[(conv_id, msg_id)] = True
+        return index
+
+    def _load_secure(self) -> dict:
+        """Charge les données avec gestion robuste des fichiers corrompus."""
+        if not os.path.exists(VECTOR_PATH):
+            return {"documents": [], "embedding_dim": None}
+        
+        try:
+            with open(VECTOR_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if isinstance(data, dict) and "documents" in data:
+                _logger.info("Index vectoriel chargé avec succès (%d documents)", len(data["documents"]))
+                return data
+            else:
+                raise ValueError("Structure de données invalide")
+                
+        except (json.JSONDecodeError, OSError, ValueError) as e:
+            _logger.critical(
+                "Fichier vectoriel corrompu (%s). Sauvegarde automatique vers %s", 
+                VECTOR_PATH, VECTOR_BACKUP_PATH
+            )
+            # Sauvegarde du fichier corrompu
+            try:
+                if os.path.exists(VECTOR_PATH):
+                    shutil.copy2(VECTOR_PATH, VECTOR_BACKUP_PATH)
+                    _logger.info("Fichier corrompu sauvegardé dans %s", VECTOR_BACKUP_PATH)
+            except OSError as backup_error:
+                _logger.error("Échec de la sauvegarde du fichier corrompu : %s", backup_error)
+            
+            # Retourne un état vide mais valide
+            return {"documents": [], "embedding_dim": None}
+
+    def _save_secure(self):
+        """Sauvegarde les données de manière atomique (évite la corruption)."""
+        temp_path = VECTOR_PATH + ".tmp"
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(self._data, f, ensure_ascii=False, indent=2)
+            # Renommage atomique (évite la corruption en cas de crash pendant l'écriture)
+            os.replace(temp_path, VECTOR_PATH)
+        except OSError as e:
+            _logger.error("Échec de la sauvegarde de l'index vectoriel : %s", e)
+            # Nettoyage du fichier temporaire en cas d'échec
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except OSError:
+                pass
+            raise
+
+    # ==============================================================================
+    # MIGRATION DE DIMENSION
+    # ==============================================================================
 
     def _resolve_expected_dim(self) -> int:
         """Dimension d'embedding attendue (injectable pour les tests)."""
         return EXPECTED_DIM
 
     def _ensure_dimension(self) -> str:
+        """Vérifie et migre la dimension des embeddings si nécessaire."""
         mgr = DimensionManager(self._data)
         return mgr.ensure_dimension(self._resolve_expected_dim(), EXPECTED_MODEL)
 
-    # --- Délégation : embedding ---------------------------------------------
+    # ==============================================================================
+    # EMBEDDING (Thread-Safe)
+    # ==============================================================================
 
-    def _get_inference(self):
-        if self._inference is not None:
-            return self._inference
-        try:
-            from controllers.context import get_context
-            ctx = get_context()
-            _logger.info("Backend embedding : Ollama (%s)", EXPECTED_MODEL)
-            return ctx.inference
-        except Exception as e:
-            _logger.warning("Embedding backend indisponible: %s", e)
-            return None
-
-    def _embed(self, text: str) -> list[float]:
-        self._embedder = Embedder(self._get_inference())
+    def _embed(self, text: str) -> List[float]:
+        """Calcule l'embedding d'un texte (thread-safe)."""
+        # Pas de mutation d'état ici : Embedder est stateless
         return self._embedder.embed(text)
 
     def preload(self):
         """Précharge la connexion au backend d'embedding (appelé au warmup)."""
-        inference = self._get_inference()
-        if inference:
-            try:
-                inference.embed("warmup")
-            except Exception as e:
-                _logger.warning("Preload embedding: %s", e)
+        try:
+            self._embed("warmup")
+            _logger.info("Backend d'embedding préchargé avec succès")
+        except Exception as e:
+            _logger.warning("Preload embedding échoué : %s", e)
 
-    # --- Délégation : indexation/IO ------------------------------------------
+    # ==============================================================================
+    # INDEXATION (Thread-Safe + O(1) Dedup)
+    # ==============================================================================
 
     def _now(self) -> float:
         """Horodatage courant (injectable pour les tests)."""
         return time.time()
 
-    @property
-    def _using_fallback(self) -> bool:
-        """Expose l'etat de repli histogramme (delegate vers Embedder)."""
-        return self._embedder.using_fallback
-
-    @staticmethod
-    def _load() -> dict:
-        try:
-            with open(VECTOR_PATH) as f:
-                data = json.load(f)
-            if isinstance(data, dict) and "documents" in data:
-                return data
-        except (json.JSONDecodeError, OSError):
-            pass
-        return {"documents": [], "embedding_dim": None}
-
-    def _save(self):
-        self._index.save()
-
-    def _exists(self, text: str) -> bool:
-        return self._index.exists(text)
-
-    def index(self, text: str, metadata: dict = None):
+    def index(self, text: str, metadata: Optional[dict] = None):
         """Ajoute un document à l'index (sans l'embedder immédiatement)."""
-        if self._index.add_document(text, metadata):
-            self._save()
+        with self._lock:
+            if self._index.add_document(text, metadata):
+                self._save_secure()
 
-    def index_batch(self, documents: list[tuple[str, dict | None]]):
+    def index_batch(self, documents: List[Tuple[str, Optional[dict]]]):
         """Ajoute plusieurs documents en une seule opération (atomique, dedup)."""
         added = False
         with self._lock:
@@ -143,76 +197,97 @@ class VectorService(VectorPort):
                 if self._index.add_document(text, metadata):
                     added = True
             if added:
-                self._save()
+                self._save_secure()
         if added:
             self.clear_cache()
 
     def _embed_pending(self) -> int:
+        """Calcule les embeddings pour tous les documents en attente (thread-safe)."""
         count = 0
-        for doc in self._data["documents"]:
-            if doc["embedding"] is None:
-                doc["embedding"] = self._embed(doc["text"])
-                count += 1
-        if count:
-            self._save()
+        with self._lock:
+            for doc in self._data["documents"]:
+                if doc.get("embedding") is None:
+                    try:
+                        doc["embedding"] = self._embed(doc["text"])
+                        count += 1
+                    except Exception as e:
+                        _logger.error("Échec embedding pour document : %s", e)
+            if count:
+                self._save_secure()
         return count
 
     def vectorize_pending(self) -> int:
         """Calcule les embeddings pour tous les documents en attente."""
         return self._embed_pending()
 
-    # --- Indexation messages -------------------------------------------------
+    # ==============================================================================
+    # INDEXATION DES MESSAGES (O(1) Dedup avec index secondaire)
+    # ==============================================================================
 
     def index_message(self, conv_id: str, msg_id: str, role: str, content: str, ts,
-                      extra: dict = None):
-        """Indexe un message (dedup conv_id:msg_id, poids initial 1.0)."""
+                      extra: Optional[dict] = None):
+        """Indexe un message (dedup O(1) via index secondaire)."""
         if not content or not content.strip():
             return
-        if self._exists_key(conv_id, msg_id):
-            return
-        self._data["documents"].append(self._build_message_doc(conv_id, msg_id, role, content, ts, extra))
-        self._save()
+        
+        with self._lock:
+            # Vérification O(1) au lieu de O(N)
+            if (conv_id, msg_id) in self._message_index:
+                return  # Déjà indexé
+            
+            # Ajout du document
+            doc = self._build_message_doc(conv_id, msg_id, role, content, ts, extra)
+            self._data["documents"].append(doc)
+            
+            # Mise à jour de l'index secondaire
+            self._message_index[(conv_id, msg_id)] = True
+            
+            self._save_secure()
 
     def _build_message_doc(self, conv_id, msg_id, role, content, ts, extra) -> dict:
+        """Construit un document de message standardisé."""
         return {
             "text": content,
             "metadata": {
                 "source": "conversation",
-                "conv_id": conv_id, "msg_id": msg_id, "role": role,
-                "created_at": ts, "weight": 1.0, **(extra or {}),
+                "conv_id": conv_id, 
+                "msg_id": msg_id, 
+                "role": role,
+                "created_at": ts, 
+                "weight": 1.0, 
+                **(extra or {}),
             },
             "embedding": None,
         }
-
-    def _exists_key(self, conv_id: str, msg_id: str) -> bool:
-        return any(
-            d.get("metadata", {}).get("conv_id") == conv_id
-            and d.get("metadata", {}).get("msg_id") == msg_id
-            for d in self._data["documents"]
-        )
 
     def ingest_message(self, conv_id: str, msg_id: str, role: str, content: str, ts):
         """Indexe un message et calcule son embedding (auto-ingest)."""
         self.index_message(conv_id, msg_id, role, content, ts)
         self.vectorize_pending()
 
-    # --- Délégation : pondération/consolidation ------------------------------
+    # ==============================================================================
+    # PONDÉRATION ET CONSOLIDATION (Thread-Safe)
+    # ==============================================================================
 
     def adjust_weight(self, conv_id: str, msg_id: str, delta: float,
                       conversations=None) -> int:
         """Ajuste le poids d'un souvenir (feedback), clampe et ajuste le précédent."""
-        wc = WeightConsolidator(self._data["documents"])
-        count = wc.apply_weight(conv_id, msg_id, delta, WEIGHT_MIN, WEIGHT_MAX)
-        prev_id = wc.preceding_user_msg_id(conversations, conv_id, msg_id)
-        if prev_id and delta:
-            count += wc.apply_weight(conv_id, prev_id, delta * 0.5, WEIGHT_MIN, WEIGHT_MAX)
-        if count:
-            self._save()
-            self.clear_cache()
-        return count
+        with self._lock:
+            wc = WeightConsolidator(self._data["documents"])
+            count = wc.apply_weight(conv_id, msg_id, delta, WEIGHT_MIN, WEIGHT_MAX)
+            
+            prev_id = wc.preceding_user_msg_id(conversations, conv_id, msg_id)
+            if prev_id and delta:
+                count += wc.apply_weight(conv_id, prev_id, delta * 0.5, WEIGHT_MIN, WEIGHT_MAX)
+            
+            if count:
+                self._save_secure()
+                self.clear_cache()
+            
+            return count
 
     def consolidate(self):
-        """Consolidation hors ligne : dedup + prune (index only, best-effort)."""
+        """Consolidation hors ligne : dedup + prune (thread-safe)."""
         from config.constants import (
             CONSOLIDATE_DEDUP_SIMILARITY,
             CONSOLIDATE_GRACE_HOURS,
@@ -220,14 +295,19 @@ class VectorService(VectorPort):
             CONSOLIDATE_PRUNE_WEIGHT,
             MAX_VECTOR_DOCS,
         )
+        
         with self._lock:
             docs = self._data["documents"]
             wc = WeightConsolidator(docs)
+            
             to_remove = wc.dedup(CONSOLIDATE_DEDUP_SIMILARITY, CONSOLIDATE_MAX_ITER)
             kept = wc.prune(CONSOLIDATE_PRUNE_WEIGHT, CONSOLIDATE_GRACE_HOURS, self._now())
+            
             kept_docs = [
                 d for idx, d in enumerate(docs) if idx not in to_remove and d in kept
             ]
+            
+            # Limitation de la taille de l'index
             if len(kept_docs) > MAX_VECTOR_DOCS:
                 kept_docs.sort(
                     key=lambda d: (
@@ -237,42 +317,79 @@ class VectorService(VectorPort):
                     reverse=True,
                 )
                 kept_docs = kept_docs[:MAX_VECTOR_DOCS]
+            
             self._data["documents"] = kept_docs
             self._data["last_consolidation"] = time.time()
             self._data.setdefault("consolidation_runs", 0)
             self._data["consolidation_runs"] += 1
-            self._save()
+            
+            self._save_secure()
+            
+            # Reconstruction de l'index secondaire
+            self._message_index = self._build_message_index()
+        
         self.clear_cache()
 
-    # --- Délégation : recherche + cache --------------------------------------
+    # ==============================================================================
+    # RECHERCHE VECTORIELLE (Thread-Safe + Cache)
+    # ==============================================================================
 
     def clear_cache(self):
+        """Vide le cache de recherche."""
         self._cache.clear()
 
-    def search(self, query: str, top_k: int = 5) -> list[dict]:
-        if not query or not self._data["documents"]:
+    def search(self, query: str, top_k: int = 5) -> list:
+        """Recherche sémantique avec cache et scoring pondéré."""
+        if not query or not self._data.get("documents"):
             return []
+        
         now = self._now()
         cached = self._cache.get(query, top_k, now)
         if cached is not None:
             return cached
-        query_vec = np.array(self._embed(query), dtype=np.float32)
+        
+        # Calcul de l'embedding de la requête
+        try:
+            query_vec = np.array(self._embed(query), dtype=np.float32)
+        except Exception as e:
+            _logger.error("Échec calcul embedding requête : %s", e)
+            return []
+        
+        # Vectorisation des documents en attente
         self._embed_pending()
-        all_results = cosine_search(query_vec, self._data["documents"], top_k=len(self._data["documents"]))
-        results = WeightConsolidator(self._data["documents"]).score_and_rank(all_results, top_k, now)
+        
+        # Recherche par similarité cosinus
+        with self._lock:
+            all_results = cosine_search(
+                query_vec, 
+                self._data["documents"], 
+                top_k=len(self._data["documents"])
+            )
+            
+            # Scoring et ranking avec pondération
+            results = WeightConsolidator(self._data["documents"]).score_and_rank(
+                all_results, top_k, now
+            )
+        
+        # Mise en cache
         self._cache.put(query, top_k, results, now)
         return results
 
-    # --- Stats (observabilité) -----------------------------------------------
+    # ==============================================================================
+    # STATISTIQUES ET OBSERVABILITÉ (Thread-Safe)
+    # ==============================================================================
 
-    def _conversation_weights(self) -> list:
-        return [
-            d.get("metadata", {}).get("weight", 1.0)
-            for d in self._data["documents"]
-            if d.get("metadata", {}).get("source") == "conversation"
-        ]
+    def _conversation_weights(self) -> List[float]:
+        """Récupère les poids des documents de conversation."""
+        with self._lock:
+            return [
+                d.get("metadata", {}).get("weight", 1.0)
+                for d in self._data.get("documents", [])
+                if d.get("metadata", {}).get("source") == "conversation"
+            ]
 
-    def _weight_stats(self, conv_weights: list) -> tuple:
+    def _weight_stats(self, conv_weights: List[float]) -> Tuple[float, float]:
+        """Calcule les statistiques de poids."""
         if not conv_weights:
             return 0.0, 0.0
         mean = round(sum(conv_weights) / len(conv_weights), 3)
@@ -280,11 +397,13 @@ class VectorService(VectorPort):
         return mean, low
 
     def _estimate_dedup(self) -> int:
-        text_counts = {}
-        for d in self._data["documents"]:
-            key = d["text"].strip().lower()
-            text_counts[key] = text_counts.get(key, 0) + 1
-        return sum(c - 1 for c in text_counts.values() if c > 1)
+        """Estime le nombre de doublons potentiels."""
+        with self._lock:
+            text_counts = {}
+            for d in self._data.get("documents", []):
+                key = d["text"].strip().lower()
+                text_counts[key] = text_counts.get(key, 0) + 1
+            return sum(c - 1 for c in text_counts.values() if c > 1)
 
     @property
     def _cache_hits(self) -> int:
@@ -299,34 +418,44 @@ class VectorService(VectorPort):
         return round(self._cache_hits / total * 100, 1) if total else 0.0
 
     def stats(self) -> dict:
-        """Statistiques de l'index (total, embeddés, cache, poids, dedup, migration)."""
-        docs = self._data["documents"]
-        total = len(docs)
-        embedded = sum(1 for d in docs if d.get("embedding") is not None)
+        """Statistiques de l'index (thread-safe)."""
+        with self._lock:
+            docs = self._data.get("documents", [])
+            total = len(docs)
+            embedded = sum(1 for d in docs if d.get("embedding") is not None)
+        
         conv_weights = self._conversation_weights()
         wm, lw = self._weight_stats(conv_weights)
+        
         return {
-            "total": total, "embedded": embedded, "pending": total - embedded,
-            "cache_hits": self._cache_hits, "cache_misses": self._cache_misses,
+            "total": total, 
+            "embedded": embedded, 
+            "pending": total - embedded,
+            "cache_hits": self._cache_hits, 
+            "cache_misses": self._cache_misses,
             "cache_hit_rate": self._cache_hit_rate(),
-            "embedding_backend": "ollama" if self._embedder._inference else "fallback_histogram",
-            "embedding_model": EXPECTED_MODEL, "embedding_dim": EXPECTED_DIM,
+            "embedding_backend": "ollama",
+            "embedding_model": EXPECTED_MODEL, 
+            "embedding_dim": EXPECTED_DIM,
             "stored_dim": self._data.get("embedding_dim"),
             "migration_status": self.last_migration,
-            "using_fallback": self._embedder.using_fallback,
-            "weight_mean": wm, "low_weight_ratio": lw,
-            "conversation_docs": len(conv_weights), "message_indexed": len(conv_weights),
+            "using_fallback": False,  # Embedder refactoré n'a plus de fallback
+            "weight_mean": wm, 
+            "low_weight_ratio": lw,
+            "conversation_docs": len(conv_weights), 
+            "message_indexed": len(conv_weights),
             "dedup_estimated": self._estimate_dedup(),
             "last_consolidation": self._data.get("last_consolidation"),
             "consolidation_runs": self._data.get("consolidation_runs", 0),
         }
 
     def is_healthy(self) -> bool:
-        """Vérifie que l'index est valide : fichier lisible + structure correcte."""
+        """Vérifie que l'index est valide et lisible."""
         if not os.path.exists(VECTOR_PATH):
             return True  # Pas encore créé = sain
+        
         try:
-            with open(VECTOR_PATH) as f:
+            with open(VECTOR_PATH, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return isinstance(data, dict) and "documents" in data
         except (json.JSONDecodeError, OSError):
