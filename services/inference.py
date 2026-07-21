@@ -5,14 +5,26 @@ import logging
 from typing import Any
 
 from models import Result
-from ports import InferencePort
+from ports import (
+    ChatPort,
+    EmbeddingPort,
+    ModelRegistryPort,
+    MultimodalPort,
+)
 from services.adapters import AdapterRegistry
 
 _logger = logging.getLogger("jarvis.inference")
 
 
-class InferenceService(InferencePort):
-    """Façade unifiée pour l'inférence LLM (backend unique: Ollama)."""
+class InferenceService(ChatPort, MultimodalPort, EmbeddingPort, ModelRegistryPort):
+    """Façade unifiée pour l'inférence LLM (backend unique: Ollama).
+    
+    Implémente les ports granulaires (ISP) :
+    - ChatPort : génération de texte (query, chat)
+    - MultimodalPort : analyse d'images (query_multimodal)
+    - EmbeddingPort : calcul d'embeddings (embed)
+    - ModelRegistryPort : découverte de modèles (list_models, is_available, etc.)
+    """
 
     def __init__(self) -> None:
         self._registry = AdapterRegistry()
