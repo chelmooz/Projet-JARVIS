@@ -93,7 +93,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _configure_root_logging()
     warn_low_memory()
 
-    # 2. Récupération du contexte (attaché à app.state lors de la création de l'app).
+    # 2. Récupération du contexte.
+    # L'injection dans app.state était prévue (cf. commentaire di.py : "Instance
+    # globale injectée dans app.state par le lifespan") mais n'avait jamais été
+    # écrite → l'app réelle plantait au démarrage (KeyError: 'context'). Corrigé :
+    # on attache le singleton de di.py si ce n'est pas déjà fait (idempotent).
+    # L'initialisation formelle (initialize()) reste déléguée à l'étape 3 ci-dessous.
+    if not hasattr(app.state, "context"):
+        from controllers.di import get_app_context  # import local : évite tout cycle d'import
+        app.state.context = get_app_context()
     ctx = app.state.context
 
     # 3. Initialisation formelle du contexte.
