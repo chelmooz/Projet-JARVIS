@@ -1,7 +1,7 @@
 """Models — Entités métier et DTO (couche M).
 
 Chaque dataclass est une valeur immuable ou une entité identifiée.
-Les invariants sont validés dans __post_init__.
+Les invariants sont validés dans ``__post_init__``.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from typing import Any
 
 class OnError(str, Enum):
     """Stratégie de gestion d'erreur dans un pipeline."""
+
     ABORT = "abort"
     SKIP = "skip"
     RETRY = "retry"
@@ -31,8 +32,9 @@ class OnError(str, Enum):
 class Result:
     """Résultat immuable d'un appel d'inférence.
 
-    Invariant : success=False implique error non-vide.
+    Invariant : ``success=False`` implique ``error`` non-vide.
     """
+
     success: bool
     data: dict[str, Any]
     agent: str
@@ -86,6 +88,7 @@ class Result:
 @dataclass(frozen=True)
 class AgentProfile:
     """Profil statique d'un agent (config, pas d'état runtime)."""
+
     key: str
     name: str
     title: str
@@ -106,6 +109,7 @@ class AgentProfile:
 @dataclass
 class Conversation:
     """Conversation persistante identifiée par id."""
+
     id: str
     title: str = ""
     created_at: datetime = field(
@@ -120,6 +124,7 @@ class Conversation:
 @dataclass(frozen=True)
 class Message:
     """Message immuable au sein d'une conversation."""
+
     role: str
     content: str
     agent: str = ""
@@ -141,6 +146,7 @@ class Message:
 @dataclass(frozen=True)
 class Document:
     """Document indexé pour la recherche vectorielle."""
+
     text: str
     metadata: dict[str, Any] = field(default_factory=dict)
     score: float = 0.0
@@ -157,6 +163,7 @@ class Document:
 @dataclass(frozen=True)
 class PipeStep:
     """Étape élémentaire d'un pipeline."""
+
     name: str
     agent_key: str
     prompt_template: str
@@ -172,6 +179,7 @@ class PipeStep:
 @dataclass(frozen=True)
 class Pipeline:
     """Pipeline séquentiel d'étapes agentiques."""
+
     id: str
     steps: tuple[PipeStep, ...] = ()
     on_error: OnError = OnError.ABORT
@@ -191,6 +199,7 @@ class AgentInput:
 
     Remplace l'ancien Task (fusion KISS).
     """
+
     task: str
     image: str | None = None
     conversation_id: str | None = None
@@ -205,6 +214,7 @@ class AgentInput:
 @dataclass(frozen=True)
 class AgentOutput:
     """DTO de sortie : réponse d'un agent vers l'API."""
+
     response: str
     agent: str
     model: str
