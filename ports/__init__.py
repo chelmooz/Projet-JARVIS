@@ -4,12 +4,11 @@ Chaque port est une interface granulaire (ISP). Les adapters concrets
 (OllamaAdapter, ShimmyAdapter, ...) implémentent un ou plusieurs ports.
 Les services de la couche métier dépendent exclusivement de ces contrats.
 
-NOTE : Les dicts de retour (get_metrics, search, get_habits, etc.) sont
-typés ici comme ``dict[str, Any]``. Cible future : TypedDict ou dataclasses 
-dédiées dans ``models/`` pour chaque contrat de retour, afin de renforcer 
-le typage statique sans impacter la flexibilité actuelle.
+NOTE: Les dicts de retour (get_metrics, search, get_habits, etc.) sont
+non typés pour l'instant. Cible : TypedDict ou dataclasses dédiées dans
+models/ pour chaque contrat de retour. À faire en une passe dédiée car
+cela impacte tous les services implémentant ces ports.
 """
-
 from __future__ import annotations
 
 from typing import Any, Literal, Protocol, runtime_checkable
@@ -22,18 +21,15 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 # ---------------------------------------------------------------------------
 # Logging & Metrics
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class LogPort(Protocol):
     """Contrat pour services/log.py (LogService)."""
-
     def log(self, level: LogLevel, message: str) -> None: ...
 
 
 @runtime_checkable
 class MetricsPort(Protocol):
     """Contrat pour services/metrics.py (MetricsService)."""
-
     def incr_requests(self, endpoint: str = "/api/jarvis") -> None: ...
     def incr_pipeline_run(self) -> None: ...
     def incr_errors(self) -> None: ...
@@ -43,11 +39,9 @@ class MetricsPort(Protocol):
 # ---------------------------------------------------------------------------
 # Inference — découpé en interfaces granulaires (ISP)
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class ChatPort(Protocol):
     """Génération de texte : prompt simple et chat multi-tours."""
-
     def query(self, prompt: str, model: str, system: str | None = None) -> str: ...
     def chat(self, model: str, messages: list[dict[str, Any]]) -> Result: ...
 
@@ -55,21 +49,18 @@ class ChatPort(Protocol):
 @runtime_checkable
 class MultimodalPort(Protocol):
     """Analyse d'images (llama3.2-vision, etc.)."""
-
     def query_multimodal(self, model: str, prompt: str, image_base64: str) -> dict[str, Any]: ...
 
 
 @runtime_checkable
 class EmbeddingPort(Protocol):
     """Calcul d'embeddings vectoriels (nomic-embed-text, etc.)."""
-
     def embed(self, text: str, model: str | None = None) -> list[float]: ...
 
 
 @runtime_checkable
 class ModelRegistryPort(Protocol):
     """Découverte et disponibilité des modèles locaux."""
-
     def list_models(self) -> list[str]: ...
     def is_available(self, model: str) -> bool: ...
     def first_available(self) -> str | None: ...
@@ -78,13 +69,22 @@ class ModelRegistryPort(Protocol):
 
 
 # ---------------------------------------------------------------------------
+# Compat ascendante (deprecated — utiliser les ports granulaires ci-dessus)
+# ---------------------------------------------------------------------------
+class InferencePort(ChatPort, MultimodalPort, EmbeddingPort, ModelRegistryPort, Protocol):
+    """Alias legacy : union des 4 ports granulaires d'inférence.
+
+    Conservé pour les tests et imports existants (test_embed_contract_aligned.py,
+    services/inference.py). Ne pas utiliser dans le nouveau code.
+    """
+
+
+# ---------------------------------------------------------------------------
 # Vector store
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class VectorPort(Protocol):
     """Contrat pour services/vector.py (VectorService)."""
-
     def index(self, text: str, metadata: dict[str, Any] | None = None) -> None: ...
     def index_batch(self, documents: list[tuple[str, dict[str, Any] | None]]) -> None: ...
     def vectorize_pending(self) -> int: ...
@@ -97,11 +97,9 @@ class VectorPort(Protocol):
 # ---------------------------------------------------------------------------
 # Memory (habitudes utilisateur)
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class HabitPort(Protocol):
     """Contrat pour services/memory.py (MemoryService) — habitudes utilisateur."""
-
     def get_habits(self, limit: int = 10) -> list[dict[str, Any]]: ...
     def update_habits(self, entry: dict[str, Any]) -> None: ...
     def is_healthy(self) -> bool: ...
@@ -110,11 +108,9 @@ class HabitPort(Protocol):
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class AnalyticsPort(Protocol):
     """Contrat pour services/analytics.py (AnalyticsService)."""
-
     def track_query(
         self,
         agent: str,
@@ -131,11 +127,9 @@ class AnalyticsPort(Protocol):
 # ---------------------------------------------------------------------------
 # Conversations
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class ConversationPort(Protocol):
     """Contrat pour services/conversation.py (ConversationService)."""
-
     def create(self, title: str = "Nouvelle conversation") -> str: ...
     def add_message(
         self,
@@ -155,14 +149,10 @@ class ConversationPort(Protocol):
 
 # ---------------------------------------------------------------------------
 # File access (autorisation granulaire par dossier)
-# NOTE : Nommé FilePort pour compat. Cible : FileAccessPort pour refléter
-# que c'est un port d'autorisation, pas de lecture/écriture directe.
 # ---------------------------------------------------------------------------
-
 @runtime_checkable
 class FilePort(Protocol):
     """Contrat pour le contrôle d'accès aux fichiers locaux."""
-
     def authorize(self, path: str) -> bool: ...
     def is_authorized(self, path: str) -> bool: ...
     def list_authorized(self) -> list[str]: ...
@@ -172,7 +162,6 @@ class FilePort(Protocol):
 # ---------------------------------------------------------------------------
 # Exports
 # ---------------------------------------------------------------------------
-
 __all__ = [
     "LogLevel",
     "LogPort",
@@ -181,6 +170,7 @@ __all__ = [
     "MultimodalPort",
     "EmbeddingPort",
     "ModelRegistryPort",
+    "InferencePort",
     "VectorPort",
     "HabitPort",
     "AnalyticsPort",
