@@ -1,4 +1,3 @@
-# controllers/context.py
 """Context & Dependency Injection — Point d'assemblage propre de l'application.
 
 Refacto SOLID / FastAPI Best Practices :
@@ -8,7 +7,6 @@ Refacto SOLID / FastAPI Best Practices :
 """
 from __future__ import annotations
 
-import os
 import types
 from typing import Any
 
@@ -48,11 +46,9 @@ def build_app() -> FastAPI:
 # ==============================================================================
 def get_app_context(request: Request) -> AppContext:
     """Dépendance principale : retourne le contexte de l'application."""
-    # Le lifespan de l'app est responsable d'initialiser et d'attacher ceci à app.state
     return request.app.state.context
 
 
-# Helpers pour une injection granulaire (recommandé pour le TDD et la clarté)
 def get_inference_service(context: AppContext = Depends(get_app_context)) -> Any:
     """Injecte le service d'inférence."""
     return context.inference
@@ -105,6 +101,16 @@ def _ctx() -> types.SimpleNamespace:
     return ctx
 
 
+def _sync_module_globals(context: Any = None) -> None:
+    """Stub no-op pour test_api.py / test_response_wrapper.py.
+    
+    Anciennement : synchronisait les globales de module (analytics, conversations, etc.)
+    depuis le contexte. Supprimé lors du refacto (injection via app.state).
+    Conservé comme no-op pour ne pas casser la collection des tests legacy.
+    """
+    pass
+
+
 __all__ = [
     "build_app",
     "get_app_context",
@@ -113,4 +119,7 @@ __all__ = [
     "get_vector_service",
     "get_agents_registry",
     "get_orchestrator",
+    "_check_ollama",
+    "_ctx",
+    "_sync_module_globals",
 ]
