@@ -2,6 +2,11 @@
 
 Chemins délégués à config.paths (compat ascendante via alias PROJECT_DIR).
 Toutes les constantes sont immuables au niveau module.
+
+NOTE: Ce module est une façade. Les constantes sont regroupées par domaine
+mais restent dans un seul fichier pour éviter de casser les imports existants.
+À terme, découper en config/limits.py, config/backend.py, config/feedback.py,
+config/launcher.py, config/runtime.py avec ré-exports ici.
 """
 
 from __future__ import annotations
@@ -50,7 +55,6 @@ OLLAMA_VERSION: Final[str] = "0.30.10"  # Version pinnée pour déterminisme.
 # Mémoire auto-améliorante (feedback)
 # ---------------------------------------------------------------------------
 
-# Poids implicites des signaux (immuable — utiliser MappingProxyType).
 FEEDBACK_WEIGHTS: Final[MappingProxyType[str, float]] = MappingProxyType({
     "copy": 0.3,
     "edit": 0.5,
@@ -63,7 +67,8 @@ WEIGHT_MIN: Final[float] = -5.0
 WEIGHT_MAX: Final[float] = 5.0
 RECENCY_DECAY: Final[float] = 0.05  # Perte 5 % par heure, plancher 0.5 après ~10h.
 
-assert WEIGHT_MIN < WEIGHT_MAX, "WEIGHT_MIN must be < WEIGHT_MAX"
+if not (WEIGHT_MIN < WEIGHT_MAX):
+    raise ValueError(f"WEIGHT_MIN ({WEIGHT_MIN}) must be < WEIGHT_MAX ({WEIGHT_MAX})")
 
 # ---------------------------------------------------------------------------
 # Consolidation hors ligne
@@ -96,6 +101,7 @@ LAUNCHER_DOWNLOAD_TIMEOUT: Final[int] = 600  # Binaires 300-600 Mo.
 # Helpers de parsing d'environnement (validation + fallback)
 # ---------------------------------------------------------------------------
 
+
 def _get_env_int(key: str, default: int) -> int:
     """Lit une variable d'env entière avec fallback gracieux."""
     raw = os.environ.get(key, "")
@@ -122,6 +128,8 @@ def _get_env_str(key: str, default: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Runtime (surchargeable via .env ou variables système)
+# NOTE: Ces valeurs sont figées au premier import. Pour un rechargement
+# à chaud, utiliser config.reload() ou redémarrer le processus.
 # ---------------------------------------------------------------------------
 
 JARVIS_PORT: Final[int] = _get_env_int("JARVIS_PORT", 8000)
