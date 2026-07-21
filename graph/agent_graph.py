@@ -37,23 +37,17 @@ class AgentGraph:
         model_provider: ModelRegistryPort,
         memory: HabitPort,
         vector_store: VectorPort,
-        toolbox: object,
-        agents: dict[str, object],
-        router: object,
-        pipeline: object,
-        conversations: ConversationPort,
-        agent_supervisor: object,
+        toolbox: object = None,
+        agents: dict[str, object] | None = None,
+        router: object = None,
+        pipeline: object = None,
+        conversations: ConversationPort | None = None,
+        agent_supervisor: object = None,
     ) -> None:
         required = {
             "model_provider": model_provider,
             "memory": memory,
             "vector_store": vector_store,
-            "toolbox": toolbox,
-            "agents": agents,
-            "router": router,
-            "pipeline": pipeline,
-            "conversations": conversations,
-            "agent_supervisor": agent_supervisor,
         }
         missing = [k for k, v in required.items() if v is None]
         if missing:
@@ -63,18 +57,14 @@ class AgentGraph:
         self.memory = memory
         self.vector_store = vector_store
         self.toolbox = toolbox
-        self.agents = agents
+        self.agents = agents or {}
         self.router = router
-        self.pipeline = pipeline  # Injecté pour compat. Non utilisé dans run().
-        self.conversations = conversations  # Injecté pour compat. Non utilisé dans run().
+        self.pipeline = pipeline
+        self.conversations = conversations
         self.agent_supervisor = agent_supervisor
 
     def _run_agent_step(self, agent_key: str, prompt: str, model: str | None = None) -> str:
-        """Exécute une étape de pipeline via un agent. Retourne la réponse textuelle.
-
-        NOTE: Méthode conservée pour compat avec d'éventuels appels externes
-        (tests, pipelines custom). Non utilisée dans run() standard.
-        """
+        """Exécute une étape de pipeline via un agent. Retourne la réponse textuelle."""
         agent = self.agents.get(agent_key)
         if not agent:
             raise ValueError(f"Agent '{agent_key}' introuvable dans le registre")
@@ -89,14 +79,7 @@ class AgentGraph:
         return result.get("response", "")
 
     def run(self, task: str, image: str | None = None, conversation_id: str | None = None) -> dict[str, Any]:
-        """Exécute une tâche JARVIS complète (5 étapes séquentielles).
-
-        Les exceptions ne sont pas capturées ici. Elles remontent à OrchestratorService
-        qui gérera le fallback métier de manière explicite.
-
-        NOTE: `state` est un dict mutable partagé entre les steps. Cible :
-        dataclass `PipelineState` dans models/ pour typer le contrat d'état.
-        """
+        """Exécute une tâche JARVIS complète (5 étapes séquentielles)."""
         state: dict[str, Any] = {
             "task": task,
             "conversation_id": conversation_id,
@@ -124,12 +107,12 @@ def create_agent_graph(
     model_provider: Any,
     memory: Any,
     vector_store: Any,
-    toolbox: Any,
-    agents: dict[str, object],
-    router: Any,
-    pipeline: Any,
-    conversations: Any,
-    agent_supervisor: Any,
+    toolbox: Any = None,
+    agents: dict[str, object] | None = None,
+    router: Any = None,
+    pipeline: Any = None,
+    conversations: Any = None,
+    agent_supervisor: Any = None,
 ) -> AgentGraph:
     """Factory pour créer un AgentGraph avec toutes ses dépendances (DIP)."""
     return AgentGraph(
