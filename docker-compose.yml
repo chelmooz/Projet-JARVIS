@@ -1,37 +1,65 @@
 version: '3.8'
 
 services:
+  # Moteur d'inférence local (remplace l'installation manuelle d'Ollama)
   ollama:
     image: ollama/ollama:latest
     container_name: jarvis_ollama
     ports:
-      - "11434:11434"
+      - "11436:11434" # On mappe le port interne 11434 vers 11436 pour respecter la config JARVIS
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia # Optionnel : décommenter pour accélération GPU
+              count: 1
+              capabilities: [gpu]
 
+  # Application JARVIS (remplace le venv portable et les hacks exFAT)
   jarvis:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: jarvis_api
     ports:
       - "8000:8000"
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://ollama:11434 # Communication interne au réseau Docker
       - PYTHONUNBUFFERED=1
+      - JARVIS_ENV=production
     depends_on:
       ollama:
         condition: service_healthy
     restart: unless-stopped
     volumes:
-      # Optionnel : pour le dev local, monte le code source
-      # - .:/app
+      # Monte le code en dev pour le rechargement à chaud, à retirer en prod
+      - .:/app
       - jarvis_data:/app/data
 
+  # Interface Web Optionnelle (OpenWebUI)
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: jarvis_openwebui
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    profiles:
+      - ui # Lancez avec 'docker compose --profile ui up' pour l'activer
+
 volumes:
-  ollama_data:
-  jarvis_data:
+  ollama_models: # Persistance des modèles GGUF (plus de soucis de taille exFAT)
+  jarvis_data:   # Persistance des conversations et configurations
