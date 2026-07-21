@@ -1,11 +1,4 @@
-"""Pipeline Steps — Étapes unitaires de l'orchestration séquentielle.
-
-Chaque fonction prend un state dict et retourne le state dict muté.
-C'est le pattern "pipeline" : state in → state out.
-
-NOTE: Le state est un dict mutable partagé. Cible : dataclass PipelineState
-dans models/ pour typer le contrat d'état et éviter les erreurs de clés.
-"""
+"""Pipeline Steps — Étapes unitaires de l'orchestration séquentielle."""
 from __future__ import annotations
 
 import logging
@@ -15,10 +8,6 @@ _logger = logging.getLogger("jarvis.pipeline_steps")
 
 
 def select_agent(state: dict[str, Any], router: Any) -> dict[str, Any]:
-    """Sélectionne l'agent cible (vision si image, sinon via le routeur).
-
-    Si router est None (tests, mode dégradé), fallback sur 'dev'.
-    """
     if state.get("image"):
         state["agent_key"] = "vision"
     elif router is not None:
@@ -29,10 +18,6 @@ def select_agent(state: dict[str, Any], router: Any) -> dict[str, Any]:
 
 
 def select_model(agent_key: str, model: str | None, provider: Any) -> str:
-    """Sélectionne le modèle pour un agent (résolution via le provider).
-
-    Défensif : utilise getattr pour tolérer les providers incomplets (tests).
-    """
     if model:
         return model
     resolve = getattr(provider, "resolve_model", None)
@@ -48,16 +33,8 @@ def select_model(agent_key: str, model: str | None, provider: Any) -> str:
     raise RuntimeError(f"Aucun modèle disponible pour l'agent '{agent_key}'")
 
 
-def retrieve_context(
-    state: dict[str, Any],
-    memory: Any,
-    vector_store: Any,
-    provider: Any,
-) -> dict[str, Any]:
-    """Récupère le contexte (mémoire + recherche vectorielle)."""
+def retrieve_context(state: dict[str, Any], memory: Any, vector_store: Any, provider: Any) -> dict[str, Any]:
     context: dict[str, Any] = {}
-
-    # Mémoire (habitudes utilisateur)
     if memory is not None:
         try:
             habits = memory.get_habits(limit=5)
@@ -65,8 +42,6 @@ def retrieve_context(
                 context["habits"] = habits
         except Exception as e:
             _logger.debug("Mémoire indisponible : %s", e)
-
-    # Recherche vectorielle
     if vector_store is not None:
         try:
             results = vector_store.search(state.get("task", ""), top_k=3)
@@ -74,38 +49,24 @@ def retrieve_context(
                 context["vector_results"] = results
         except Exception as e:
             _logger.debug("Vector store indisponible : %s", e)
-
     state["context"] = context
     return state
 
 
-def query_model(
-    state: dict[str, Any],
-    provider: Any,
-    agents: dict[str, object],
-    toolbox: Any,
-    model_selector: Any,
-) -> dict[str, Any]:
-    """Exécute la requête via l'agent sélectionné."""
+def query_model(state: dict[str, Any], provider: Any, agents: dict[str, object], toolbox: Any, model_selector: Any) -> dict[str, Any]:
     agent_key = state.get("agent_key", "dev")
     agent = agents.get(agent_key)
-
     if agent is None:
         state["error"] = f"Agent '{agent_key}' introuvable"
         state["response"] = f"Désolé, l'agent '{agent_key}' n'est pas disponible."
         return state
-
     model = model_selector(agent_key, state.get("model"), provider)
-
-    # Construction du prompt avec contexte
     task = state.get("task", "")
     context = state.get("context", {})
     prompt = task
     if context:
         context_str = "\n".join(f"- {k}: {v}" for k, v in context.items())
         prompt = f"Contexte:\n{context_str}\n\nTâche: {task}"
-
-    # Exécution via l'agent
     try:
         if hasattr(agent, "run"):
             result = agent.run(prompt, model=model)
@@ -113,7 +74,6 @@ def query_model(
             result = agent.query(prompt, model=model)
         else:
             result = {"response": str(agent)}
-
         if isinstance(result, dict):
             state["response"] = result.get("response", str(result))
             state["suggested_skill"] = result.get("suggested_skill")
@@ -121,39 +81,25 @@ def query_model(
         else:
             state["response"] = str(result)
     except Exception as e:
-        _logger.error("Erreur lors de l'exécution de l'agent '%s' : %s", agent_key, e)
+        _logger.error("Erreur agent '%s' : %s", agent_key, e)
         state["error"] = str(e)
         state["response"] = f"Une erreur est survenue : {e}"
-
     return state
 
 
-def save_results(
-    state: dict[str, Any],
-    memory: Any,
-    vector_store: Any,
-) -> dict[str, Any]:
-    """Sauvegarde les résultats (mémoire + indexation vectorielle)."""
+def save_results(state: dict[str, Any], memory: Any, vector_store: Any) -> dict[str, Any]:
     response = state.get("response", "")
     if not response:
         return state
-
-    # Indexation vectorielle (best-effort)
     if vector_store is not None:
         try:
             vector_store.index(response, metadata={"source": "agent_response"})
         except Exception as e:
             _logger.debug("Indexation vectorielle échouée : %s", e)
-
     return state
 
 
 def format_output(state: dict[str, Any]) -> dict[str, Any]:
-    """Formate la sortie finale du pipeline.
-
-    Contrat de retour (vérifié par test_agent_graph.py) :
-    response, agent, model, backend, error, suggested_skill, context.
-    """
     return {
         "response": state.get("response", ""),
         "agent": state.get("agent_key", ""),
