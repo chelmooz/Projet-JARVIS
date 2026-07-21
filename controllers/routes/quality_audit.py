@@ -1,34 +1,46 @@
 """Route API — Audit Qualité : inspection complète du projet."""
+
+from __future__ import annotations
+
 import threading
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends
 
+from controllers.responses import fail, ok
 from services.analysis import QualityAuditor
 
 router = APIRouter()
-_auditor = QualityAuditor()
+
 _audit_lock = threading.Lock()
 
 
+def get_auditor() -> QualityAuditor:
+    """Dépendance : fournit une instance de l'auditeur qualité."""
+    return QualityAuditor()
+
+
+def _execute_audit(auditor: QualityAuditor):
+    """Exécute l'audit avec un verrou non-bloquant."""
+    if not _audit_lock.acquire(blocking=False):
+        return fail("Audit déjà en cours", status_code=409)
+    try:
+        report = auditor.audit()
+        report["success"] = True
+        return ok(report)
+    finally:
+        _audit_lock.release()
+
+
 @router.get("/api/quality-audit")
-def run_audit():
-    # Laisse sync : audit complet (lecture disque + analyse, I/O/CPU bloquant).
+def run_audit(auditor: QualityAuditor = Depends(get_auditor)):
     """Compat: audit complet du projet via GET."""
-    return run_audit_post()
+    return _execute_audit(auditor)
 
 
 @router.post("/api/quality-audit")
-def run_audit_post():
+def run_audit_post(auditor: QualityAuditor = Depends(get_auditor)):
     """Audit complet du projet : code quality, tests, structure, documentation."""
-    if not _audit_lock.acquire(blocking=False):
-        return JSONResponse(
-            {"success": False, "error": "Audit deja en cours"},
-            status_code=409,
-        )
-    try:
-        report = _auditor.audit()
-    finally:
-        _audit_lock.release()
-    report["success"] = True
-    return report
+    return _execute_audit(auditor)
+
+
+__all__ = ["router"]
