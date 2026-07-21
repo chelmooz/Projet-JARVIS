@@ -1,102 +1,149 @@
-"""Constantes partagées — Limites, version, backend par défaut.
+"""Constantes partagées — Limites, version, backend, feedback, launcher.
 
-Chemins : délégués à config.paths (compat ascendante via alias PROJECT_DIR).
+Chemins délégués à config.paths (compat ascendante via alias PROJECT_DIR).
+Toutes les constantes sont immuables au niveau module.
 """
+
+from __future__ import annotations
+
 import os
+from types import MappingProxyType
+from typing import Final
 
 from config.paths import CONFIG_DIR, LOGS_DIR, MEMORY_DIR, ROOT, STATIC_DIR
 
-PROJECT_DIR = ROOT
-VERSION = "5.4"
+# ---------------------------------------------------------------------------
+# Compat ascendante (deprecated — utiliser config.paths.ROOT directement)
+# ---------------------------------------------------------------------------
 
-# --- Limites ---
-MAX_HABITS = 200         # Nombre max d'entrées d'habitudes
-MAX_LOG_ENTRIES = 500    # Nombre max d'entrées dans le fichier de log
-MAX_QUERIES = 1000       # Nombre max de requêtes trackées dans analytics
-MAX_VECTOR_CACHE = 32    # Taille du cache LRU des recherches vectorielles
-MAX_BODY_SIZE = 10 * 1024 * 1024  # Taille max du body HTTP (10 Mo)
-MAX_CONVERSATION_MESSAGES = 200  # Garde les 200 derniers messages par conversation
-                                 # (fenetre glissante : evite un JSON qui grossit
-                                 # indéfiniment sur cle USB lente).
-AGENT_TIMEOUT_SECONDS = 120    # Garde-fou wall-clock par agent (prompt+toolbox+LLM)
+PROJECT_DIR: Final = ROOT  # Alias legacy, ne pas utiliser dans le nouveau code.
 
-# --- Backend par défaut ---
-DEFAULT_MODEL = "qwen2.5:7b"
-DEFAULT_BACKEND = "ollama"
+# ---------------------------------------------------------------------------
+# Version
+# ---------------------------------------------------------------------------
 
-# --- Mémoire auto-améliorante (feedback) ---
-# Poids implicites des signaux (externes, ajustables sans toucher au code métier).
-FEEDBACK_WEIGHTS = {
-    "copy": 0.3,           # l'utilisateur réutilise la réponse
-    "edit": 0.5,           # l'utilisateur édite/adapte la réponse
-    "revisit": 0.05,        # relecture d'une conversation (engagement faible)
-    "regenerate": -0.3,     # l'utilisateur demande une autre réponse
-    "delete_conv": -1.0,    # suppression de la conversation (signal fort négatif)
-}
-# Borne de clamp du poids d'un souvenir vectoriel.
-WEIGHT_MIN = -5.0
-WEIGHT_MAX = 5.0
-# Décroissance de la récence dans la recherche pondérée (Étape 4).
-# recency_factor = max(0.5, 1.0 - RECENCY_DECAY * age_hours)
-# → perte 5 % par heure, plancher 0.5 après ~10h. Ajustable sans toucher au code métier.
-RECENCY_DECAY = 0.05
+VERSION: Final[str] = "5.4"
 
-# --- Consolidation hors ligne (Étape 5) ---
-# Seuil de similarité cosinus pour considérer deux embeddings comme quasi-identiques.
-CONSOLIDATE_DEDUP_SIMILARITY = 0.98
-# Seuil de poids en dessous duquel un souvenir est éligible à la purge.
-CONSOLIDATE_PRUNE_WEIGHT = -2.0
-# Délai de grâce (heures) avant qu'un souvenir à poids bas ne soit purgé.
-CONSOLIDATE_GRACE_HOURS = 720  # 30 jours
-# Nombre max d'itérations (garde-fou O(n²) time-box).
-CONSOLIDATE_MAX_ITER = 1000
-# Nombre maximum de documents conservés dans l'index vectoriel. Au-delà,
-# consolidate() purge les moins pertinents (poids puis ancienneté) pour borner
-# la taille du store sur clef USB et éviter une croissance infinie.
-MAX_VECTOR_DOCS = 5000
-# Nombre maximum de resultats retournes par find_files (evite de scanner/
-# retourner des millions d'entrees sur une clef USB).
-MAX_FIND_FILES = 1000
+# ---------------------------------------------------------------------------
+# Limites métier
+# ---------------------------------------------------------------------------
 
-# --- Launcher timeouts ---
-LAUNCHER_KILL_DELAY = 1
-LAUNCHER_PORT_POLL_MAX = 10  # Nombre max de tentatives pour verifier si le port est libre
-LAUNCHER_PORT_POLL_SLEEP = 0.5  # Delai entre chaque tentative (secondes)
-LAUNCHER_START_DELAY = 2
-LAUNCHER_PROCESS_WAIT = 3
-LAUNCHER_MONITOR_SLEEP = 1
-LAUNCHER_RESTART_DELAY = 3
-LAUNCHER_POLL_SLEEP = 1
-LAUNCHER_URLOPEN_TIMEOUT = 2
-LAUNCHER_PIP_TIMEOUT = 10
-LAUNCHER_INSTALL_TIMEOUT = 60
-LAUNCHER_WAIT_TIMEOUT = 120
-LAUNCHER_DOWNLOAD_TIMEOUT = 600  # Augmente a 600s pour binaires 300-600 Mo (audit D10)
+MAX_HABITS: Final[int] = 200
+MAX_LOG_ENTRIES: Final[int] = 500
+MAX_QUERIES: Final[int] = 1000
+MAX_VECTOR_CACHE: Final[int] = 32
+MAX_BODY_SIZE: Final[int] = 10 * 1024 * 1024  # 10 Mo
+MAX_CONVERSATION_MESSAGES: Final[int] = 200  # Fenêtre glissante par conversation.
+AGENT_TIMEOUT_SECONDS: Final[int] = 120  # Garde-fou wall-clock par agent.
+MAX_VECTOR_DOCS: Final[int] = 5000  # Borne de l'index vectoriel sur clef USB.
+MAX_FIND_FILES: Final[int] = 1000  # Borne des résultats de find_files.
 
-# --- Ollama version (pingee pour determinisme) ---
-OLLAMA_VERSION = "0.30.10"  # Version connue stable, evite 'latest' non deterministe
+# ---------------------------------------------------------------------------
+# Backend par défaut
+# ---------------------------------------------------------------------------
 
-# --- Environnement (surchargeable via .env ou variables système) ---
-JARVIS_PORT = int(os.environ.get("JARVIS_PORT", "8000"))
-JARVIS_LOG_LEVEL = os.environ.get("JARVIS_LOG_LEVEL", "INFO").upper()
-JARVIS_DEV = os.environ.get("JARVIS_DEV", "").lower() in ("1", "true", "yes")
-# Profil low I/O / low VRAM : reduit les acces disque (cache vectoriel plus petit,
-# moins de resultats par defaut) pour les machines sur cle USB lente ou peu de RAM.
-JARVIS_LOW_IO = os.environ.get("JARVIS_LOW_IO", "").lower() in ("1", "true", "yes")
+DEFAULT_MODEL: Final[str] = "qwen2.5:7b"
+DEFAULT_BACKEND: Final[str] = "ollama"
+OLLAMA_VERSION: Final[str] = "0.30.10"  # Version pinnée pour déterminisme.
 
-# --- CORS ---
-CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "http://localhost:3000")
+# ---------------------------------------------------------------------------
+# Mémoire auto-améliorante (feedback)
+# ---------------------------------------------------------------------------
 
-# Tailles de cache adaptees au profil
-VECTOR_CACHE_SIZE_NORMAL = MAX_VECTOR_CACHE
-VECTOR_CACHE_SIZE_LOW = 8
+# Poids implicites des signaux (immuable — utiliser MappingProxyType).
+FEEDBACK_WEIGHTS: Final[MappingProxyType[str, float]] = MappingProxyType({
+    "copy": 0.3,
+    "edit": 0.5,
+    "revisit": 0.05,
+    "regenerate": -0.3,
+    "delete_conv": -1.0,
+})
 
-DEFAULT_TOP_K = 5
-DEFAULT_TOP_K_LOW = 3
+WEIGHT_MIN: Final[float] = -5.0
+WEIGHT_MAX: Final[float] = 5.0
+RECENCY_DECAY: Final[float] = 0.05  # Perte 5 % par heure, plancher 0.5 après ~10h.
 
-# --- Intervalles de rafraichissement ---
-REFRESH_INTERVAL = 30  # secondes entre chaque refresh du cache de statut
-WARMUP_DELAY = 5  # secondes de delai avant le warmup
+assert WEIGHT_MIN < WEIGHT_MAX, "WEIGHT_MIN must be < WEIGHT_MAX"
+
+# ---------------------------------------------------------------------------
+# Consolidation hors ligne
+# ---------------------------------------------------------------------------
+
+CONSOLIDATE_DEDUP_SIMILARITY: Final[float] = 0.98
+CONSOLIDATE_PRUNE_WEIGHT: Final[float] = -2.0
+CONSOLIDATE_GRACE_HOURS: Final[int] = 720  # 30 jours.
+CONSOLIDATE_MAX_ITER: Final[int] = 1000  # Garde-fou O(n²) time-box.
+
+# ---------------------------------------------------------------------------
+# Launcher timeouts (infrastructure)
+# ---------------------------------------------------------------------------
+
+LAUNCHER_KILL_DELAY: Final[int] = 1
+LAUNCHER_PORT_POLL_MAX: Final[int] = 10
+LAUNCHER_PORT_POLL_SLEEP: Final[float] = 0.5
+LAUNCHER_START_DELAY: Final[int] = 2
+LAUNCHER_PROCESS_WAIT: Final[int] = 3
+LAUNCHER_MONITOR_SLEEP: Final[int] = 1
+LAUNCHER_RESTART_DELAY: Final[int] = 3
+LAUNCHER_POLL_SLEEP: Final[int] = 1
+LAUNCHER_URLOPEN_TIMEOUT: Final[int] = 2
+LAUNCHER_PIP_TIMEOUT: Final[int] = 10
+LAUNCHER_INSTALL_TIMEOUT: Final[int] = 60
+LAUNCHER_WAIT_TIMEOUT: Final[int] = 120
+LAUNCHER_DOWNLOAD_TIMEOUT: Final[int] = 600  # Binaires 300-600 Mo.
+
+# ---------------------------------------------------------------------------
+# Helpers de parsing d'environnement (validation + fallback)
+# ---------------------------------------------------------------------------
+
+def _get_env_int(key: str, default: int) -> int:
+    """Lit une variable d'env entière avec fallback gracieux."""
+    raw = os.environ.get(key, "")
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _get_env_bool(key: str, default: bool = False) -> bool:
+    """Lit une variable d'env booléenne (1/true/yes → True)."""
+    raw = os.environ.get(key, "").lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes")
+
+
+def _get_env_str(key: str, default: str) -> str:
+    """Lit une variable d'env string avec fallback."""
+    return os.environ.get(key, default) or default
+
+
+# ---------------------------------------------------------------------------
+# Runtime (surchargeable via .env ou variables système)
+# ---------------------------------------------------------------------------
+
+JARVIS_PORT: Final[int] = _get_env_int("JARVIS_PORT", 8000)
+JARVIS_LOG_LEVEL: Final[str] = _get_env_str("JARVIS_LOG_LEVEL", "INFO").upper()
+JARVIS_DEV: Final[bool] = _get_env_bool("JARVIS_DEV", False)
+JARVIS_LOW_IO: Final[bool] = _get_env_bool("JARVIS_LOW_IO", False)
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
+CORS_ORIGIN: Final[str] = _get_env_str("CORS_ORIGIN", "http://localhost:3000")
+
+# ---------------------------------------------------------------------------
+# Cache & Recherche (profil low I/O)
+# ---------------------------------------------------------------------------
+
+VECTOR_CACHE_SIZE_NORMAL: Final[int] = MAX_VECTOR_CACHE
+VECTOR_CACHE_SIZE_LOW: Final[int] = 8
+
+DEFAULT_TOP_K: Final[int] = 5
+DEFAULT_TOP_K_LOW: Final[int] = 3
 
 
 def vector_cache_size() -> int:
@@ -105,16 +152,32 @@ def vector_cache_size() -> int:
 
 
 def default_top_k() -> int:
-    """Top-k de recherche par defaut selon le profil."""
+    """Top-k de recherche par défaut selon le profil."""
     return DEFAULT_TOP_K_LOW if JARVIS_LOW_IO else DEFAULT_TOP_K
 
+
+# ---------------------------------------------------------------------------
+# Intervalles de rafraîchissement
+# ---------------------------------------------------------------------------
+
+REFRESH_INTERVAL: Final[int] = 30  # Secondes entre chaque refresh du cache de statut.
+WARMUP_DELAY: Final[int] = 5  # Secondes de délai avant le warmup.
+
+# ---------------------------------------------------------------------------
+# Exports
+# ---------------------------------------------------------------------------
+
 __all__ = [
+    # Compat
     "PROJECT_DIR",
-    "STATIC_DIR",
+    # Chemins (ré-export depuis config.paths)
     "CONFIG_DIR",
-    "MEMORY_DIR",
     "LOGS_DIR",
+    "MEMORY_DIR",
+    "STATIC_DIR",
+    # Version
     "VERSION",
+    # Limites
     "MAX_HABITS",
     "MAX_LOG_ENTRIES",
     "MAX_QUERIES",
@@ -122,31 +185,26 @@ __all__ = [
     "MAX_BODY_SIZE",
     "MAX_CONVERSATION_MESSAGES",
     "AGENT_TIMEOUT_SECONDS",
+    "MAX_VECTOR_DOCS",
+    "MAX_FIND_FILES",
+    # Backend
     "DEFAULT_MODEL",
     "DEFAULT_BACKEND",
+    "OLLAMA_VERSION",
+    # Feedback
     "FEEDBACK_WEIGHTS",
     "WEIGHT_MIN",
     "WEIGHT_MAX",
     "RECENCY_DECAY",
+    # Consolidation
     "CONSOLIDATE_DEDUP_SIMILARITY",
     "CONSOLIDATE_PRUNE_WEIGHT",
     "CONSOLIDATE_GRACE_HOURS",
     "CONSOLIDATE_MAX_ITER",
-    "MAX_VECTOR_DOCS",
-    "MAX_FIND_FILES",
-    "JARVIS_PORT",
-    "JARVIS_LOG_LEVEL",
-    "JARVIS_DEV",
-    "JARVIS_LOW_IO",
-    "CORS_ORIGIN",
-    "VECTOR_CACHE_SIZE_LOW",
-    "DEFAULT_TOP_K",
-    "DEFAULT_TOP_K_LOW",
-    "REFRESH_INTERVAL",
-    "WARMUP_DELAY",
-    "vector_cache_size",
-    "default_top_k",
+    # Launcher
     "LAUNCHER_KILL_DELAY",
+    "LAUNCHER_PORT_POLL_MAX",
+    "LAUNCHER_PORT_POLL_SLEEP",
     "LAUNCHER_START_DELAY",
     "LAUNCHER_PROCESS_WAIT",
     "LAUNCHER_MONITOR_SLEEP",
@@ -157,8 +215,21 @@ __all__ = [
     "LAUNCHER_INSTALL_TIMEOUT",
     "LAUNCHER_WAIT_TIMEOUT",
     "LAUNCHER_DOWNLOAD_TIMEOUT",
-    "OLLAMA_VERSION",
-    "LAUNCHER_PORT_POLL_MAX",
-    "LAUNCHER_PORT_POLL_SLEEP",
+    # Runtime
+    "JARVIS_PORT",
+    "JARVIS_LOG_LEVEL",
+    "JARVIS_DEV",
+    "JARVIS_LOW_IO",
+    # CORS
+    "CORS_ORIGIN",
+    # Cache
     "VECTOR_CACHE_SIZE_NORMAL",
+    "VECTOR_CACHE_SIZE_LOW",
+    "DEFAULT_TOP_K",
+    "DEFAULT_TOP_K_LOW",
+    "vector_cache_size",
+    "default_top_k",
+    # Refresh
+    "REFRESH_INTERVAL",
+    "WARMUP_DELAY",
 ]
