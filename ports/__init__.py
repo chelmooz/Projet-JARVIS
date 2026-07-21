@@ -3,13 +3,21 @@
 Chaque port est une interface granulaire (ISP). Les adapters concrets
 (OllamaAdapter, ShimmyAdapter, ...) implémentent un ou plusieurs ports.
 Les services de la couche métier dépendent exclusivement de ces contrats.
+
+NOTE: Les dicts de retour (get_metrics, search, get_habits, etc.) sont
+non typés pour l'instant. Cible : TypedDict ou dataclasses dédiées dans
+models/ pour chaque contrat de retour. À faire en une passe dédiée car
+cela impacte tous les services implémentant ces ports.
 """
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
-from models import Result
+from models import Result  # Couplage ports→models : Result est un DTO partagé.
+                           # Cible : définir Result dans ports/ ou models/dto.py.
+
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 # ---------------------------------------------------------------------------
@@ -20,7 +28,7 @@ from models import Result
 class LogPort(Protocol):
     """Contrat pour services/log.py (LogService)."""
 
-    def log(self, level: str, message: str) -> None: ...
+    def log(self, level: LogLevel, message: str) -> None: ...
 
 
 @runtime_checkable
@@ -147,7 +155,9 @@ class ConversationPort(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# File access
+# File access (autorisation granulaire par dossier)
+# NOTE: Nommé FilePort pour compat. Cible : FileAccessPort pour refléter
+# que c'est un port d'autorisation, pas de lecture/écriture.
 # ---------------------------------------------------------------------------
 
 @runtime_checkable
@@ -158,3 +168,23 @@ class FilePort(Protocol):
     def is_authorized(self, path: str) -> bool: ...
     def list_authorized(self) -> list[str]: ...
     def revoke(self, path: str) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# Exports
+# ---------------------------------------------------------------------------
+
+__all__ = [
+    "LogLevel",
+    "LogPort",
+    "MetricsPort",
+    "ChatPort",
+    "MultimodalPort",
+    "EmbeddingPort",
+    "ModelRegistryPort",
+    "VectorPort",
+    "HabitPort",
+    "AnalyticsPort",
+    "ConversationPort",
+    "FilePort",
+]
