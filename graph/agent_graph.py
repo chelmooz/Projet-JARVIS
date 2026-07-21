@@ -31,29 +31,7 @@ class AgentGraph:
     Les ports typés garantissent le contrat structurel. Les dépendances sans
     port dédié sont typées `object` (pas `Any`) pour forcer le cast explicite.
     """
-def create_agent_graph(
-    model_provider: Any,
-    memory: Any,
-    vector_store: Any,
-    toolbox: Any,
-    agents: dict[str, object],
-    router: Any,
-    pipeline: Any,
-    conversations: Any,
-    agent_supervisor: Any,
-) -> AgentGraph:
-    """Factory pour créer un AgentGraph avec toutes ses dépendances (DIP)."""
-    return AgentGraph(
-        model_provider=model_provider,
-        memory=memory,
-        vector_store=vector_store,
-        toolbox=toolbox,
-        agents=agents,
-        router=router,
-        pipeline=pipeline,
-        conversations=conversations,
-        agent_supervisor=agent_supervisor,
-    )
+
     def __init__(
         self,
         model_provider: ModelRegistryPort,
@@ -65,7 +43,7 @@ def create_agent_graph(
         pipeline: object,
         conversations: ConversationPort,
         agent_supervisor: object,
-    ):
+    ) -> None:
         required = {
             "model_provider": model_provider,
             "memory": memory,
@@ -142,4 +120,29 @@ def create_agent_graph(
         return format_output(state)
 
 
-__all__ = ["AgentGraph"]
+def create_agent_graph(
+    model_provider: Any,
+    memory: Any,
+    vector_store: Any,
+    toolbox: Any,
+    agents: dict[str, object],
+    router: Any,
+    pipeline: Any,
+    conversations: Any,
+    agent_supervisor: Any,
+) -> AgentGraph:
+    """Factory pour créer un AgentGraph avec toutes ses dépendances (DIP)."""
+    return AgentGraph(
+        model_provider=model_provider,
+        memory=memory,
+        vector_store=vector_store,
+        toolbox=toolbox,
+        agents=agents,
+        router=router,
+        pipeline=pipeline,
+        conversations=conversations,
+        agent_supervisor=agent_supervisor,
+    )
+
+
+__all__ = ["AgentGraph", "create_agent_graph"]
