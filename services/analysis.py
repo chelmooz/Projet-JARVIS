@@ -8,6 +8,9 @@ Les responsabilités sont déléguées à des analyseurs dédiés :
 L'API publique est préservée : analyze_file, analyze_project,
 generate_global_report, check_test_exists, ainsi que l'alias review_file.
 """
+
+from __future__ import annotations
+
 import ast
 import os
 import time
@@ -27,9 +30,7 @@ QualityAuditor = analysis_audit.QualityAuditor
 class Analyzer:
     """Analyseur statique unifié : délègue aux analyseurs par responsabilité."""
 
-    review_file = None  # backward compat: assigné après la définition de classe
-
-    def __init__(self):
+    def __init__(self) -> None:
         self._security = SecurityAnalyzer()
         self._performance = PerformanceAnalyzer()
         self._maintainability = MaintainabilityAnalyzer()
@@ -37,6 +38,7 @@ class Analyzer:
         self._tests = TestExistenceChecker()
 
     def analyze_file(self, path: str) -> AnalysisReport:
+        """Analyse un fichier Python et retourne un rapport d'analyse."""
         report = AnalysisReport(path)
         try:
             with open(path, encoding="utf-8", errors="replace") as f:
@@ -60,33 +62,54 @@ class Analyzer:
         return report.finalize()
 
     def check_test_exists(self, source_path: str) -> dict:
+        """Vérifie si des tests existent pour le fichier source donné."""
         return self._tests.resolve(source_path)
 
     def analyze_project(self, root: str) -> list[AnalysisReport]:
+        """Analyse tous les fichiers Python d'un projet (borné à _MAX_PROJECT_FILES)."""
         reports = []
         for path in _py_files(root)[:_MAX_PROJECT_FILES]:
             if not os.path.basename(path).startswith("__"):
                 reports.append(self.analyze_file(path))
         return reports
 
-    def generate_global_report(self, root: str = None) -> dict:
+    def generate_global_report(self, root: str | None = None) -> dict:
+        """Génère un rapport global sur un projet (métriques agrégées)."""
         t0 = time.perf_counter()
         target = root or os.getcwd()
         reports = self.analyze_project(target)
+        if not reports:
+            return {
+                "project": target,
+                "files_analyzed": 0,
+                "total_findings": 0,
+                "average_score": 0.0,
+                "files_with_tests": 0,
+                "coverage_pct": 0.0,
+                "elapsed_s": 0.0,
+                "reports": [],
+            }
         total_violations = sum(r.total for r in reports)
-        avg_score = sum(r["score"] for r in reports) / len(reports) if reports else 0
-        tests_ok = sum(1 for r in reports if self.check_test_exists(r["path"])["test_found"])
+        avg_score = sum(r["score"] for r in reports) / len(reports)
+        # Calcul unique des fichiers avec tests (évite le double appel check_test_exists).
+        files_with_tests = 0
+        for r in reports:
+            if self.check_test_exists(r["path"])["test_found"]:
+                files_with_tests += 1
         elapsed = time.perf_counter() - t0
         return {
             "project": target,
             "files_analyzed": len(reports),
             "total_findings": total_violations,
             "average_score": round(avg_score, 1),
-            "files_with_tests": tests_ok,
-            "coverage_pct": round(tests_ok / len(reports) * 100, 1) if reports else 0,
+            "files_with_tests": files_with_tests,
+            "coverage_pct": round(files_with_tests / len(reports) * 100, 1),
             "elapsed_s": round(elapsed, 3),
             "reports": [dict(r) for r in reports],
         }
 
+    # Alias backward-compat : review_file = analyze_file (même signature, même comportement).
+    review_file = analyze_file
 
-Analyzer.review_file = Analyzer.analyze_file  # backward compat alias
+
+__all__ = ["Analyzer", "QualityAuditor"]
