@@ -1,124 +1,144 @@
-"""Tests pour OrchestratorService — Coordination métier."""
-from unittest.mock import MagicMock, patch
+"""Tests pour OrchestratorService — Coordination métier.
 
+Posture TDD stricte :
+- Aucun MagicMock : utilisation exclusive des Fakes définis dans conftest.py.
+- Tests centrés sur le comportement public (handle_request).
+- Suppression des tests de méthodes privées (_build_fallback_response, etc.).
+- Suppression des patchs globaux (injection via le constructeur).
+"""
 import pytest
 
-from services.orchestrator import OrchestratorService
+
+class TestOrchestratorTextFlow:
+    """Tests du flux textuel (via AgentGraph)."""
+
+    def test_success_calls_graph_and_tracks_metrics(self, orchestrator, fake_metrics, fake_log):
+        """Vérifie le succès, l'incrémentation des métriques et le log."""
+        result = orchestrator.handle_request("debug code", image=None, conv_id="conv123")
+        
+        assert result["response"] == "Graph OK"
+        assert result["conversation_id"] == "conv123"
+        assert fake_metrics.requests == 1
+        assert any("graph agent=dev" in msg for _, msg in fake_log.logs)
+
+    def test_failure_returns_explicit_fallback(
+        self, fake_inference, fake_memory, fake_vector, fake_log, 
+        fake_analytics, fake_conversations, fake_metrics, fake_agents, 
+        fake_router, fake_toolbox
+    ):
+        """Vérifie le fallback métier et l'observabilité en cas d'erreur critique."""
+        from services.orchestrator import OrchestratorService
+        
+        def failing_graph_factory():
+            class FailingGraph:
+                def run(self, task, conversation_id):
+                    raise RuntimeError("Ollama down")
+            return FailingGraph()
+            
+        # On override le router pour forcer un agent spécifique dans le fallback
+        fake_router.select_agent = lambda task: "cyber"
+        
+        svc = OrchestratorService(
+            inference=fake_inference, memory=fake_memory, vector=fake_vector,
+            log=fake_log, analytics=fake_analytics, conversations=fake_conversations,
+            metrics=fake_metrics, agents=fake_agents, router_service=fake_router,
+            toolbox=fake_toolbox, agent_graph_factory=failing_graph_factory,
+        )
+        
+        result = svc.handle_request("scan network", image=None, conv_id=None)
+        
+        assert "Mode simulation" in result["response"]
+        assert result["agent"] == "cyber"
+        assert any("ERROR" in level and "Graph failed" in msg for level, msg in fake_log.logs)
 
 
-@pytest.fixture
-def mocks():
-    return {
-        "inference": MagicMock(),
-        "memory": MagicMock(),
-        "vector": MagicMock(),
-        "log": MagicMock(),
-        "analytics": MagicMock(),
-        "conversations": MagicMock(),
-        "metrics": MagicMock(),
-        "agents": {"vision": MagicMock()},
-        "router_service": MagicMock(),
-        "toolbox": MagicMock(),
-    }
+class TestOrchestratorVisionFlow:
+    """Tests du flux vision (via Agent dédié)."""
 
-
-@pytest.fixture
-def graph_factory():
-    g = MagicMock()
-    g.run.return_value = {
-        "response": "ok", "agent": "dev", "model": "phi4-mini",
-    }
-    return lambda: g
-
-
-@pytest.fixture
-def service(mocks, graph_factory):
-    svc = OrchestratorService(
-        inference=mocks["inference"], memory=mocks["memory"],
-        vector=mocks["vector"], log=mocks["log"],
-        analytics=mocks["analytics"], conversations=mocks["conversations"],
-        metrics=mocks["metrics"], agents=mocks["agents"],
-        router_service=mocks["router_service"], toolbox=mocks["toolbox"],
-        agent_graph_factory=graph_factory,
-    )
-    return svc
-
-
-class TestHandleRequest:
-    def test_returns_dict_without_image(self, service, mocks):
-        result = service.handle_request("debug code", None, None)
-        assert isinstance(result, dict)
-        assert result["response"] == "ok"
-        mocks["metrics"].incr_requests.assert_called_once_with("/api/jarvis")
-
-    def test_returns_dict_with_image(self, service, mocks):
-        mocks["agents"]["vision"].run.return_value = {
-            "response": "vision ok", "agent": "vision", "model": "llava",
+    def test_success_persists_conversation_and_updates_habits(
+        self, fake_inference, fake_memory, fake_vector, fake_log, 
+        fake_analytics, fake_conversations, fake_metrics, fake_agents, 
+        fake_router, fake_toolbox
+    ):
+        """Vérifie la persistance, les habitudes et les métriques pour la vision."""
+        from services.orchestrator import OrchestratorService
+        
+        # Configuration du Fake Agent Vision
+        fake_agents["vision"].run = lambda task, model, context: {
+            "response": "I see a cat", "agent": "vision", "model": "llava"
         }
-        with patch("services.orchestrator.select_vision_model", return_value="llava"):
-            result = service.handle_request("describe this image", "base64...", None)
-        assert isinstance(result, dict)
+        
+        svc = OrchestratorService(
+            inference=fake_inference, memory=fake_memory, vector=fake_vector,
+            log=fake_log, analytics=fake_analytics, conversations=fake_conversations,
+            metrics=fake_metrics, agents=fake_agents, router_service=fake_router,
+            toolbox=fake_toolbox, 
+            agent_graph_factory=lambda: None,  # Non utilisé pour la vision
+            vision_model_selector=lambda inf: "llava"
+        )
+        
+        result = svc.handle_request("describe this", image="base64...", conv_id="conv_vision")
+        
+        assert result["response"] == "I see a cat"
+        assert result["conversation_id"] == "conv_vision"
+        
+        # Vérifie la persistance (2 messages : user + assistant)
+        assert len(fake_conversations.messages) == 2
+        assert fake_conversations.messages[0]["role"] == "user"
+        assert fake_conversations.messages[1]["role"] == "assistant"
+        
+        # Vérifie la mise à jour des habitudes
+        assert len(fake_memory.habits) == 1
+        
+        # Vérifie le tracking analytics
+        assert len(fake_analytics.queries) == 1
+        assert fake_analytics.queries[0]["success"] is True
 
-    def test_with_conv_id_does_not_save_messages(self, service, mocks):
-        # ADR-004 : la persistance (save_conv/track_query) est déplacée dans le
-        # routeur HTTP, pas l'orchestrateur. L'orchestrateur ne doit PAS écrire.
-        service.handle_request("debug", None, "conv123")
-        mocks["conversations"].add_message.assert_not_called()
-
-    def test_calls_graph_with_conv_id(self, service, mocks, graph_factory):
-        g = graph_factory()
-        service.handle_request("debug", None, "conv42")
-        g.run.assert_called_once()
-        call_kwargs = g.run.call_args[1]
-        assert call_kwargs.get("conversation_id") == "conv42"
-
-    def test_graph_failure_returns_fallback(self, service, mocks, graph_factory):
-        g = graph_factory()
-        g.run.side_effect = RuntimeError("Ollama down")
-        mocks["router_service"].select_agent.return_value = "cyber"
-        result = service.handle_request("scan network", None, None)
-        assert "response" in result
-        assert "simulation" in result["response"].lower()
-
-    def test_graph_failure_logs_error(self, service, mocks, graph_factory):
-        g = graph_factory()
-        g.run.side_effect = RuntimeError("Ollama down")
-        mocks["router_service"].select_agent.return_value = "cyber"
-        service.handle_request("scan network", None, None)
-        mocks["log"].log.assert_any_call("ERROR", mocks["log"].log.call_args[0][1])
-
-
-class TestSimulationResponse:
-    def test_returns_dict_with_expected_keys(self, service):
-        result = service._simulation_response("task", "dev", "error msg", 0.0)
-        assert "response" in result
-        assert result["agent"] == "dev"
-        assert "backend" in result
-        assert result["suggested_skill"] is None
-
-    def test_contains_error_in_response(self, service):
-        result = service._simulation_response("task", "cyber", "connection refused", 1.0)
-        assert "connection refused" in result["response"]
-
-
-class TestRunVision:
-    def test_calls_vision_agent(self, service, mocks):
-        mocks["agents"]["vision"].run.return_value = {
-            "response": "vision desc", "agent": "vision", "model": "llava",
-        }
-        result = service._run_vision("describe", "llava", {}, "vision", 0.0)
-        mocks["agents"]["vision"].run.assert_called_once_with("describe", "llava", {})
-        assert result["response"] == "vision desc"
-
-    def test_updates_habits(self, service, mocks):
-        mocks["agents"]["vision"].run.return_value = {
-            "response": "ok", "agent": "vision", "model": "llava",
-        }
-        service._run_vision("task", "llava", {}, "vision", 0.0)
-        mocks["memory"].update_habits.assert_called_once()
-
-    def test_exception_returns_error_dict(self, service, mocks):
-        mocks["agents"]["vision"].run.side_effect = ValueError("vision model crashed")
-        result = service._run_vision("task", "llava", {}, "vision", 0.0)
+    def test_no_model_available_returns_error(
+        self, fake_inference, fake_memory, fake_vector, fake_log, 
+        fake_analytics, fake_conversations, fake_metrics, fake_agents, 
+        fake_router, fake_toolbox
+    ):
+        """Vérifie le court-circuit si aucun modèle vision n'est trouvé."""
+        from services.orchestrator import OrchestratorService
+        
+        svc = OrchestratorService(
+            inference=fake_inference, memory=fake_memory, vector=fake_vector,
+            log=fake_log, analytics=fake_analytics, conversations=fake_conversations,
+            metrics=fake_metrics, agents=fake_agents, router_service=fake_router,
+            toolbox=fake_toolbox, 
+            agent_graph_factory=lambda: None,
+            vision_model_selector=lambda inf: None  # Aucun modèle disponible
+        )
+        
+        result = svc.handle_request("describe", image="base64...", conv_id=None)
+        
         assert "error" in result
-        assert "vision model crashed" in result["error"]
+        assert "Aucun modele vision" in result["error"]
+
+    def test_agent_crash_returns_error_dict(
+        self, fake_inference, fake_memory, fake_vector, fake_log, 
+        fake_analytics, fake_conversations, fake_metrics, fake_agents, 
+        fake_router, fake_toolbox
+    ):
+        """Vérifie la gestion d'erreur si l'agent vision crash."""
+        from services.orchestrator import OrchestratorService
+        
+        def crashing_run(task, model, context):
+            raise ValueError("Vision model crashed")
+            
+        fake_agents["vision"].run = crashing_run
+        
+        svc = OrchestratorService(
+            inference=fake_inference, memory=fake_memory, vector=fake_vector,
+            log=fake_log, analytics=fake_analytics, conversations=fake_conversations,
+            metrics=fake_metrics, agents=fake_agents, router_service=fake_router,
+            toolbox=fake_toolbox, 
+            agent_graph_factory=lambda: None,
+            vision_model_selector=lambda inf: "llava"
+        )
+        
+        result = svc.handle_request("describe", image="base64...", conv_id=None)
+        
+        assert "error" in result
+        assert "Vision model crashed" in result["error"]
