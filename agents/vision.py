@@ -10,21 +10,25 @@ pas de fences de code exploitables) : ``suggested_skill`` reste ``None``.
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+import logging
+from typing import Any, Final, Protocol
 
 from agents.base import AgentRunResult
 from agents.generic import GenericAgent
 
+_logger = logging.getLogger("jarvis.agents.vision")
+
 # ---------------------------------------------------------------------------
 # Constantes de configuration de l'agent (évite les magic strings).
+# Final : immuables au niveau type-checker (pas de réassignation accidentelle).
 # ---------------------------------------------------------------------------
 
-PROFILE_KEY: str = "designer"
-VISION_DOMAIN_PROMPT: str = "Tu es un expert en analyse visuelle."
+PROFILE_KEY: Final[str] = "designer"
+VISION_DOMAIN_PROMPT: Final[str] = "Tu es un expert en analyse visuelle."
 
 # Clé du contexte portant l'image encodée (cohérent avec JarvisRequest.image
 # et l'injection effectuée par le graph). Ne pas renommer sans migration.
-_IMAGE_CONTEXT_KEY: str = "image"
+_IMAGE_CONTEXT_KEY: Final[str] = "image"
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +40,7 @@ class _VisionModelProvider(Protocol):
     """Sous-ensemble d'inférence requis par l'agent vision (texte + image)."""
 
     def query(self, prompt: str, model: str, system: str | None = None) -> str: ...
-    def query_multimodal(self, model: str, prompt: str, image_base64: str) -> Any: ...
+    def query_multimodal(self, model: str, prompt: str, image_base64: str) -> dict | str: ...
     def get_active_backend(self) -> str: ...
 
 
@@ -66,7 +70,7 @@ class VisionAgent(GenericAgent):
         return {
             "agent": self._profile_key,
             "model": model,
-            "backend": self.model.get_active_backend(),
+            "backend": self.model_provider.get_active_backend(),
             "response": response,
             "suggested_skill": None,
         }
@@ -77,7 +81,7 @@ class VisionAgent(GenericAgent):
 
     def _run_multimodal(self, model: str, task: str, image_data: str) -> str:
         """Appel multimodal ; extrait la chaîne de réponse du payload."""
-        result = self.model.query_multimodal(model, task, image_data)
+        result = self.model_provider.query_multimodal(model, task, image_data)
         return self._extract_response(result)
 
     def _run_text(
@@ -87,25 +91,36 @@ class VisionAgent(GenericAgent):
         system, user = self._build_messages(
             self._profile_key, task, context, default_prompt=self._domain_prompt,
         )
-        return self.model.query(user, model, system=system)
+        return self.model_provider.query(user, model, system=system)
 
     # ------------------------------------------------------------------
     # Normalisation du payload multimodal
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _extract_response(result: Any) -> str:
+    def _extract_response(result: dict | str) -> str:
         """Extrait la réponse d'un payload multimodal (dict ``{"content": ...}`` ou str).
 
         Le backend renvoie soit un dict (``{"content", "model", "role"}``), soit
         directement une chaîne selon la version d'Ollama : on normalise les deux.
-        Un payload inattendu (``None``/autre) dégénère en chaîne vide plutôt que
-        de propager une exception jusqu'à l'API.
+        Un payload inattendu dégénère en chaîne vide mais est loggé en warning
+        (dégradation observable, pas muette).
         """
         if isinstance(result, dict):
             content = result.get("content")
-            return content if isinstance(content, str) else ""
-        return result if isinstance(result, str) else ""
+            if isinstance(content, str):
+                return content
+            _logger.warning(
+                "Payload multimodal : 'content' non-str (%s)", type(content).__name__,
+            )
+            return ""
+        if isinstance(result, str):
+            return result
+        # Garde-fou runtime : le backend Ollama n'est pas typé statiquement.
+        _logger.warning(
+            "Payload multimodal inattendu (%s), réponse vide", type(result).__name__,
+        )
+        return ""
 
 
 __all__ = ["VisionAgent", "PROFILE_KEY", "VISION_DOMAIN_PROMPT"]
