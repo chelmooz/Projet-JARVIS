@@ -19,6 +19,7 @@ import asyncio
 import os
 import threading
 import time
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -45,7 +46,7 @@ from controllers.static_cache import serve_cached_file
 from services.profiling import get_slow_endpoints
 
 
-def _service_healthy(service) -> bool:
+def _service_healthy(service: Any) -> bool:
     """État de santé défensif d'un service (``is_healthy()`` optionnel)."""
     check = getattr(service, "is_healthy", None)
     if check is None:
@@ -56,7 +57,7 @@ def _service_healthy(service) -> bool:
         return False
 
 
-def _build_status(context) -> dict:
+def _build_status(context: Any) -> dict[str, Any]:
     """Construit le dict de status à partir du contexte (état des services).
 
     Remplace les globales legacy ``_check_ollama`` / ``_refresh_status_cache``
@@ -110,11 +111,11 @@ def create_app() -> FastAPI:
     # --- Routes système inline (dette : à extraire vers routes/system.py) ---
 
     @app.get("/api/backend")
-    async def get_backend():
+    async def get_backend() -> dict[str, str]:
         return {"backend": "ollama"}
 
     @app.get("/api/models")
-    async def list_models(request: Request):
+    async def list_models(request: Request) -> dict[str, Any]:
         context = request.app.state.context
         inference = getattr(context, "inference", None)
         if inference is None:
@@ -123,7 +124,7 @@ def create_app() -> FastAPI:
         models = await asyncio.to_thread(inference.list_models)
         return {"models": models, "available": True}
 
-    @app.get("/")
+    @app.get("/", response_model=None)
     async def index(request: Request):
         index_path = os.path.join(STATIC_DIR, "index.html")
         resp = await asyncio.to_thread(serve_cached_file, index_path, request)
@@ -132,7 +133,7 @@ def create_app() -> FastAPI:
         return {"message": "JARVIS API — voir /docs pour la documentation"}
 
     @app.get("/api/status")
-    async def get_status(request: Request):
+    async def get_status(request: Request) -> dict[str, Any]:
         context = request.app.state.context
         cache = request.app.state.status_cache
         lock = request.app.state.status_lock
@@ -149,11 +150,11 @@ def create_app() -> FastAPI:
         return ok(data)
 
     @app.get("/api/metrics")
-    async def get_metrics(request: Request):
+    async def get_metrics(request: Request) -> dict[str, Any]:
         context = request.app.state.context
         return ok(context.metrics.get_metrics())
 
-    @app.get("/{path:path}")
+    @app.get("/{path:path}", response_model=None)
     async def serve_static(path: str, request: Request):
         full_path = os.path.join(STATIC_DIR, path)
         resolved = os.path.abspath(full_path)
