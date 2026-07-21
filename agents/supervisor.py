@@ -23,7 +23,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from config.constants import AGENT_TIMEOUT_SECONDS
 
@@ -105,7 +106,17 @@ class AgentSupervisor:
         if error is not None:
             raise error
 
-        return result if result is not None else {}
+        # Fail-Fast : un worker terminé sans erreur DOIT avoir produit un
+        # résultat. ``None`` signifie que l'agent a violé son contrat de
+        # retour (``run() -> AgentRunResult``). On lève au point de défaillance
+        # plutôt que de retourner ``{}``, qui produirait un KeyError opaque
+        # chez le consommateur (``result["response"]``).
+        if result is None:
+            raise RuntimeError(
+                f"Agent {_agent_name(agent)} a terminé sans résultat ni erreur "
+                f"(contrat run() violé : retour None)"
+            )
+        return result
 
     # ------------------------------------------------------------------
     # Gestion du timeout
