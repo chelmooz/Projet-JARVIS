@@ -77,6 +77,16 @@ def get_orchestrator(context: AppContext = Depends(get_app_context)) -> Any:
 # ==============================================================================
 # STUBS LEGACY POUR COMPATIBILITÉ DES TESTS (NE PAS UTILISER EN PRODUCTION)
 # ==============================================================================
+def get_context() -> types.SimpleNamespace:
+    """Stub pour test_context_refactor.py — retourne un contexte minimal.
+    
+    Anciennement : retournait le contexte global mutable.
+    Supprimé lors du refacto (injection via app.state).
+    Conservé comme stub pour ne pas casser la collection des tests legacy.
+    """
+    return _ctx()
+
+
 def _check_ollama() -> bool:
     """Stub pour test_wave_a.py — vérifie si Ollama répond."""
     try:
@@ -119,6 +129,7 @@ __all__ = [
     "get_vector_service",
     "get_agents_registry",
     "get_orchestrator",
+    "get_context",
     "_check_ollama",
     "_ctx",
     "_sync_module_globals",
