@@ -1,10 +1,13 @@
 """Selecteur de modèles — Choisit le meilleur modèle disponible pour un agent."""
+
+from __future__ import annotations
+
 import json
 import logging
 import os
 import threading
 from collections.abc import Sequence
-from typing import Optional
+from typing import Any
 
 from config.constants import PROJECT_DIR
 
@@ -26,13 +29,14 @@ class _PreferencesCache:
     Remplace les variables globales mutables par un état encapsulé et testable.
     """
     
-    def __init__(self, path: str):
+    def __init__(self, path: str) -> None:
         self._path = path
-        self._cache: dict = {}
+        self._cache: dict[str, Any] = {}
         self._mtime: float = 0.0
         self._lock = threading.Lock()
 
-    def get(self) -> dict:
+    def get(self) -> dict[str, Any]:
+        """Retourne les préférences actuelles, en rechargeant si le fichier a changé."""
         try:
             current_mtime = os.path.getmtime(self._path)
         except OSError:
@@ -46,7 +50,8 @@ class _PreferencesCache:
             # Retourne une copie pour éviter la mutation externe du cache
             return self._cache.copy()
 
-    def _load_json(self) -> dict:
+    def _load_json(self) -> dict[str, Any]:
+        """Charge le fichier JSON de préférences."""
         try:
             with open(self._path, encoding="utf-8") as f:
                 return json.load(f)
@@ -61,7 +66,7 @@ class _PreferencesCache:
 _prefs_cache = _PreferencesCache(PREFERENCES_PATH)
 
 
-def _load_json(path: str) -> dict:
+def _load_json(path: str) -> dict[str, Any]:
     """Charge un fichier JSON de manière sécurisée."""
     try:
         with open(path, encoding="utf-8") as f:
@@ -73,12 +78,20 @@ def _load_json(path: str) -> dict:
         return {}
 
 
-def load_model_sizes() -> dict:
+def load_model_sizes() -> dict[str, Any]:
+    """Charge la configuration des tailles de modèles."""
     return _load_json(MODEL_SIZES_PATH)
 
 
-def recommend_model(specs: dict) -> dict:
-    """Recommande un modèle basé sur les spécifications matérielles."""
+def recommend_model(specs: dict[str, Any]) -> dict[str, Any]:
+    """Recommande un modèle basé sur les spécifications matérielles.
+    
+    Args:
+        specs: Dictionnaire contenant 'ram_gb', 'vram_gb', 'cpu_only'.
+        
+    Returns:
+        Dictionnaire avec 'model' et 'fallback'.
+    """
     sizes = load_model_sizes()
     if not sizes:
         return {"model": DEFAULT_FALLBACK_MODEL, "fallback": True}
@@ -112,12 +125,12 @@ def recommend_model(specs: dict) -> dict:
     return {"model": compatible[0][0], "fallback": False}
 
 
-def read_preferences() -> dict:
+def read_preferences() -> dict[str, Any]:
     """Charge les préférences utilisateur (avec cache thread-safe)."""
     return _prefs_cache.get()
 
 
-def fallback_models() -> dict:
+def fallback_models() -> dict[str, str]:
     """Correspondance agent -> modèle par défaut."""
     return {
         "cyber": "ornith-1.0-9b",
@@ -128,7 +141,7 @@ def fallback_models() -> dict:
     }
 
 
-def _first_available(inference, models: Sequence[str]) -> Optional[str]:
+def _first_available(inference: Any, models: Sequence[str]) -> str | None:
     """Retourne le premier modèle disponible dans la liste."""
     for model in models:
         resolved = inference.resolve_model(model)
@@ -137,12 +150,12 @@ def _first_available(inference, models: Sequence[str]) -> Optional[str]:
     return None
 
 
-def select_vision_model(inference) -> Optional[str]:
+def select_vision_model(inference: Any) -> str | None:
     """Sélectionne le premier modèle vision disponible."""
     return _first_available(inference, VISION_MODELS)
 
 
-def select_model(agent_key: str, inference, log_service=None) -> str:
+def select_model(agent_key: str, inference: Any, log_service: Any | None = None) -> str:
     """Sélectionne le meilleur modèle pour un agent donné.
     
     Stratégie :
@@ -151,6 +164,14 @@ def select_model(agent_key: str, inference, log_service=None) -> str:
       3. Fallback par agent
       4. Premier modèle générique disponible
       5. Chaîne vide si aucun modèle (l'appelant doit gérer l'erreur)
+      
+    Args:
+        agent_key: Clé de l'agent (ex: 'cyber', 'dev', 'vision').
+        inference: Service d'inférence (doit implémenter resolve_model/first_available).
+        log_service: Service de log optionnel pour les avertissements.
+        
+    Returns:
+        Nom du modèle sélectionné, ou chaîne vide si aucun modèle n'est disponible.
     """
     if agent_key == VISION_KEY:
         return select_vision_model(inference) or ""
@@ -180,3 +201,12 @@ def select_model(agent_key: str, inference, log_service=None) -> str:
     if log_service:
         log_service.log("WARN", f"Aucun modèle disponible pour l'agent '{agent_key}'")
     return ""
+
+
+__all__ = [
+    "recommend_model",
+    "read_preferences",
+    "fallback_models",
+    "select_vision_model",
+    "select_model",
+]
