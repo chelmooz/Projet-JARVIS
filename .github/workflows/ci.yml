@@ -1,1 +1,43 @@
+name: CI
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      JARVIS_OFFLINE_TESTS: "1"
+      PYTHONPATH: .
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          if [ -f requirements.txt ]; then
+            pip install --prefer-binary -r requirements.txt
+          else
+            pip install -e .
+          fi
+          pip install pytest pytest-cov ruff
+
+      - name: Lint (Ruff)
+        run: ruff check .
+
+      - name: Tests unitaires & offline (avec couverture)
+        run: |
+          pytest -q --strict-markers -m "not live" \
+            --cov=. --cov-report=term-missing --cov-fail-under=70 \
+            --maxfail=1
