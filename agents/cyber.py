@@ -23,6 +23,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Protocol
 
 from agents.base import AgentRunResult, BaseAgent
@@ -35,16 +36,17 @@ _logger = logging.getLogger("jarvis.agents.cyber")
 # ---------------------------------------------------------------------------
 
 CYBER_DOMAIN_PROMPT: str = (
-    "Tu es specialise en cybersecurite. Analyse les logs, identifie les "
-    "vulnerabilites et propose des corrections."
+    "Tu es spécialisé en cybersécurité. Analyse les logs, identifie les "
+    "vulnérabilités et propose des corrections."
 )
 
 # ---------------------------------------------------------------------------
 # Mots-clés de détection des workflows (regex précompilés, ordre = priorité).
 # Les clés correspondent aux clés de ``cyber_workflows.json``.
+# MappingProxyType : immuable au runtime. L'ordre d'insertion fixe la priorité.
 # ---------------------------------------------------------------------------
 
-_WORKFLOW_KEYWORDS: dict[str, tuple[re.Pattern[str], ...]] = {
+_WORKFLOW_KEYWORDS: MappingProxyType[str, tuple[re.Pattern[str], ...]] = MappingProxyType({
     "CISA_KNOWN_EXPLOITED_VULNS": tuple(
         re.compile(p) for p in (
             r"\bcisa\b", r"\bkev\b", r"\bknown exploited\b", r"\bvuln\b",
@@ -81,7 +83,7 @@ _WORKFLOW_KEYWORDS: dict[str, tuple[re.Pattern[str], ...]] = {
     "LOG_ANALYSIS": tuple(
         re.compile(p) for p in (r"\blog\b", r"\bevenement\b", r"\bevent\b", r"\bsecurity log\b")
     ),
-}
+})
 
 
 # ---------------------------------------------------------------------------
@@ -102,8 +104,8 @@ class CyberAgent(BaseAgent):
 
     def __init__(self, model_provider: _ModelProvider, memory: Any | None = None) -> None:
         super().__init__()
-        self.model: _ModelProvider = model_provider
-        # ``memory`` injecté par la factory ; non exploité par run().
+        self.model_provider: _ModelProvider = model_provider
+        # ``memory`` injecté par la factory pour compat ; non exploité par run().
         self.memory: Any | None = memory
         self._workflows: dict[str, dict[str, Any]] = self._load_workflows()
 
@@ -136,11 +138,11 @@ class CyberAgent(BaseAgent):
         """Associe un workflow, construit le prompt cyber et interroge le LLM."""
         matched_workflow = self._match_workflow(task)
         system, user = self._build_cyber_messages(task, context, matched_workflow)
-        response = self.model.query(user, model, system=system)
+        response = self.model_provider.query(user, model, system=system)
         return {
             "agent": self.PROFILE_KEY,
             "model": model,
-            "backend": self.model.get_active_backend(),
+            "backend": self.model_provider.get_active_backend(),
             "response": response,
             "suggested_skill": self._suggest_skill(response, matched_workflow),
         }
@@ -168,12 +170,13 @@ class CyberAgent(BaseAgent):
         similar_text = self._similar_cases_block(context)
         tool_section = self._tool_results_section(context)
 
+        workflow_names = ", ".join(self._workflows.keys()) if self._workflows else "aucun"
         user = (
-            f"Workflows disponibles: {', '.join(self._workflows.keys())}"
+            f"Workflows disponibles : {workflow_names}"
             f"{workflow_prompt}"
             f"{similar_text}"
             f"{tool_section}"
-            f"\nTache : {task}"
+            f"\nTâche : {task}"
         )
         return system, user.strip()
 
@@ -185,7 +188,7 @@ class CyberAgent(BaseAgent):
         steps = "\n".join(
             f"  {i + 1}. {s}" for i, s in enumerate(workflow.get("steps", []))
         )
-        return f"\nWorkflow detecte: {workflow.get('name', '?')}\nEtapes:\n{steps}\n"
+        return f"\nWorkflow détecté : {workflow.get('name', '?')}\nÉtapes :\n{steps}\n"
 
     def _tool_results_section(self, context: dict[str, Any]) -> str:
         """Section ``tool_results`` de la toolbox, défensive (méthode optionnelle)."""
@@ -211,14 +214,14 @@ class CyberAgent(BaseAgent):
     # Skill suggéré & exposition API
     # ------------------------------------------------------------------
 
-    @staticmethod
+    @classmethod
     def _suggest_skill(
-        result: str, workflow: dict[str, Any] | None = None,
+        cls, result: str, workflow: dict[str, Any] | None = None,
     ) -> str | None:
         """Skill du workflow si défini, sinon détection depuis les fences de code."""
         if workflow and workflow.get("suggested_skill"):
             return workflow["suggested_skill"]
-        return BaseAgent._detect_skill_from_code(result, prefix="security_audit")
+        return cls._detect_skill_from_code(result, prefix="security_audit")
 
     def get_workflows(self) -> dict[str, dict[str, Any]]:
         """Retourne une copie des workflows chargés (exposition API, pas de fuite)."""
