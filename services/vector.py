@@ -7,20 +7,36 @@ Refacto DevOps / SOLID / Thread-Safe :
 - Plus d'exposition de _data (encapsulation respectée).
 - Index secondaire pour déduplication O(1) au lieu de O(N).
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
 import shutil
 import threading
 import time
-from typing import List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
-from config.constants import MEMORY_DIR, WEIGHT_MAX, WEIGHT_MIN
+from config.constants import (
+    CONSOLIDATE_DEDUP_SIMILARITY,
+    CONSOLIDATE_GRACE_HOURS,
+    CONSOLIDATE_MAX_ITER,
+    CONSOLIDATE_PRUNE_WEIGHT,
+    MAX_VECTOR_DOCS,
+    MEMORY_DIR,
+    WEIGHT_MAX,
+    WEIGHT_MIN,
+)
 from ports import VectorPort
 from services.vector_cache import VECTOR_CACHE_TTL_SECONDS, VectorCache
-from services.vector_dimension import MIGRATION_OK, MIGRATION_REINDEXED, MIGRATION_RESET, DimensionManager
+from services.vector_dimension import (
+    MIGRATION_OK,
+    MIGRATION_REINDEXED,
+    MIGRATION_RESET,
+    DimensionManager,
+)
 from services.vector_embedder import Embedder
 from services.vector_index import VectorIndex
 from services.vector_search import cosine_search
@@ -36,8 +52,13 @@ EXPECTED_MODEL = "nomic-embed-text-v2-moe"
 
 # Ré-export pour compatibilité ascendante (constants propres au cache)
 __all__ = [
-    "VECTOR_CACHE_TTL_SECONDS", "VectorService", "EXPECTED_DIM", "EXPECTED_MODEL",
-    "MIGRATION_OK", "MIGRATION_REINDEXED", "MIGRATION_RESET",
+    "VECTOR_CACHE_TTL_SECONDS",
+    "VectorService",
+    "EXPECTED_DIM",
+    "EXPECTED_MODEL",
+    "MIGRATION_OK",
+    "MIGRATION_REINDEXED",
+    "MIGRATION_RESET",
 ]
 
 
@@ -48,7 +69,7 @@ class VectorService(VectorPort):
     et les fichiers corrompus sont automatiquement sauvegardés avant réinitialisation.
     """
 
-    def __init__(self, inference_service):
+    def __init__(self, inference_service: Any) -> None:
         """Initialise l'index vectoriel avec injection de dépendance stricte.
         
         Args:
@@ -84,7 +105,7 @@ class VectorService(VectorPort):
     # GESTION SÉCURISÉE DES DONNÉES (Thread-Safe + Résilience)
     # ==============================================================================
 
-    def _build_message_index(self) -> dict:
+    def _build_message_index(self) -> dict[tuple[str, str], bool]:
         """Construit un index secondaire pour les messages de conversation (O(1) lookup)."""
         index = {}
         for doc in self._data.get("documents", []):
@@ -96,7 +117,7 @@ class VectorService(VectorPort):
                     index[(conv_id, msg_id)] = True
         return index
 
-    def _load_secure(self) -> dict:
+    def _load_secure(self) -> dict[str, Any]:
         """Charge les données avec gestion robuste des fichiers corrompus."""
         if not os.path.exists(VECTOR_PATH):
             return {"documents": [], "embedding_dim": None}
@@ -127,7 +148,7 @@ class VectorService(VectorPort):
             # Retourne un état vide mais valide
             return {"documents": [], "embedding_dim": None}
 
-    def _save_secure(self):
+    def _save_secure(self) -> None:
         """Sauvegarde les données de manière atomique (évite la corruption)."""
         temp_path = VECTOR_PATH + ".tmp"
         try:
@@ -162,12 +183,12 @@ class VectorService(VectorPort):
     # EMBEDDING (Thread-Safe)
     # ==============================================================================
 
-    def _embed(self, text: str) -> List[float]:
+    def _embed(self, text: str) -> list[float]:
         """Calcule l'embedding d'un texte (thread-safe)."""
         # Pas de mutation d'état ici : Embedder est stateless
         return self._embedder.embed(text)
 
-    def preload(self):
+    def preload(self) -> None:
         """Précharge la connexion au backend d'embedding (appelé au warmup)."""
         try:
             self._embed("warmup")
@@ -183,13 +204,13 @@ class VectorService(VectorPort):
         """Horodatage courant (injectable pour les tests)."""
         return time.time()
 
-    def index(self, text: str, metadata: Optional[dict] = None):
+    def index(self, text: str, metadata: dict[str, Any] | None = None) -> None:
         """Ajoute un document à l'index (sans l'embedder immédiatement)."""
         with self._lock:
             if self._index.add_document(text, metadata):
                 self._save_secure()
 
-    def index_batch(self, documents: List[Tuple[str, Optional[dict]]]):
+    def index_batch(self, documents: list[tuple[str, dict[str, Any] | None]]) -> None:
         """Ajoute plusieurs documents en une seule opération (atomique, dedup)."""
         added = False
         with self._lock:
@@ -224,8 +245,15 @@ class VectorService(VectorPort):
     # INDEXATION DES MESSAGES (O(1) Dedup avec index secondaire)
     # ==============================================================================
 
-    def index_message(self, conv_id: str, msg_id: str, role: str, content: str, ts,
-                      extra: Optional[dict] = None):
+    def index_message(
+        self, 
+        conv_id: str, 
+        msg_id: str, 
+        role: str, 
+        content: str, 
+        ts: float,
+        extra: dict[str, Any] | None = None
+    ) -> None:
         """Indexe un message (dedup O(1) via index secondaire)."""
         if not content or not content.strip():
             return
@@ -244,7 +272,15 @@ class VectorService(VectorPort):
             
             self._save_secure()
 
-    def _build_message_doc(self, conv_id, msg_id, role, content, ts, extra) -> dict:
+    def _build_message_doc(
+        self, 
+        conv_id: str, 
+        msg_id: str, 
+        role: str, 
+        content: str, 
+        ts: float, 
+        extra: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """Construit un document de message standardisé."""
         return {
             "text": content,
@@ -260,7 +296,14 @@ class VectorService(VectorPort):
             "embedding": None,
         }
 
-    def ingest_message(self, conv_id: str, msg_id: str, role: str, content: str, ts):
+    def ingest_message(
+        self, 
+        conv_id: str, 
+        msg_id: str, 
+        role: str, 
+        content: str, 
+        ts: float
+    ) -> None:
         """Indexe un message et calcule son embedding (auto-ingest)."""
         self.index_message(conv_id, msg_id, role, content, ts)
         self.vectorize_pending()
@@ -269,8 +312,13 @@ class VectorService(VectorPort):
     # PONDÉRATION ET CONSOLIDATION (Thread-Safe)
     # ==============================================================================
 
-    def adjust_weight(self, conv_id: str, msg_id: str, delta: float,
-                      conversations=None) -> int:
+    def adjust_weight(
+        self, 
+        conv_id: str, 
+        msg_id: str, 
+        delta: float,
+        conversations: Any | None = None
+    ) -> int:
         """Ajuste le poids d'un souvenir (feedback), clampe et ajuste le précédent."""
         with self._lock:
             wc = WeightConsolidator(self._data["documents"])
@@ -286,16 +334,8 @@ class VectorService(VectorPort):
             
             return count
 
-    def consolidate(self):
+    def consolidate(self) -> None:
         """Consolidation hors ligne : dedup + prune (thread-safe)."""
-        from config.constants import (
-            CONSOLIDATE_DEDUP_SIMILARITY,
-            CONSOLIDATE_GRACE_HOURS,
-            CONSOLIDATE_MAX_ITER,
-            CONSOLIDATE_PRUNE_WEIGHT,
-            MAX_VECTOR_DOCS,
-        )
-        
         with self._lock:
             docs = self._data["documents"]
             wc = WeightConsolidator(docs)
@@ -334,11 +374,11 @@ class VectorService(VectorPort):
     # RECHERCHE VECTORIELLE (Thread-Safe + Cache)
     # ==============================================================================
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Vide le cache de recherche."""
         self._cache.clear()
 
-    def search(self, query: str, top_k: int = 5) -> list:
+    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """Recherche sémantique avec cache et scoring pondéré."""
         if not query or not self._data.get("documents"):
             return []
@@ -379,7 +419,7 @@ class VectorService(VectorPort):
     # STATISTIQUES ET OBSERVABILITÉ (Thread-Safe)
     # ==============================================================================
 
-    def _conversation_weights(self) -> List[float]:
+    def _conversation_weights(self) -> list[float]:
         """Récupère les poids des documents de conversation."""
         with self._lock:
             return [
@@ -388,7 +428,7 @@ class VectorService(VectorPort):
                 if d.get("metadata", {}).get("source") == "conversation"
             ]
 
-    def _weight_stats(self, conv_weights: List[float]) -> Tuple[float, float]:
+    def _weight_stats(self, conv_weights: list[float]) -> tuple[float, float]:
         """Calcule les statistiques de poids."""
         if not conv_weights:
             return 0.0, 0.0
@@ -417,7 +457,7 @@ class VectorService(VectorPort):
         total = self._cache_hits + self._cache_misses
         return round(self._cache_hits / total * 100, 1) if total else 0.0
 
-    def stats(self) -> dict:
+    def stats(self) -> dict[str, Any]:
         """Statistiques de l'index (thread-safe)."""
         with self._lock:
             docs = self._data.get("documents", [])
