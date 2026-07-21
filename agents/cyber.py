@@ -1,71 +1,173 @@
-"""Agent spécialisé en cybersécurité et analyse de logs (profil `datasecu`)."""
+"""Agent spécialisé en cybersécurité et analyse de logs (profil ``datasecu``).
+
+Responsabilités (SRP)
+---------------------
+- Détection *data-driven* d'un workflow cyber par mots-clés (regex précompilés).
+- Composition d'un prompt de domaine cyber enrichi du workflow détecté.
+- Délégation de l'inférence au fournisseur injecté.
+
+Le mapping mots-clés -> workflow est une **constante de module** (et non un
+littéral enfoui dans la méthode) : c'est testable, lisible, et ajouter un
+workflow ne touche pas à la logique (OCP). Les regex y sont précompilées une
+seule fois au chargement du module (pas à chaque requête).
+
+Note : ce mapping est un candidat naturel à externalisation vers
+``config/cyber_workflow_keywords.yaml`` (single source of truth prévue) ; on
+le branchera dessus une fois la structure de ce YAML lue et validée. D'ici là,
+cette constante reste la source de vérité runtime.
+"""
+
+from __future__ import annotations
 
 import json
+import logging
 import re
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol
 
-from agents.base import BaseAgent
+from agents.base import AgentRunResult, BaseAgent
 from config.paths import CYBER_WORKFLOWS_CONFIG
+
+_logger = logging.getLogger("jarvis.agents.cyber")
+
+# ---------------------------------------------------------------------------
+# Prompt de domaine cyber (évite le magic string).
+# ---------------------------------------------------------------------------
+
+CYBER_DOMAIN_PROMPT: str = (
+    "Tu es specialise en cybersecurite. Analyse les logs, identifie les "
+    "vulnerabilites et propose des corrections."
+)
+
+# ---------------------------------------------------------------------------
+# Mots-clés de détection des workflows (regex précompilés, ordre = priorité).
+# Les clés correspondent aux clés de ``cyber_workflows.json``.
+# ---------------------------------------------------------------------------
+
+_WORKFLOW_KEYWORDS: dict[str, tuple[re.Pattern[str], ...]] = {
+    "CISA_KNOWN_EXPLOITED_VULNS": tuple(
+        re.compile(p) for p in (
+            r"\bcisa\b", r"\bkev\b", r"\bknown exploited\b", r"\bvuln\b",
+        )
+    ),
+    "DETECT_EDR": tuple(
+        re.compile(p) for p in (
+            r"\bedr\b", r"\bantivirus\b", r"\bdefense\b", r"\bsecurity product\b",
+        )
+    ),
+    "EDR_TELEMETRY_GAPS": tuple(
+        re.compile(p) for p in (r"\btelemetry\b", r"\bgap\b", r"\bedr lacune\b")
+    ),
+    "TTP_REPORT_ANALYSIS": tuple(
+        re.compile(p) for p in (
+            r"\bttp\b", r"\bmitre\b", r"\batt&ck\b", r"\breport\b", r"\badversaire\b",
+        )
+    ),
+    "PRIVILEGE_AUDIT": tuple(
+        re.compile(p) for p in (
+            r"\bprivilege\b", r"\bwhoami\b", r"\badmin\b", r"\belevation\b",
+        )
+    ),
+    "CALDERA_INTEL": tuple(re.compile(p) for p in (r"\bcaldera\b", r"\boperation\b")),
+    "HELLO_CALDERA": tuple(
+        re.compile(p) for p in (r"\bcaldera message\b", r"\bpopup\b", r"\bmessage box\b")
+    ),
+    "FORENSIC_COLLECT": tuple(
+        re.compile(p) for p in (r"\bforensic\b", r"\bcollecte\b", r"\bincident response\b")
+    ),
+    "NETWORK_SCAN": tuple(
+        re.compile(p) for p in (r"\bscan\b", r"\bnetwork\b", r"\bport\b", r"\bdecouvrir\b")
+    ),
+    "LOG_ANALYSIS": tuple(
+        re.compile(p) for p in (r"\blog\b", r"\bevenement\b", r"\bevent\b", r"\bsecurity log\b")
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# Contrat minimal du fournisseur d'inférence (ISP).
+# ---------------------------------------------------------------------------
+
+class _ModelProvider(Protocol):
+    """Sous-ensemble d'inférence requis par l'agent cyber."""
+
+    def query(self, prompt: str, model: str, system: str | None = None) -> str: ...
+    def get_active_backend(self) -> str: ...
 
 
 class CyberAgent(BaseAgent):
     """Agent cybersécurité : correspondances de workflows + prompts spécialisés."""
 
-    PROFILE_KEY = "datasecu"
+    PROFILE_KEY: str = "datasecu"
 
-    def __init__(self, model_provider: Any, memory: Any) -> None:
+    def __init__(self, model_provider: _ModelProvider, memory: Any | None = None) -> None:
         super().__init__()
-        self.model = model_provider
-        self.memory = memory
-        self._workflows = self._load_workflows()
+        self.model: _ModelProvider = model_provider
+        # ``memory`` injecté par la factory ; non exploité par run().
+        self.memory: Any | None = memory
+        self._workflows: dict[str, dict[str, Any]] = self._load_workflows()
 
-    def _load_workflows(self) -> dict:
-        """Charge les workflows depuis le fichier de configuration (`cyber_workflows.json`).
+    # ------------------------------------------------------------------
+    # Chargement des workflows
+    # ------------------------------------------------------------------
 
-        Retourne un dict vide si le fichier est absent ou corrompu.
+    @staticmethod
+    def _load_workflows() -> dict[str, dict[str, Any]]:
+        """Charge ``cyber_workflows.json`` (section ``workflows``).
+
+        Dégradation gracieuse : dict vide si absent ; warning si corrompu
+        (observable, mais sans crasher le LLM).
         """
+        workflows_path = Path(CYBER_WORKFLOWS_CONFIG)
         try:
-            with open(CYBER_WORKFLOWS_CONFIG, encoding="utf-8") as f:
-                return json.load(f).get("workflows", {})
-        except (FileNotFoundError, json.JSONDecodeError):
+            with workflows_path.open(encoding="utf-8") as handle:
+                return json.load(handle).get("workflows", {})
+        except FileNotFoundError:
+            return {}
+        except (json.JSONDecodeError, OSError) as exc:
+            _logger.warning("Workflows cyber illisibles (%s): %s", workflows_path, exc)
             return {}
 
-    def run(self, task: str, model: str, context: dict[str, Any]) -> dict:
-        """Exécute une tâche cyber : associe un workflow, construit le prompt et interroge le LLM."""
+    # ------------------------------------------------------------------
+    # Exécution
+    # ------------------------------------------------------------------
+
+    def run(self, task: str, model: str, context: dict[str, Any]) -> AgentRunResult:
+        """Associe un workflow, construit le prompt cyber et interroge le LLM."""
         matched_workflow = self._match_workflow(task)
         system, user = self._build_cyber_messages(task, context, matched_workflow)
-        result = self.model.query(user, model, system=system)
+        response = self.model.query(user, model, system=system)
         return {
-            "agent":           self.PROFILE_KEY,
-            "model":           model,
-            "backend":         self.model.get_active_backend(),
-            "response":        result,
-            "suggested_skill": self._suggest_skill(result, matched_workflow),
+            "agent": self.PROFILE_KEY,
+            "model": model,
+            "backend": self.model.get_active_backend(),
+            "response": response,
+            "suggested_skill": self._suggest_skill(response, matched_workflow),
         }
+
+    # ------------------------------------------------------------------
+    # Composition du prompt
+    # ------------------------------------------------------------------
 
     def _build_cyber_messages(
         self,
         task: str,
         context: dict[str, Any],
-        workflow: dict | None = None,
+        workflow: dict[str, Any] | None = None,
     ) -> tuple[str, str]:
-        """Construit ``(system, user)`` : domaine cyber + workflow détecté + cas/outils."""
-        domain = (
-            "Tu es specialise en cybersecurite. Analyse les logs, identifie les "
-            "vulnerabilites et propose des corrections."
-        )
-        system, _ = self._build_messages(self.PROFILE_KEY, task, context, default_prompt=domain)
-        workflow_prompt = ""
-        if workflow:
-            steps = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(workflow.get("steps", [])))
-            workflow_prompt = f"\nWorkflow detecte: {workflow.get('name','?')}\nEtapes:\n{steps}\n"
-        # Réutilise le bloc « cas similaires » défini dans BaseAgent (DRY)
-        profile = self._load_profile(self.PROFILE_KEY)
-        _, similar_text = self._render_context_blocks(profile, context)
-        tool_results = context.get("tool_results", {})
-        tool_section = ""
-        if tool_results and self.toolbox:
-            tool_section = self.toolbox.tool_results_to_prompt(tool_results)
+        """Construit ``(system, user)`` : domaine cyber + workflow + cas/outils.
+
+        Optimisation : le ``system`` est dérivé directement du prompt de domaine
+        (``_with_skills``) sans repasser par ``_build_messages`` qui reconstruit
+        un ``user`` ici inutilisé. Le bloc « cas similaires » est obtenu sans
+        recharger le profil (``_similar_cases_block`` suffit).
+        """
+        system = self._with_skills(CYBER_DOMAIN_PROMPT).strip()
+
+        workflow_prompt = self._workflow_prompt(workflow)
+        similar_text = self._similar_cases_block(context)
+        tool_section = self._tool_results_section(context)
+
         user = (
             f"Workflows disponibles: {', '.join(self._workflows.keys())}"
             f"{workflow_prompt}"
@@ -73,34 +175,54 @@ class CyberAgent(BaseAgent):
             f"{tool_section}"
             f"\nTache : {task}"
         )
-        return system.strip(), user.strip()
+        return system, user.strip()
 
-    def _match_workflow(self, task: str) -> dict | None:
-        """Retourne le workflow dont un mot-clé regex apparaît dans la tâche, ou None."""
+    @staticmethod
+    def _workflow_prompt(workflow: dict[str, Any] | None) -> str:
+        """Bloc texte du workflow détecté, ou ``''``."""
+        if not workflow:
+            return ""
+        steps = "\n".join(
+            f"  {i + 1}. {s}" for i, s in enumerate(workflow.get("steps", []))
+        )
+        return f"\nWorkflow detecte: {workflow.get('name', '?')}\nEtapes:\n{steps}\n"
+
+    def _tool_results_section(self, context: dict[str, Any]) -> str:
+        """Section ``tool_results`` de la toolbox, défensive (méthode optionnelle)."""
+        tool_results = context.get("tool_results", {})
+        render = getattr(self.toolbox, "tool_results_to_prompt", None)
+        if not tool_results or render is None:
+            return ""
+        return render(tool_results) or ""
+
+    # ------------------------------------------------------------------
+    # Détection de workflow
+    # ------------------------------------------------------------------
+
+    def _match_workflow(self, task: str) -> dict[str, Any] | None:
+        """Retourne le 1er workflow dont un mot-clé regex matche la tâche."""
         task_lower = task.lower()
-        keywords = {
-            "CISA_KNOWN_EXPLOITED_VULNS": [r"\bcisa\b", r"\bkev\b", r"\bknown exploited\b", r"\bvuln\b"],
-            "DETECT_EDR": [r"\bedr\b", r"\bantivirus\b", r"\bdefense\b", r"\bsecurity product\b"],
-            "EDR_TELEMETRY_GAPS": [r"\btelemetry\b", r"\bgap\b", r"\bedr lacune\b"],
-            "TTP_REPORT_ANALYSIS": [r"\bttp\b", r"\bmitre\b", r"\batt&ck\b", r"\breport\b", r"\badversaire\b"],
-            "PRIVILEGE_AUDIT": [r"\bprivilege\b", r"\bwhoami\b", r"\badmin\b", r"\belevation\b"],
-            "CALDERA_INTEL": [r"\bcaldera\b", r"\boperation\b"],
-            "HELLO_CALDERA": [r"\bcaldera message\b", r"\bpopup\b", r"\bmessage box\b"],
-            "FORENSIC_COLLECT": [r"\bforensic\b", r"\bcollecte\b", r"\bincident response\b"],
-            "NETWORK_SCAN": [r"\bscan\b", r"\bnetwork\b", r"\bport\b", r"\bdecouvrir\b"],
-            "LOG_ANALYSIS": [r"\blog\b", r"\bevenement\b", r"\bevent\b", r"\bsecurity log\b"],
-        }
-        for wf_key, patterns in keywords.items():
-            if any(re.search(p, task_lower) for p in patterns):
+        for wf_key, patterns in _WORKFLOW_KEYWORDS.items():
+            if any(pattern.search(task_lower) for pattern in patterns):
                 return self._workflows.get(wf_key)
         return None
 
-    def _suggest_skill(self, result: str, workflow: dict | None = None) -> str | None:
-        """Propose un skill : celui du workflow si défini, sinon détection depuis le code."""
+    # ------------------------------------------------------------------
+    # Skill suggéré & exposition API
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _suggest_skill(
+        result: str, workflow: dict[str, Any] | None = None,
+    ) -> str | None:
+        """Skill du workflow si défini, sinon détection depuis les fences de code."""
         if workflow and workflow.get("suggested_skill"):
             return workflow["suggested_skill"]
-        return self._detect_skill_from_code(result, prefix="security_audit")
+        return BaseAgent._detect_skill_from_code(result, prefix="security_audit")
 
-    def get_workflows(self) -> dict:
-        """Retourne les workflows chargés (pour exposition API)."""
-        return self._workflows
+    def get_workflows(self) -> dict[str, dict[str, Any]]:
+        """Retourne une copie des workflows chargés (exposition API, pas de fuite)."""
+        return dict(self._workflows)
+
+
+__all__ = ["CyberAgent", "CYBER_DOMAIN_PROMPT"]
