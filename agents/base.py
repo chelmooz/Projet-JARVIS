@@ -1,101 +1,188 @@
-"""Classe de base abstraite pour tous les agents JARVIS.
+"""Classe de base abstraite de tous les agents JARVIS.
 
-Définit le contrat commun (méthode `run` abstraite) et les helpers de
-construction de prompt à partir des profils (`config/agent_profiles.json`).
+Définit le contrat commun (``run``) et les helpers de construction de
+prompt à partir des profils (``config/agent_profiles.json``).
+
+Responsabilités (SRP)
+---------------------
+- Contrat d'exécution d'un agent (``run``).
+- Composition du prompt (profil + skills + outils + contexte).
+- Lecture *cachée* des profils, avec invalidation par mtime et protection
+  par verrou (le serveur FastAPI est multi-thread via le threadpool).
+
+Le cache de profils reste un attribut de **classe** volontairement :
+``PROFILES_PATH`` est un *hook* de substitution (tests, sous-classes) et
+doit rester override-able. Le verrou garantit l'atomicité du refresh.
 """
+
+from __future__ import annotations
 
 import json
 import logging
-import os
+import threading
 from abc import ABC, abstractmethod
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol, TypedDict
 
 from config.paths import PROFILES_FILE
 
 _logger = logging.getLogger("jarvis.agents.base")
 
 
+# ---------------------------------------------------------------------------
+# Contrat de retour de ``run`` (dict typé — compat runtime avec les
+# consommateurs graph/controllers qui lisent par clé ``result["response"]``).
+# ---------------------------------------------------------------------------
+
+class AgentRunResult(TypedDict, total=False):
+    """Forme du dict retourné par :meth:`BaseAgent.run`.
+
+    ``response``, ``agent`` et ``model`` sont toujours présents par
+    convention ; les autres clés sont optionnelles.
+    """
+
+    response: str
+    agent: str
+    model: str
+    backend: str
+    suggested_skill: str | None
+    error: str | None
+    metadata: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Contrat structurel de la toolbox injectée (diagnostics + fichiers).
+# ---------------------------------------------------------------------------
+
+class _ToolboxLike(Protocol):
+    """Tout objet exposant ``describe_tools() -> str`` fait l'affaire."""
+
+    def describe_tools(self) -> str: ...
+
+
+# ---------------------------------------------------------------------------
+# Mapping data-driven des fences de code -> extension de fichier.
+# L'ordre d'insertion fixe la priorité de détection (powershell > bash > py).
+# ---------------------------------------------------------------------------
+
+_CODE_FENCE_TO_EXT: dict[str, str] = {
+    "```powershell": "ps1",
+    "```bash": "sh",
+    "```python": "py",
+}
+
+
 class BaseAgent(ABC):
     """Contrat commun à tous les agents (dev, network, hardware, cyber, vision)."""
 
-    PROFILES_PATH = PROFILES_FILE
-    _profile_cache: dict[str, dict] = {}
+    # Hook de substitution (tests / sous-classes) : chemin du fichier de profils.
+    PROFILES_PATH: Path = PROFILES_FILE
+
+    # Cache de classe partagé + invalidation par mtime, protégés par verrou.
+    _profile_cache: dict[str, dict[str, Any]] = {}
     _profile_mtime: float = 0.0
+    _cache_lock: threading.Lock = threading.Lock()
 
     def __init__(self) -> None:
-        self.toolbox = None
+        self.toolbox: _ToolboxLike | None = None
 
-    def inject_toolbox(self, toolbox: Any) -> None:
-        """Branche la toolbox (diagnostics + fichiers) utilisée pour décrire les outils."""
+    def inject_toolbox(self, toolbox: _ToolboxLike | None) -> None:
+        """Branche la toolbox (diagnostics + fichiers) décrivant les outils."""
         self.toolbox = toolbox
 
     @abstractmethod
-    def run(self, task: str, model: str, context: dict[str, Any]) -> dict:
-        """Exécute une tâche et retourne {'response', 'agent', 'model', ...}."""
+    def run(self, task: str, model: str, context: dict[str, Any]) -> AgentRunResult:
+        """Exécute une tâche et retourne un :class:`AgentRunResult`."""
         raise NotImplementedError
 
-    def _load_profile(self, profile_key: str) -> dict:
-        """Charge un profil depuis PROFILES_PATH (section `profiles`).
+    # ------------------------------------------------------------------
+    # Chargement des profils (cache mtime + verrou)
+    # ------------------------------------------------------------------
 
-        Cache classe avec invalidation au mtime pour eviter I/O disque
-        a chaque requete (sur cle USB lente, 5-15 ms par read).
-        Retourne un dict vide si le fichier est absent ou corrompu.
+    def _load_profile(self, profile_key: str) -> dict[str, Any]:
+        """Charge un profil (section ``profiles``) avec cache invalidé au mtime.
+
+        Évite un I/O disque par requête (5-15 ms sur clef USB lente).
+        Le verrou rend le refresh atomique en environnement multi-thread.
+        Retourne un dict vide si le fichier est absent ; logge en warning
+        si le JSON est corrompu (dégradation gracieuse, pas de crash LLM).
         """
-        try:
-            current_mtime = os.path.getmtime(self.PROFILES_PATH)
-        except OSError:
-            return {}
-        if current_mtime != self._profile_mtime:
+        profiles_path = Path(self.PROFILES_PATH)
+        with self._cache_lock:
             try:
-                with open(self.PROFILES_PATH, encoding="utf-8") as f:
-                    profiles = json.load(f).get("profiles", {})
-            except (FileNotFoundError, json.JSONDecodeError):
+                current_mtime = profiles_path.stat().st_mtime
+            except OSError:
                 return {}
-            self.__class__._profile_cache.clear()
-            self.__class__._profile_cache.update(profiles)
-            self.__class__._profile_mtime = current_mtime
-        return self._profile_cache.get(profile_key, {})
+            if current_mtime != self._profile_mtime:
+                try:
+                    with profiles_path.open(encoding="utf-8") as handle:
+                        profiles = json.load(handle).get("profiles", {})
+                except FileNotFoundError:
+                    return {}
+                except json.JSONDecodeError as exc:
+                    _logger.warning("Profils corrompus (%s): %s", profiles_path, exc)
+                    return {}
+                self.__class__._profile_cache = dict(profiles)
+                self.__class__._profile_mtime = current_mtime
+            return self._profile_cache.get(profile_key, {})
+
+    # ------------------------------------------------------------------
+    # Composition du prompt
+    # ------------------------------------------------------------------
 
     @staticmethod
-    def _similar_cases_block(context: dict) -> str:
-        """Retourne le texte des cas similaires récents (limité à 3), ou ''."""
-        similar = context.get("similar_cases", [])
-        if not similar:
-            return ""
-        items = "\n".join(f"  - {s['text'][:200]}" for s in similar[:3])
-        return f"\nCas similaires récents :\n{items}"
+    def _with_skills(system: str) -> str:
+        """Ajoute le texte des skills activés au system prompt (DRY).
+
+        Dégradation silencieuse : si ``skills.json`` est illisible, le
+        prompt LLM n'est jamais cassé (l'erreur est loggée en amont).
+        """
+        skills_text = BaseAgent._enabled_skills()
+        return f"{system}\n\n{skills_text}" if skills_text else system
 
     @staticmethod
     def _enabled_skills() -> str:
-        """Texte des skills activés (toggle Skills), '' si aucun ou erreur I/O.
+        """Texte des skills activés (toggle Skills), ``''`` si aucun/erreur.
 
-        Import paresseux pour éviter tout cycle avec services.skills ; jamais
-        levé pour ne pas casser le prompt LLM si skills.json est illisible.
+        Import paresseux pour éviter tout cycle avec ``services.skills``.
         """
         from services.skills import get_enabled_skills_text
 
         try:
             return get_enabled_skills_text()
-        except Exception as e:  # noqa: BLE001 - dégradations silencieuses tolérées
-            _logger.warning("Skills ignorés (toggle inactif): %s", e)
+        except Exception as exc:  # noqa: BLE001 - dégradation tolérée
+            _logger.warning("Skills ignorés (toggle inactif): %s", exc)
             return ""
 
     @staticmethod
-    def _render_context_blocks(profile: dict, context: dict) -> tuple[str, str]:
-        """Construit les blocs de texte réutilisables (outils + cas similaires).
+    def _similar_cases_block(context: dict[str, Any]) -> str:
+        """Texte des cas similaires récents (max 3), ou ``''``."""
+        similar = context.get("similar_cases", [])
+        if not similar:
+            return ""
+        items = "\n".join(f"  - {s.get('text', '')[:200]}" for s in similar[:3])
+        return f"\nCas similaires récents :\n{items}"
 
-        Retourne ``(tools_desc, similar_text)`` prêts à injecter dans un prompt.
-        Évite la duplication entre `_profile_prompt` et `_build_messages`.
-        """
+    @staticmethod
+    def _render_context_blocks(
+        profile: dict[str, Any], context: dict[str, Any],
+    ) -> tuple[str, str]:
+        """Construit les blocs réutilisables ``(tools_desc, similar_text)``."""
         tools = profile.get("tools", {})
         tools_desc = (
-            "\nOutils disponibles :\n" + "\n".join(
-                f"  - {k}: {v}" for k, v in tools.items()
-            )
+            "\nOutils disponibles :\n"
+            + "\n".join(f"  - {k}: {v}" for k, v in tools.items())
             if tools
             else ""
         )
         return tools_desc, BaseAgent._similar_cases_block(context)
+
+    def _toolbox_block(self) -> str:
+        """Description de la toolbox injectée, préfixée d'un saut de ligne."""
+        if self.toolbox is None:
+            return ""
+        toolbox_desc = self.toolbox.describe_tools()
+        return f"\n{toolbox_desc}" if toolbox_desc else ""
 
     def _profile_prompt(
         self,
@@ -104,29 +191,17 @@ class BaseAgent(ABC):
         context: dict[str, Any],
         default_prompt: str | None = None,
     ) -> str:
-        """Assemble un prompt monolitaire (system + outils + contexte + tâche).
+        """Prompt monolithe (system + outils + contexte + tâche).
 
-        `default_prompt` (optionnel) remplace le system prompt du profil chargé
-        (utilisé par les agents spécialisés : domaine cyber, prompt métier…).
+        ``default_prompt`` remplace le system prompt du profil (agents
+        spécialisés : domaine cyber, prompt métier…).
         """
         profile = self._load_profile(profile_key)
         system = default_prompt if default_prompt is not None else profile.get("system_prompt", "")
-        skills_text = self._enabled_skills()
-        if skills_text:
-            system = f"{system}\n\n{skills_text}"
+        system = self._with_skills(system)
         tools_desc, similar_text = self._render_context_blocks(profile, context)
         history = context.get("recent_tasks", [])
         return f"{system}{tools_desc}\nContexte récent : {history}{similar_text}\nTâche : {task}"
-
-    def _toolbox_block(self) -> str:
-        """Retourne la description de la toolbox (diagnostics + fichiers), préfixée d'un saut de ligne.
-
-        Helper extrait pour respecter la limite d'arguments/longueur (Clean Code §3.B).
-        """
-        if not self.toolbox:
-            return ""
-        toolbox_desc = self.toolbox.describe_tools()
-        return f"\n{toolbox_desc}" if toolbox_desc else ""
 
     def _build_messages(
         self,
@@ -135,16 +210,16 @@ class BaseAgent(ABC):
         context: dict[str, Any],
         default_prompt: str | None = None,
     ) -> tuple[str, str]:
-        """Retourne ``(system_prompt, user_prompt)`` séparés pour l'appel LLM.
+        """Retourne ``(system_prompt, user_prompt)`` séparés pour le LLM.
 
-        Ajoute la description de la toolbox (diagnostics + fichiers) si injectée.
-        `default_prompt` (optionnel) remplace le system prompt du profil chargé.
+        La description de la toolbox y est ajoutée côté *user* (contrairement
+        à :meth:`_profile_prompt` qui la place côté *system*) : cette
+        répartition est conservée telle quelle pour éviter toute régression
+        de prompt. ``default_prompt`` remplace le system prompt du profil.
         """
         profile = self._load_profile(profile_key)
         system = default_prompt if default_prompt is not None else profile.get("system_prompt", "")
-        skills_text = self._enabled_skills()
-        if skills_text:
-            system = f"{system}\n\n{skills_text}"
+        system = self._with_skills(system)
         tools_desc, similar_text = self._render_context_blocks(profile, context)
         toolbox_desc = self._toolbox_block()
         history = context.get("recent_tasks", [])
@@ -153,11 +228,11 @@ class BaseAgent(ABC):
 
     @staticmethod
     def _detect_skill_from_code(result: str, prefix: str = "script") -> str | None:
-        """Détecte l'extension de fichier à partir des blocs de code (```powershell/bash/python)."""
-        if "```powershell" in result:
-            return f"{prefix}.ps1"
-        if "```bash" in result:
-            return f"{prefix}.sh"
-        if "```python" in result:
-            return f"{prefix}.py"
+        """Détecte l'extension à partir des fences de code (```powershell/bash/python)."""
+        for fence, ext in _CODE_FENCE_TO_EXT.items():
+            if fence in result:
+                return f"{prefix}.{ext}"
         return None
+
+
+__all__ = ["BaseAgent", "AgentRunResult"]
