@@ -231,7 +231,7 @@ class AgentOutput:
 # ---------------------------------------------------------------------------
 # Compat ascendante (deprecated — utiliser AgentInput directement)
 # ---------------------------------------------------------------------------
-Task = AgentInput  # Alias legacy pour tests/test_router.py
+Task = AgentInput  # Alias legacy pour tests/test_router.py et services/router.py
 
 
 __all__ = [
