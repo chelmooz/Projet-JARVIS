@@ -1,0 +1,17 @@
+pipeline:
+  id: code_review
+  on_error: abort
+  description: "Analyse un script → revue de code → audit securite"
+  steps:
+    - name: review_code
+      agent_key: dev
+      prompt_template: "Revise ce code et suggere des ameliorations : {task}"
+      on_error: abort
+    - name: security_audit
+      agent_key: cyber
+      prompt_template: "Analyse les risques de securite dans ce code : {task}"
+      on_error: abort
+    - name: consolidate
+      agent_key: dev
+      prompt_template: "Consolide les retours de revue et securite en plan d'action : {task}"
+      on_error: skip

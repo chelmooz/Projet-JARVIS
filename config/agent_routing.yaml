@@ -1,0 +1,71 @@
+# Configuration du routage d'agents — préfixes, mots-clés, fallback
+prefix_map:
+  "@cyber": cyber
+  "@dev": dev
+  "@network": network
+  "@hardware": hardware
+  "@vision": vision
+  "@orchestrateur": dev
+  "@techlead": dev
+  "@devops": dev
+  "@designer": dev
+  "@datasecu": cyber
+
+keyword_map:
+  cyber:
+    - securite
+    - security
+    - log
+    - audit
+    - firewall
+    - forensic
+    - vulnerabilite
+    - malware
+    - virus
+    - hack
+    - attaque
+    - intrusion
+  dev:
+    - script
+    - code
+    - debug
+    - python
+    - bash
+    - powershell
+    - fonction
+    - programme
+    - algorithme
+    - developpement
+  network:
+    - reseau
+    - network
+    - ip
+    - vlan
+    - tcp
+    - ping
+    - dns
+    - routeur
+    - port
+    - connectivite
+    - wifi
+    - latence
+  hardware:
+    - driver
+    - bios
+    - ram
+    - cpu
+    - disque
+    - materiel
+    - temperature
+    - panne
+    - ecran bleu
+    - ventilo
+  vision:
+    - image
+    - screenshot
+    - capture
+    - photo
+    - visuel
+    - ecran
+
+fallback: dev

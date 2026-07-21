@@ -1,0 +1,12 @@
+# Configuration des adapters backend
+# Modifier ici pour changer de backend sans toucher au code
+
+ollama:
+  base_url: "http://127.0.0.1:11436"
+  models_dir: "models/ollama/"
+
+embedding:
+  model: "nomic-embed-text-v2-moe"
+
+default_backend: "ollama"
+timeout: 120

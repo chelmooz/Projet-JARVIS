@@ -1,0 +1,8 @@
+{
+  "qwen2.5":                          {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 4.5, "cpu_only": false},
+  "phi-4-mini-instruct-abliterated":  {"ram_min_gb": 2,  "vram_min_gb": 0,  "disk_gb": 2.6, "cpu_only": true},
+  "deepseek-coder-v2-lite-instruct":  {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 4.0, "cpu_only": false},
+  "ornith-1.0-9b":                    {"ram_min_gb": 16, "vram_min_gb": 8,  "disk_gb": 9.0, "cpu_only": false},
+  "llama3.2-vision":                  {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 7.0, "cpu_only": false, "vision": true},
+  "nomic-embed-text-v2-moe":          {"ram_min_gb": 2,  "vram_min_gb": 0,  "disk_gb": 0.6, "cpu_only": true, "embedding": true}
+}

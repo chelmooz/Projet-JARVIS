@@ -1,0 +1,56 @@
+name: build-mac-portable-python
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download CPython standalone
+        run: |
+          curl -L -o cpython.tar.gz \
+            "https://github.com/astral-sh/python-build-standalone/releases/download/20250723/cpython-3.13.5+20250723-aarch64-apple-darwin-install_only.tar.gz"
+          tar xzf cpython.tar.gz
+      - name: Install dependencies
+        run: |
+          ./python/bin/python3 -m ensurepip
+          ./python/bin/python3 -m pip install \
+            --target=./python/lib/python3.13/site-packages \
+            -r requirements-reference.txt
+      - name: Package
+        run: |
+          mkdir -p portable_python/mac/arm64
+          cp -r python/* portable_python/mac/arm64/
+          ln -s lib/python3.13/site-packages portable_python/mac/arm64/site-packages 2>/dev/null || true
+          tar czf mac-arm64-python.tar.gz -C portable_python/mac arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-arm64-python
+          path: mac-arm64-python.tar.gz
+
+  build-x86_64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download CPython standalone
+        run: |
+          curl -L -o cpython.tar.gz \
+            "https://github.com/astral-sh/python-build-standalone/releases/download/20250723/cpython-3.13.5+20250723-x86_64-apple-darwin-install_only.tar.gz"
+          tar xzf cpython.tar.gz
+      - name: Install dependencies
+        run: |
+          ./python/bin/python3 -m ensurepip
+          ./python/bin/python3 -m pip install \
+            --target=./python/lib/python3.13/site-packages \
+            -r requirements-reference.txt
+      - name: Package
+        run: |
+          mkdir -p portable_python/mac/x86_64
+          cp -r python/* portable_python/mac/x86_64/
+          ln -s lib/python3.13/site-packages portable_python/mac/x86_64/site-packages 2>/dev/null || true
+          tar czf mac-x86_64-python.tar.gz -C portable_python/mac x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-x86_64-python
+          path: mac-x86_64-python.tar.gz

@@ -1,0 +1,26 @@
+{
+  "ollama": {
+    "linux": {
+      "version": "0.134.0",
+      "arch": "x86_64",
+      "date": "2026-06-17",
+      "note": ""
+    },
+    "mac": {
+      "version": "0.134.0",
+      "arch": "universal (x86_64 + arm64)",
+      "date": "2026-06-17"
+    },
+    "win": {
+      "version": "0.134.0",
+      "arch": "x86_64",
+      "date": "2026-06-17"
+    }
+  },
+  "diagnostic": {
+    "windows": ["handle64.exe", "PsInfo64.exe", "psloglist64.exe", "psping64.exe", "PsService64.exe", "smartctl.exe"],
+    "linux": "Voir README — utiliser smartmontools natif",
+    "mac": "Voir README — utiliser smartmontools via brew"
+  },
+  "generated": "2026-06-29"
+}

@@ -1,0 +1,76 @@
+# Configuration des triggers Toolbox — mot-clés → outil
+triggers:
+  - keywords: [disque, disk, smart, hdd, ssd, stockage]
+    key: disk
+    tool: smartctl
+    description: "SMART disk health (smartctl)"
+  - keywords: [info, systeme, system, configuration]
+    key: system
+    tool: psinfo
+    description: "system information (PsInfo)"
+  - keywords: [log, journal, evenement, event]
+    key: log
+    tool: psloglist
+    description: "Windows Event Log (psloglist)"
+  - keywords: [handle, processus, process, fichier ouvert]
+    key: process
+    tool: handle
+    description: "open file handles (handle)"
+  - keywords: [ping, latence, connectivite, connectivity, reseau, network]
+    key: network
+    tool: psping
+    description: "ping & latency (psping)"
+  - keywords: [service, windows, demarrage, startup]
+    key: service
+    tool: psservice
+    description: "service status (PsService)"
+  - keywords: [liste, dossier, ls, dir, repertoire, contenu du dossier]
+    key: ls
+    tool: list_dir
+    description: "lister un dossier autorise"
+  - keywords: [cat, ouvre, read, lecture, lit, fichier, contenu du fichier, texte]
+    key: read
+    tool: read_file
+    description: "lire un fichier texte (max 10 Ko)"
+  - keywords: [cherche, trouve, find, grep, recherche]
+    key: find
+    tool: find_files
+    description: "chercher fichiers par pattern glob"
+
+  # ── Kill Coding (SOLID / TDD / Clean Code / KISS) ──
+  - keywords: [kill, coding, solide, solid, clean code, kiss, qualite, quality, analyse code, code review]
+    key: kill_analyze
+    tool: kill_analyze
+    description: "analyse un fichier Python (SOLID, Clean Code, KISS)"
+  - keywords: [test, tdd, test manquant, coverage, couverture]
+    key: kill_tests
+    tool: kill_tests
+    description: "verifie si un fichier source a des tests associes (TDD)"
+  - keywords: [audit code, audit projet, global, project, tout le code]
+    key: kill_project
+    tool: kill_project
+    description: "audit complet du projet (SOLID, tests, qualite)"
+
+  # ── Code Review (sécurité / performance / maintenabilité) ──
+  - keywords: [securite, security, securisé, sql inject, xss, secret, password, vulnérabilité, vulnerability]
+    key: code_review_sec
+    tool: code_review
+    description: "revue de sécurité d'un fichier Python (secrets, injections, XSS)"
+  - keywords: [performance, lent, slow, optimise, optimisation, boucle, n+1, requete, query]
+    key: code_review_perf
+    tool: code_review
+    description: "revue de performance d'un fichier Python (boucles, N+1, allocations)"
+  - keywords: [maintenabilité, maintainability, duplication, complexite, refactor, dette technique]
+    key: code_review_maint
+    tool: code_review
+    description: "revue de maintenabilité d'un fichier Python (duplication, complexité)"
+  - keywords: [revue complete, review full, audit securite, audit performance]
+    key: code_review_full
+    tool: code_review
+    description: "revue complète sécurité + performance + maintenabilité d'un fichier Python"
+
+  # ── Audit Qualité (global) ──
+  - keywords: [audit qualite, quality audit, qualite projet, audit global, etat du projet, bilan projet, project health, quality report]
+    key: quality_audit
+    tool: quality_audit
+    description: "audit complet du projet : code, tests, structure, documentation"

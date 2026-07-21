@@ -1,0 +1,153 @@
+{
+    "description": "Workflows cybersecurite issus de NVISOsecurity/cyber-security-llm-agents + JARVIS",
+    "version": "1.0",
+    "workflows": {
+        "CISA_KNOWN_EXPLOITED_VULNS": {
+            "name": "CISA KEV — Resume des dernieres vulns connues",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "📋",
+            "agents": ["cyber", "dev"],
+            "steps": [
+                "Telecharger https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+                "Extraire les 10 dernieres entrees du tableau 'vulnerabilities'",
+                "Resumer chaque vuln : produit, description courte, lien",
+                "Afficher dans un tableau structure"
+            ],
+            "prompt": "Analyse le flux CISA KEV et resume les 10 dernieres vulnerabilites exploitees connues. Pour chaque vuln : produit concerne, description, score si disponible, lien de reference. Formate en tableau.",
+            "output_type": "table",
+            "suggested_skill": "cisa_kev_report"
+        },
+        "DETECT_EDR": {
+            "name": "Detection EDR — identifier l'EDR en cours",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "🛡️",
+            "agents": ["cyber", "hardware"],
+            "steps": [
+                "Telecharger https://raw.githubusercontent.com/tsale/EDR-Telemetry/main/README.md",
+                "Extraire la liste des produits de securite mentionnes",
+                "Lister les services Windows en cours",
+                "Croiser les deux listes pour identifier l'EDR actif"
+            ],
+            "prompt": "Identifie quel logiciel de securite (EDR/AV) est installe sur ce systeme. Liste les processus et services lies a la securite, compare avec la base EDR-Telemetry, et conclus quel produit est actif.",
+            "output_type": "analysis",
+            "suggested_skill": "edr_detection"
+        },
+        "EDR_TELEMETRY_GAPS": {
+            "name": "Analyse des lacunes telemetriques EDR",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "🔍",
+            "agents": ["cyber"],
+            "steps": [
+                "Telecharger https://raw.githubusercontent.com/tsale/EDR-Telemetry/main/EDR_telem.json",
+                "Identifier les sous-categories non couvertes par l'EDR cible",
+                "Resumer les lacunes par categorie"
+            ],
+            "prompt": "Analyse les lacunes telemetriques de l'EDR courant en utilisant la base EDR-Telemetry. Liste les sous-categories non couvertes et suggere des ameliorations.",
+            "output_type": "gap_analysis",
+            "suggested_skill": "edr_gaps_audit"
+        },
+        "TTP_REPORT_ANALYSIS": {
+            "name": "Analyse de rapport TTP — extraire les techniques MITRE",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "📄",
+            "agents": ["cyber"],
+            "steps": [
+                "Telecharger un rapport de securite depuis une URL",
+                "Extraire les techniques MITRE ATT&CK mentionnees",
+                "Mapper a des capacites Caldera si disponible",
+                "Creer un profil adversaire"
+            ],
+            "prompt": "Analyse ce rapport de menace et extrait toutes les techniques MITRE ATT&CK. Pour chaque technique : tactique, ID MITRE, description, et recommandation de detection.",
+            "output_type": "mitre_mapping",
+            "suggested_skill": "ttp_analyzer"
+        },
+        "PRIVILEGE_AUDIT": {
+            "name": "Audit des privileges utilisateur",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "🔑",
+            "agents": ["cyber", "hardware"],
+            "steps": [
+                "Executer 'whoami /all' ou equivalent",
+                "Lister tous les privileges",
+                "Determiner le niveau (standard/administrateur/systeme)",
+                "Identifier les privileges excessifs"
+            ],
+            "prompt": "Audite les privileges de l'utilisateur courant. Execute whoami /all (Windows) ou id (Linux), liste les privileges, identifie ceux qui sont excessifs ou dangereux, et donne une conclusion sur le niveau de compromission potentiel.",
+            "output_type": "audit",
+            "suggested_skill": "priv_audit"
+        },
+        "CALDERA_INTEL": {
+            "name": "Collecte d'info Caldera",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "⚡",
+            "agents": ["cyber", "network"],
+            "steps": [
+                "Interroger l'API Caldera pour l'operation active",
+                "Recuperer les infos de l'agent actif (PAW)",
+                "Lister les capacites disponibles"
+            ],
+            "prompt": "Interroge l'API Caldera (http://localhost:8888) pour recuperer les informations sur l'operation et l'agent actif : ID operation, PAW de l'agent, capacites chargees. Format JSON.",
+            "output_type": "intel",
+            "suggested_skill": "caldera_collect"
+        },
+        "HELLO_CALDERA": {
+            "name": "Hello Caldera — message sur l'agent",
+            "source": "NVISOsecurity/cyber-security-llm-agents",
+            "emoji": "💬",
+            "agents": ["cyber"],
+            "steps": [
+                "Recuperer l'agent Caldera actif",
+                "Utiliser powershell pour afficher une message box"
+            ],
+            "prompt": "Envoie un message a l'agent Caldera pour afficher une boite de dialogue sur le bureau avec un message de securite.",
+            "output_type": "command",
+            "suggested_skill": "caldera_hello"
+        },
+        "FORENSIC_COLLECT": {
+            "name": "Collecte forensique rapide",
+            "source": "JARVIS native",
+            "emoji": "🔬",
+            "agents": ["cyber", "hardware"],
+            "steps": [
+                "Collecter les logs evenements (Security, System)",
+                "Verifier les connexions reseau actives",
+                "Lister les processus anormaux",
+                "Verifier les entrees de demarrage"
+            ],
+            "prompt": "Effectue une collecte forensique rapide : analyse les logs evenements recents, liste les connexions reseau etablies, identifie les processus suspects, verifie les persistances (startup, scheduled tasks, services). Genere un rapport structure.",
+            "output_type": "forensic_report",
+            "suggested_skill": "quick_forensic"
+        },
+        "NETWORK_SCAN": {
+            "name": "Scan reseau et inventaire",
+            "source": "JARVIS native",
+            "emoji": "\ud83c\udf10",
+            "agents": ["cyber", "network"],
+            "steps": [
+                "1. Decouvrir les hotes actifs avec Get-NetNeighbor (ARP) + ping sweep",
+                "2. Tester les ports courants (22, 80, 443, 445, 3389, 5985, 5986) sur chaque hote",
+                "3. Identifier les services exposes et les processus associes",
+                "4. Signaler les ports dangereux et generer un tableau IP:ports:criticite",
+                "5. Option : ecrire le resultat dans un fichier scan_$date.txt"
+            ],
+            "prompt": "Execute un scan reseau PowerShell : Get-NetNeighbor pour la decouverte ARP, Test-NetConnection pour les ports, Get-Service pour les services. Genere un tableau structure IP : ports ouverts : services : niveau de dangerosite.",
+            "output_type": "scan",
+            "suggested_skill": "network_sweep"
+        },
+        "LOG_ANALYSIS": {
+            "name": "Analyse de logs evenements",
+            "source": "JARVIS native",
+            "emoji": "📊",
+            "agents": ["cyber"],
+            "steps": [
+                "Analyser les derniers evenements (Security, Sysmon)",
+                "Identifier les evenements critiques (4625, 4688, 4648)",
+                "Correler avec les IoC connus",
+                "Generer un rapport temporel"
+            ],
+            "prompt": "Analyse les logs evenements Windows : identifier les tentatives de connexion echouees (EventID 4625), les processus crees (4688), les connexions RDP (4648). Resume les evenements critiques sur les dernieres 24h.",
+            "output_type": "temporal_analysis",
+            "suggested_skill": "event_log_cruncher"
+        }
+    }
+}

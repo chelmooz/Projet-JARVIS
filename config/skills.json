@@ -1,0 +1,63 @@
+{
+  "version": "1.0",
+  "skills": [
+    {
+      "id": "kill_coding",
+      "name": "\ud83d\udd2a Kill Coding",
+      "description": "Architecture SOLID, TDD, clean code, KISS \u2014 regles de codage strictes",
+      "category": "developpement",
+      "enabled": false,
+      "prompt": "## Regles de codage\n1. **SOLID** : Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion\n2. **TDD** : Red-Green-Refactor \u2014 ecris le test d'abord, fais-le passer, refactore\n3. **Clean Code** : noms explicites, fonctions courtes, docstrings, pas de commentaires superflus\n4. **KISS** : Keep It Simple and Stupid \u2014 pas de sur-ingenierie"
+    },
+    {
+      "id": "network_sweep",
+      "name": "\ud83c\udf10 Network Sweep",
+      "description": "Scan reseau, inventaire des hotes, detection de ports ouverts et services exposes",
+      "category": "securite",
+      "enabled": false,
+      "prompt": "## Regles de scan reseau\n1. **Decouverte** : utilise ARP table (Get-NetNeighbor) et ping sweep (Test-Connection) pour lister les hotes actifs\n2. **Ports** : teste les ports courants (22, 80, 443, 445, 3389, 5985, 5986) sur chaque hote avec Test-NetConnection\n3. **Services** : identifie les services exposes via Get-Service et Get-Process sur les hotes accessibles\n4. **Dangerosite** : signale tout port dangereux ouvert (RDP 3389, SMB 445, Telnet 23, MSSQL 1433)\n5. **Rapport** : genere un tableau structure avec IP, hostname, ports ouverts, services, criticite"
+    },
+    {
+      "id": "cyber_audit",
+      "name": "\ud83d\udee1\ufe0f Cyber Audit",
+      "description": "Regles d'analyse de securite : verifier logs, processus, ports, persistances",
+      "category": "securite",
+      "enabled": false,
+      "prompt": "## Regles d'audit cyber\n1. Verifie les logs evenements (Security, System) pour les 24 dernieres heures\n2. Liste les connexions reseau etablies et les ports en ecoute\n3. Identifie les processus anormaux (CPU, memoire, signature suspecte)\n4. Verifie les persistances : startup, scheduled tasks, services, WMI\n5. Signale tout IoC identifie avec son niveau de criticite"
+    },
+    {
+      "id": "code_review",
+      "name": "\ud83d\udccb Code Review",
+      "description": "Revue de code automatique : securite, performance, maintenabilite",
+      "category": "developpement",
+      "enabled": false,
+      "prompt": "## Regles de revue de code\n1. **Securite** : cherche les injections SQL, XSS, path traversal, hardcoded secrets\n2. **Performance** : boucles inutiles, N+1 queries, allocations excessives\n3. **Maintenabilite** : duplication, complexite cyclomatique, nommage\n4. **Testing** : verifie que le code est testable et qu'il existe des tests\n5. Rend un rapport structure avec criticite par finding"
+    },
+    {
+      "id": "runbook_rag",
+      "name": "Runbook RAG",
+      "description": "Ingestion et recherche vectorielle de runbooks avec scrubbing PII/secrets",
+      "category": "developpement",
+      "enabled": false,
+      "source": "manual_script",
+      "prompt": "## Runbook RAG\n1. **Scrub la requete** avec sanitize.scrub() avant tout embedding\n2. **Recherche** via VectorService.search() \u2014 ne pas creer de service parallele\n3. **Scrub les excerpts** retournes avant de les renvoyer (PII/secrets dans les runbooks)\n4. **Filtre optionnel** par service via metadata[\"service\"]\n5. **Hash dedup** : chaque chunk a un metadata[\"hash\"] sha256 pour skipper les increments inchanges"
+    },
+    {
+      "id": "quality_audit",
+      "name": "Audit Qualite",
+      "description": "Audit complet du projet : code quality, tests, structure, documentation, score global",
+      "category": "developpement",
+      "enabled": false,
+      "prompt": "## Audit Qualite\n1. **Code Quality** : lance Kill Coding + Code Review sur tous les fichiers source\n2. **Tests** : verifie le taux de reussite, l'existence de tests par source, la couverture\n3. **Structure** : verifie que toutes les routes sont importables, les outils enregistres, pas d'imports morts\n4. **Dependances** : verifie que tous les imports internes resolvent\n5. **Documentation** : verifie la presence de docstrings, README, CHANGELOG, licence\n6. **Score composite** : moyenne ponderee de tous les sous-scores (code 40%, tests 30%, structure 15%, docs 15%)"
+    },
+    {
+      "id": "loop_engineering",
+      "name": "Loop Engineering",
+      "description": "Pilotage de boucles agentiques : RTOC, pre-vol 4 questions, anatomie 5 blocs, detection de stagnation, verifier sub-agent isole",
+      "category": "developpement",
+      "enabled": false,
+      "source": "manual_script",
+      "prompt": "## Loop Engineering\n1. **Pre-vol** : valider les 4 questions (tache recurrente ? condition arret scriptable ? cout de reprise supportable ? autonome ?)\n2. **Etat** : fichier J:\\loop.md avec header (max_iterations, condition_arret, stagnation_max) + historique append-only\n3. **Cycle** : RED (max_iterations) \u2192 condition_arret (bash) \u2192 action \u2192 GREEN (assertion bash) \u2192 stagnation check \u2192 append\n4. **Verifier** : modele distinct si condition arret non scriptable \u2014 jamais le meme que l'acteur\n5. **Anti-patterns** : pas de self-improvement loop non isolee, pas de condition textuelle, pas d'historique complet relu"
+    }
+  ]
+}

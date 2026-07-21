@@ -1,0 +1,21 @@
+pipeline:
+  id: full_audit
+  on_error: abort
+  description: "Audit complet systeme + reseau + securite"
+  steps:
+    - name: system_check
+      agent_key: hardware
+      prompt_template: "Diagnostique l'etat du systeme : {task}"
+      on_error: abort
+    - name: network_check
+      agent_key: network
+      prompt_template: "Analyse la configuration reseau : {task}"
+      on_error: abort
+    - name: security_check
+      agent_key: cyber
+      prompt_template: "Audit de securite : {task}"
+      on_error: abort
+    - name: consolidate_report
+      agent_key: dev
+      prompt_template: "Consolide les 3 audits en un rapport structure : {task}"
+      on_error: skip

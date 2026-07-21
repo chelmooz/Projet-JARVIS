@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0e17">
+<meta name="description" content="JARVIS Portable Edition v5.4 — Assistant IA local avec 5 agents, analyse d'images et mémoire vectorielle.">
+<meta property="og:title" content="JARVIS Portable Edition">
+<meta property="og:description" content="Assistant IA local sécurisé — 100% portable, zéro installation système.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2313161f'/%3E%3Cpath d='M9 11h14M11 11v9a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-9' fill='none' stroke='%2338bdf8' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='12.5' cy='17' r='1.6' fill='%23818cf8'/%3E%3Ccircle cx='19.5' cy='17' r='1.6' fill='%23818cf8'/%3E%3C/svg%3E">
+<title>JARVIS Portable</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/chart.umd.min.js" defer></script>
+</head>
+<body>
+<noscript>
+  <div class="noscript-banner">
+    ⚠️ JARVIS nécessite JavaScript. Activez-le dans les paramètres de votre navigateur.
+  </div>
+</noscript>
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>JARVIS</h1>
+    <div class="sub">Portable · v5.4</div>
+  </div>
+  <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale">
+    <button class="tab-btn active" data-tab="chat" aria-label="Chat" title="Chat">
+      <span class="icon" aria-hidden="true">💬</span> Chat
+    </button>
+    <button class="tab-btn" data-tab="conversations" aria-label="Conversations" title="Historique des conversations">
+      <span class="icon" aria-hidden="true">🗂️</span> Conversations
+    </button>
+    <button class="tab-btn" data-tab="agents" aria-label="Agents" title="Agents">
+      <span class="icon" aria-hidden="true">🧠</span> Agents
+    </button>
+    <button class="tab-btn" data-tab="skills" aria-label="Skills" title="Compétences">
+      <span class="icon" aria-hidden="true">⚡</span> Skills
+    </button>
+    <button class="tab-btn" data-tab="vision" aria-label="Vision" title="Analyse d'image">
+      <span class="icon" aria-hidden="true">📷</span> Vision
+    </button>
+    <button class="tab-btn" data-tab="tools" aria-label="Outils" title="Outils de diagnostic">
+      <span class="icon" aria-hidden="true">🔧</span> Outils
+    </button>
+    <button class="tab-btn" data-tab="analytics" aria-label="Analytics" title="Statistiques">
+      <span class="icon" aria-hidden="true">📊</span> Analytics
+    </button>
+    <button class="tab-btn" data-tab="settings" aria-label="Réglages" title="Paramètres">
+      <span class="icon" aria-hidden="true">⚙️</span> Réglages
+    </button>
+  </nav>
+  <div class="sidebar-convs" id="sidebar-convs">
+    <div class="sidebar-convs-header" id="sidebar-convs-header">
+      <span class="label">💬 Conversations</span>
+      <span class="arrow" id="conv-arrow">▶</span>
+      <button class="clear-btn" id="clear-convs-btn" style="display:none">✕ Tout effacer</button>
+    </div>
+    <div class="sidebar-convs-list empty" id="conv-list">Aucune conversation</div>
+  </div>
+  <div class="sidebar-status" id="status-bar" role="status" aria-live="polite">
+    <div>Backend: <span id="st-backend">—</span></div>
+    <div>Ollama: <span id="st-ollama">—</span></div>
+    <div>Mémoire: <span id="st-memory">—</span></div>
+    <div>Vecteur: <span id="st-vector">—</span></div>
+    <div>RSS: <span id="st-rss">—</span></div>
+    <div>Requêtes: <span id="st-requests">0</span></div>
+    <div>Uptime: <span id="st-uptime">—</span></div>
+  </div>
+  <div class="sidebar-footer">JARVIS Portable · v5.4</div>
+</div>
+
+<div class="main">
+
+  <!-- CHAT TAB -->
+  <div class="tab-content active" id="tab-chat">
+    <div class="header" id="chat-header">
+      <span class="label">Agent :</span>
+      <span class="badge badge-agent" id="current-agent">—</span>
+      <span class="badge badge-model" id="current-model">—</span>
+      <span class="badge badge-backend" id="current-backend">Ollama</span>
+    </div>
+    <div class="chat" id="chat-messages"></div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="chat-input" rows="1" placeholder="Tapez votre message… (Ctrl+Enter pour envoyer)" maxlength="10000" aria-label="Zone de saisie du message" role="textbox"></textarea>
+        <div class="input-actions">
+          <button id="vision-btn" title="Joindre une image" aria-label="Joindre une image">📷</button>
+        </div>
+      </div>
+      <button id="send-btn" aria-label="Envoyer le message">Envoyer</button>
+    </div>
+    <details class="help-box" style="display:none">
+      <summary>Aide</summary>
+      <div class="help-content"><p><strong>Raccourcis :</strong> Ctrl+Enter = envoyer, Ctrl+L = vider le chat, Ctrl+Z = recommencer la conversation.</p></div>
+    </details>
+  </div>
+
+  <!-- CONVERSATIONS TAB -->
+  <div class="tab-content" id="tab-conversations">
+    <div class="header"><span class="label">Historique des conversations</span></div>
+    <div class="conversations-area">
+      <div class="sidebar-convs-list" id="conv-list-main">Aucune conversation</div>
+    </div>
+  </div>
+
+  <!-- AGENTS TAB -->
+  <div class="tab-content" id="tab-agents">
+    <div class="header"><span class="label">Profil des agents</span></div>
+    <div class="agents-area" id="agents-area">
+      <span>Agents: <span id="agent-count">0</span></span>
+      <div class="agents-grid" id="agents-grid"></div>
+    </div>
+  </div>
+
+  <!-- SKILLS TAB -->
+  <div class="tab-content" id="tab-skills">
+    <div class="skills-header">
+      <span class="label">Skills disponibles</span>
+      <span class="skills-on" id="skills-on"></span>
+      <span>Actives: <span id="skill-count">0</span></span>
+      <span id="skills-status"></span>
+    </div>
+    <div class="skills-grid" id="skills-grid"></div>
+  </div>
+
+  <!-- VISION TAB -->
+  <div class="tab-content" id="tab-vision">
+    <div class="header"><span class="label">Analyse d'image</span></div>
+    <div class="vision-area">
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Zone de dépôt d'image">
+        <div class="icon" aria-hidden="true">📷</div>
+        <p>Cliquez ou déposez une image ici</p>
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" id="vision-file" aria-label="Sélectionner une image">
+      </div>
+      <img id="vision-preview" alt="Aperçu de l'image à analyser" style="display:none">
+      <div id="vision-result" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <!-- TOOLS TAB -->
+  <div class="tab-content" id="tab-tools">
+    <div class="header"><span class="label">Outils de diagnostic</span></div>
+    <div class="tools-area"><div class="tools-grid"></div></div>
+  </div>
+
+  <!-- ANALYTICS TAB -->
+  <div class="tab-content" id="tab-analytics">
+    <div class="header"><span class="label">Statistiques d'usage</span></div>
+    <div class="analytics-area">
+      <div class="analytics-kpis" id="analytics-kpis"></div>
+      <div class="analytics-grid" id="analytics-cards"></div>
+      <div class="analytics-chart-row" id="analytics-charts">
+        <div class="analytics-chart-box">
+          <h3>Répartition par agent</h3>
+          <canvas id="chart-agent"></canvas>
+        </div>
+        <div class="analytics-chart-box">
+          <h3>Latence moyenne par agent</h3>
+          <canvas id="chart-latency"></canvas>
+        </div>
+        <div class="analytics-chart-box">
+          <h3>Répartition horaire</h3>
+          <canvas id="chart-hourly"></canvas>
+        </div>
+        <div class="analytics-chart-box">
+          <h3>Index vectoriel</h3>
+          <canvas id="chart-vector"></canvas>
+        </div>
+      </div>
+      <button id="btn-vectorize-convs">Vectoriser les conversations</button>
+      <span id="vectorize-status"></span>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-content" id="tab-settings">
+    <div class="header"><span class="label">Réglages</span></div>
+    <div class="settings-area" id="settings-area">
+      <div class="settings-group">
+        <h3>Modèle &amp; backend</h3>
+        <div class="setting-row">
+          <span>Modèle par défaut</span>
+          <select id="s-default-model"></select>
+        </div>
+        <div class="setting-row">
+          <span>Backend</span>
+          <span id="ab-backend">Ollama</span>
+        </div>
+        <label class="setting-row">
+          <span>Mode hors-ligne</span>
+          <input type="checkbox" id="s-offline">
+        </label>
+        <div id="offline-banner" style="display:none"></div>
+      </div>
+      <div class="settings-group">
+        <h3>Dossiers autorisés</h3>
+        <div id="fp-list"></div>
+        <div class="setting-row">
+          <input type="text" id="fp-path" placeholder="Chemin du dossier">
+          <button type="button" id="fp-browse">Parcourir</button>
+        </div>
+        <div id="fp-feedback" class="fp-feedback"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- File browser modal -->
+<div class="fb-overlay" id="fb-overlay" role="dialog" aria-label="Sélection de dossier" aria-modal="true">
+  <div class="fb-modal">
+    <div class="fb-header">
+      <button class="fb-back" id="fb-back" style="display:none" aria-label="Retour">←</button>
+      <h3 id="fb-title">Sélectionner un dossier</h3>
+      <button class="fb-close" id="fb-close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="fb-breadcrumb" id="fb-breadcrumb" role="navigation" aria-label="Fil d'Ariane"></div>
+    <div class="fb-body" id="fb-body" role="listbox" aria-label="Liste des dossiers"></div>
+    <div class="fb-footer">
+      <input type="text" id="fb-path" placeholder="Ou entrez un chemin..." aria-label="Chemin du dossier">
+      <button class="fb-cancel-btn" id="fb-cancel-btn">Annuler</button>
+      <button class="fb-select-btn" id="fb-select-btn">Autoriser</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container" role="alert" aria-live="assertive"></div>
+<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" id="image-input" style="display:none" aria-label="Sélection d'image cachée">
+
+<script src="assets/js/app.js" defer onerror="document.getElementById('toast-container').innerHTML='<div class=toast-error>Erreur chargement app.js</div>'"></script>
+
+</body>
+</html>

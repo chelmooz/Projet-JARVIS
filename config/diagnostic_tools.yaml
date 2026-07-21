@@ -1,0 +1,80 @@
+# Diagnostic Tools — Configuration des outils externes pour DiagnosticExtService
+# Chaque outil décrit le binaire, timeout, plateforme, arguments et checksum SHA256.
+# Plateformes supportées : win32, linux, darwin
+# Platform-specific keys : binary/args/sha256 (win32), linux_binary/linux_args/linux_sha256 (linux), darwin_binary/darwin_args/darwin_sha256 (darwin)
+# Si sha256 est vide, la vérification est ignorée.
+---
+tools:
+  smartctl:
+    binary: smartctl.exe
+    linux_binary: smartctl
+    darwin_binary: smartctl
+    description: "SMART disk health (temperature, reallocated sectors, power-on hours)"
+    timeout: 15
+    platforms: [win32, linux, darwin]
+    args: ["-a", "{device}"]
+    linux_args: ["-a", "{device}"]
+    darwin_args: ["-a", "{device}"]
+    sha256: E38945652D86A4B0CDFEE8A63EE2737F2026A68D4C164A3B7C78EDC10B807507
+
+  psinfo:
+    binary: PsInfo64.exe
+    linux_binary: uname
+    darwin_binary: uname
+    description: "System information (OS, kernel, hardware)"
+    timeout: 10
+    platforms: [win32, linux, darwin]
+    args: ["-s", "-d", "-c"]
+    linux_args: ["-a"]
+    darwin_args: ["-a"]
+    sha256: DE73B73EEB156F877DE61F4A6975D06759292ED69F31AAF06C9811F3311E03E7
+
+  psloglist:
+    binary: psloglist64.exe
+    linux_binary: journalctl
+    description: "System log dumper"
+    timeout: 20
+    platforms: [win32, linux]
+    args: ["-s", "{log_name}"]
+    linux_args: ["-n", "50", "--no-pager", "-u", "{log_name}"]
+    sha256: 5E55B4CAF47A248A10ABD009617684E969DBE5C448D087EE8178262AAAB68636
+
+  handle:
+    binary: handle64.exe
+    linux_binary: lsof
+    darwin_binary: lsof
+    description: "List open file handles by process or name"
+    timeout: 10
+    platforms: [win32, linux, darwin]
+    args: ["-accepteula", "{pattern}"]
+    linux_args: ["{pattern}"]
+    darwin_args: ["{pattern}"]
+    sha256: 24BAFCC570CC9BBB6B6E6652A57A519E0464E3996891AABA6F55299CCE20B04F
+
+  psping:
+    binary: psping64.exe
+    linux_binary: ping
+    darwin_binary: ping
+    description: "Network latency and connectivity test"
+    timeout: 15
+    platforms: [win32, linux, darwin]
+    args: ["-n", "{count}", "{target}"]
+    linux_args: ["-c", "{count}", "{target}"]
+    darwin_args: ["-c", "{count}", "{target}"]
+    sha256: D1F718D219930E57794BDADF9DDA61406294B0759038CEF282F7544B44B92285
+
+  psservice:
+    binary: PsService64.exe
+    linux_binary: systemctl
+    description: "Service status and management"
+    timeout: 10
+    platforms: [win32, linux]
+    args: ["query", "{service_name}"]
+    linux_args: ["status", "{service_name}"]
+    sha256: 554F523914CDBAED8B17527170502199C185BD69A41C81102C50DBB0E5E5A78D
+
+# Répertoire des binaires (relatif à PROJECT_DIR)
+bin_dir: bin/diagnostic
+
+# Emplacement du fichier de consentement (relatif à PROJECT_DIR)
+consent_file: config/.diagnostic_consent
