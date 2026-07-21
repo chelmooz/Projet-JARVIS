@@ -1,1 +1,1 @@
-"""Services — Logique metier (couche S de MVC)"""
+"""Services — Logique métier (couche S de MVC)."""
