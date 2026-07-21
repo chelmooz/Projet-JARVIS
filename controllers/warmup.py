@@ -1,88 +1,126 @@
-"""Warmup asynchrone (hors event loop) + cycle de vie FastAPI.
+"""Warmup & Lifecycle — Gestion propre du démarrage et de l'arrêt de l'application.
 
-Les dependances sont passees via AppContext pour eviter l'import circulaire
-avec controllers.context.
+Refacto DevOps / SOLID / Async :
+- Plus d'appels à `get_context()` global. Le contexte est récupéré via `app.state`.
+- Warmup critique SYNCHRONE : l'application n'accepte les requêtes qu'UNE FOIS les 
+  dépendances critiques (modèle par défaut, vector store) préchargées.
+- Remplacement de `threading.Thread` par `asyncio.to_thread` pour une intégration 
+  propre avec l'event loop de FastAPI.
+- Logging ERROR explicite en cas d'échec de préchauffage (fin du Fail-Silent).
 """
-
 import logging
-import threading
-import time
+import asyncio
 
 from config.constants import DEFAULT_MODEL
-from controllers.di import AppContext
-from controllers.status import _refresh_status_cache, _status_refresher
 
-_logger = logging.getLogger("jarvis.context")
+_logger = logging.getLogger("jarvis.warmup")
 
 
-def _warmup_vector_store(ctx: AppContext):
-    """Pre-charge et consolide le store vectoriel (best-effort, hors ligne)."""
-    vector = ctx.vector
-    log = ctx.log
-    try:
-        vector.preload()
-    except Exception as e:
-        log.log("WARN", f"Preload vectoriel: echec ({e})")
-    try:
-        vector.consolidate()
-        log.log("INFO", "Consolidation vectorielle terminee")
-    except Exception as e:
-        log.log("WARN", f"Consolidation vectorielle: echec ({e})")
-
-
-def _warmup_default_model(ctx: AppContext, default_model: str):
-    """Envoie une requete de reveil au modele par defaut si disponible."""
-    inference = ctx.inference
-    log = ctx.log
-    if not inference.is_available(default_model):
+async def _warmup_vector_store(ctx):
+    """Pré-charge et consolide le store vectoriel de manière asynchrone."""
+    vector = getattr(ctx, "vector", None)
+    if not vector:
         return
+
     try:
-        log.log("INFO", f"Warmup: pre-chargement du modele {default_model}...")
-        inference.query("Reponds 'ok' en un mot.", default_model)
-        log.log("INFO", "Warmup: modele pret.")
+        _logger.info("Préchargement du store vectoriel en cours...")
+        # Délégation au thread pool pour ne pas bloquer l'event loop de démarrage
+        await asyncio.to_thread(vector.preload)
+        await asyncio.to_thread(vector.consolidate)
+        _logger.info("Consolidation vectorielle terminée avec succès.")
     except Exception as e:
-        log.log("WARN", f"Warmup: echec ({e})")
+        _logger.error(
+            "ÉCHEC CRITIQUE du préchargement vectoriel : %s. "
+            "La fonctionnalité RAG sera indisponible ou dégradée.", e
+        )
+        # Note : On ne lève pas d'exception pour permettre au reste de l'app de démarrer,
+        # mais le niveau ERROR garantit la visibilité dans les logs de supervision.
 
 
-def _warmup(ctx: AppContext):
-    """Thread de pre-chargement asynchrone (hors event loop).
+async def _warmup_default_model(ctx, default_model: str):
+    """Envoie une requête de réveil au modèle par défaut pour éviter le cold-start."""
+    inference = getattr(ctx, "inference", None)
+    if not inference:
+        return
 
-    Apres le delai de warmup : rafraichit le cache de status, lance le refresher
-    periodique, puis pre-charge le store vectoriel et le modele par defaut.
-    """
-    # time.sleep correct ici : hors event loop (thread lance via threading.Thread)
-    time.sleep(ctx.warmup_delay)
-    default_model = DEFAULT_MODEL
-    _refresh_status_cache(ctx, ctx.cache_lock)
-    threading.Thread(
-        target=_status_refresher, args=(ctx, ctx.stop_event, ctx.refresh_interval), daemon=True
-    ).start()
-    log = ctx.log
-    log.log("INFO", "Cache status rafraichi (warmup)")
-    _warmup_vector_store(ctx)
-    _warmup_default_model(ctx, default_model)
+    if not inference.is_available(default_model):
+        _logger.warning(
+            "Modèle par défaut '%s' non disponible. Le premier appel subira une latence de chargement.", 
+            default_model
+        )
+        return
+
+    try:
+        _logger.info("Warmup: pré-chargement du modèle '%s' en mémoire...", default_model)
+        # Appel synchrone déporté dans un thread pour ne pas geler l'event loop
+        await asyncio.to_thread(inference.query, "Reponds 'ok' en un mot.", default_model)
+        _logger.info("Warmup: modèle '%s' prêt et en cache.", default_model)
+    except Exception as e:
+        _logger.error(
+            "ÉCHEC du warmup du modèle '%s' : %s. "
+            "Les premières requêtes subiront une latence importante.", default_model, e
+        )
 
 
 async def lifespan(app):
-    """Cycle de vie FastAPI : lance le warmup au demarrage, arret propre a la sortie."""
+    """Cycle de vie FastAPI : initialisation au démarrage, nettoyage à l'arrêt.
+    
+    Ce contexte garantit que l'application est pleinement opérationnelle 
+    avant d'accepter la première requête HTTP (principe de readiness).
+    """
     from services.diagnostics.checks import warn_low_memory
     from services.log import _configure_root_logging
 
+    # 1. Configuration initiale
     _configure_root_logging()
     warn_low_memory()
 
-    from controllers.context import get_context
-    ctx = get_context()
-    threading.Thread(target=_warmup, args=(ctx,), daemon=True).start()
+    # 2. Récupération du contexte (injecté proprement lors de la création de l'app)
+    ctx = app.state.context
+    
+    # 3. Initialisation formelle du contexte (si ce n'est pas déjà fait par le constructeur)
+    if hasattr(ctx, "initialize") and not getattr(ctx, "_is_initialized", False):
+        ctx.initialize()
+        ctx._is_initialized = True
+
+    _logger.info("=== Démarrage des services JARVIS ===")
+
+    # 4. Warmup critique (synchrone du point de vue du démarrage de l'app)
+    # L'app ne sera pas "ready" tant que ces tâches ne sont pas terminées.
+    await _warmup_vector_store(ctx)
+    await _warmup_default_model(ctx, DEFAULT_MODEL)
+
+    # 5. Démarrage des tâches de fond (ex: file d'ingestion asynchrone)
     ingest_queue = getattr(ctx, "ingest_queue", None)
     if ingest_queue is not None:
         ingest_queue.start()
-    yield
+        _logger.info("File d'ingestion démarrée.")
+
+    _logger.info("=== JARVIS est prêt à accepter des requêtes ===")
+    
+    yield  # L'application tourne ici et accepte le trafic
+
+    # ==============================================================================
+    # SHUTDOWN (Arrêt propre et déterministe)
+    # ==============================================================================
+    _logger.info("=== Arrêt de JARVIS en cours ===")
+    
     if ingest_queue is not None:
         ingest_queue.stop()
-    ctx.stop_event.set()
-    inference = ctx.inference
+        _logger.info("File d'ingestion arrêtée.")
+
+    # Signaler l'arrêt aux threads de fond (ex: status refresher)
+    stop_event = getattr(ctx, "stop_event", None)
+    if stop_event is not None:
+        stop_event.set()
+
+    # Fermeture propre des connexions HTTP (Ollama adapter)
+    inference = getattr(ctx, "inference", None)
     if inference is not None:
-        inference.close()
-    log = ctx.log
-    log.log("INFO", "Warmup: arret propre signale.")
+        try:
+            inference.close()
+            _logger.info("Connexions d'inférence fermées proprement.")
+        except Exception as e:
+            _logger.warning("Erreur lors de la fermeture de l'inférence : %s", e)
+
+    _logger.info("=== Arrêt de JARVIS terminé ===")
