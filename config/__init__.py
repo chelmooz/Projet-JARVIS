@@ -1,17 +1,17 @@
 """Configuration JARVIS — Chargement typé et validation des fichiers JSON.
 
 Expose une API immuable et validée pour accéder aux configurations :
-- agent_profiles.json   : profils d'équipe (orchestrateur, techlead, devops, designer, datasecu)
-- model_preferences.json: mapping modèles → profils → agents
-- cyber_workflows.json  : workflows cybersec (NVISO + natifs)
-- components.json       : versions et assets pour le downloader
+- ``agent_profiles.json``   : profils d'équipe (orchestrateur, techlead, devops, etc.)
+- ``model_preferences.json``: mapping modèles → profils → agents
+- ``cyber_workflows.json``  : workflows cybersec (NVISO + natifs)
+- ``components.json``       : versions et assets pour le downloader
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -85,10 +85,10 @@ class ComponentsConfig:
 # ---------------------------------------------------------------------------
 
 def _load_json(filename: str) -> Any:
-    """Charge un fichier JSON depuis le dossier config/.
+    """Charge un fichier JSON depuis le dossier ``config/``.
 
     Raises:
-        ConfigError: Si le fichier est absent ou invalide.
+        ConfigError: Si le fichier est absent, invalide ou ne peut être lu.
     """
     path = _CONFIG_DIR / filename
     if not path.exists():
@@ -110,9 +110,11 @@ _cache: dict[str, Any] = {}
 
 
 def get_agent_profiles() -> tuple[AgentProfileConfig, ...]:
-    """Retourne les 5 profils d'équipe validés."""
+    """Retourne les profils d'équipe validés."""
     if "agent_profiles" not in _cache:
         raw = _load_json("agent_profiles.json")
+        if not isinstance(raw, list):
+            raise ConfigError("agent_profiles.json doit contenir une liste de profils")
         profiles = tuple(
             AgentProfileConfig(
                 key=p["key"],
@@ -132,6 +134,8 @@ def get_model_preferences() -> tuple[ModelPreference, ...]:
     """Retourne le mapping modèles → profils → agents."""
     if "model_preferences" not in _cache:
         raw = _load_json("model_preferences.json")
+        if not isinstance(raw, list):
+            raise ConfigError("model_preferences.json doit contenir une liste de préférences")
         prefs = tuple(
             ModelPreference(
                 model=m["model"],
@@ -149,6 +153,8 @@ def get_cyber_workflows() -> tuple[CyberWorkflow, ...]:
     """Retourne les workflows cybersec validés."""
     if "cyber_workflows" not in _cache:
         raw = _load_json("cyber_workflows.json")
+        if not isinstance(raw, list):
+            raise ConfigError("cyber_workflows.json doit contenir une liste de workflows")
         workflows = tuple(
             CyberWorkflow(
                 id=w["id"],
@@ -167,6 +173,9 @@ def get_components() -> ComponentsConfig:
     """Retourne la config des composants téléchargeables."""
     if "components" not in _cache:
         raw = _load_json("components.json")
+        if not isinstance(raw, dict):
+            raise ConfigError("components.json doit être un dictionnaire")
+        
         assets = tuple(
             ComponentAsset(
                 name=a["name"],
