@@ -1,73 +1,184 @@
 """Chemins centralisés du projet — Single Point of Truth.
 
-Remplace les définitions dupliquées de chemins dans 17+ fichiers.
-Tous les chemins sont dérivés de ROOT (détection automatique).
+Tous les chemins sont dérivés de ROOT (détection automatique via pathlib).
 Plateformes supportées : windows, linux, darwin.
 """
-import os
+
+from __future__ import annotations
+
 import platform
+from pathlib import Path
+from typing import Final
 
-# --- Racine du projet (auto-détectée) ---
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# ---------------------------------------------------------------------------
+# Racine du projet (auto-détectée)
+# ---------------------------------------------------------------------------
 
-# --- Plateforme ---
-SYSTEM = platform.system().lower()
-IS_WINDOWS = SYSTEM == "windows"
+ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 
-# --- Répertoires racine ---
-BIN_DIR = os.path.join(ROOT, "bin")
-CONFIG_DIR = os.path.join(ROOT, "config")
-MODELS_DIR = os.path.join(ROOT, "models")
-PORTABLE_DIR = os.path.join(ROOT, "portable_python")
-STATIC_DIR = os.path.join(ROOT, "static")
-MEMORY_DIR = os.path.join(ROOT, "memory")
-LOGS_DIR = os.path.join(ROOT, "logs")
+assert ROOT.exists(), f"Project root not found: {ROOT}"
 
-LIB_DIR = os.path.join(ROOT, "lib")
+# ---------------------------------------------------------------------------
+# Plateforme
+# ---------------------------------------------------------------------------
 
-# --- Sous-répertoires ---
-BIN_WIN = os.path.join(BIN_DIR, "win")
-BIN_LINUX = os.path.join(BIN_DIR, "linux")
-BIN_MAC = os.path.join(BIN_DIR, "mac")
-BIN_DIAGNOSTIC = os.path.join(BIN_DIR, "diagnostic")
-MODELS_OLLAMA = os.path.join(MODELS_DIR, "ollama")
-OLLAMA_LIB = os.path.join(LIB_DIR, "ollama")
-PID_DIR = os.path.join(MEMORY_DIR, "pids")
-PIPELINES_DIR = os.path.join(CONFIG_DIR, "pipelines")
+SYSTEM: Final[str] = platform.system().lower()
+IS_WINDOWS: Final[bool] = SYSTEM == "windows"
+IS_MACOS: Final[bool] = SYSTEM == "darwin"
+IS_LINUX: Final[bool] = SYSTEM == "linux"
 
-# --- Fichiers de configuration ---
-ADAPTERS_CONFIG = os.path.join(CONFIG_DIR, "adapters.yaml")
-PREFERENCES_FILE = os.path.join(CONFIG_DIR, "model_preferences.json")
-PROFILES_FILE = os.path.join(CONFIG_DIR, "agent_profiles.json")
-ROUTING_CONFIG = os.path.join(CONFIG_DIR, "agent_routing.yaml")
-TRIGGERS_CONFIG = os.path.join(CONFIG_DIR, "toolbox_triggers.yaml")
-CYBER_KEYWORDS_CONFIG = os.path.join(CONFIG_DIR, "cyber_workflow_keywords.yaml")
-DIAGNOSTIC_CONFIG = os.path.join(CONFIG_DIR, "diagnostic_tools.yaml")
-CONSENT_FILE = os.path.join(CONFIG_DIR, ".diagnostic_consent")
-REQUIREMENTS_FILE = os.path.join(ROOT, "requirements.txt")
-CYBER_WORKFLOWS_CONFIG = os.path.join(CONFIG_DIR, "cyber_workflows.json")
-SKILLS_CONFIG = os.path.join(CONFIG_DIR, "skills.json")
+# ---------------------------------------------------------------------------
+# Répertoires racine
+# ---------------------------------------------------------------------------
 
-# --- Fichiers de logs ---
-LOG_FILE = os.path.join(LOGS_DIR, "api.json")
+BIN_DIR: Final[Path] = ROOT / "bin"
+CONFIG_DIR: Final[Path] = ROOT / "config"
+MODELS_DIR: Final[Path] = ROOT / "models"
+PORTABLE_DIR: Final[Path] = ROOT / "portable_python"
+STATIC_DIR: Final[Path] = ROOT / "static"
+MEMORY_DIR: Final[Path] = ROOT / "memory"
+LOGS_DIR: Final[Path] = ROOT / "logs"
+LIB_DIR: Final[Path] = ROOT / "lib"
+
+# ---------------------------------------------------------------------------
+# Sous-répertoires binaires (par plateforme)
+# ---------------------------------------------------------------------------
+
+BIN_WIN: Final[Path] = BIN_DIR / "win"
+BIN_LINUX: Final[Path] = BIN_DIR / "linux"
+BIN_MAC: Final[Path] = BIN_DIR / "mac"
+BIN_DIAGNOSTIC: Final[Path] = BIN_DIR / "diagnostic"
+
+# ---------------------------------------------------------------------------
+# Sous-répertoires modèles & lib
+# ---------------------------------------------------------------------------
+
+MODELS_OLLAMA: Final[Path] = MODELS_DIR / "ollama"
+OLLAMA_LIB: Final[Path] = LIB_DIR / "ollama"
+
+# ---------------------------------------------------------------------------
+# Sous-répertoires mémoire & config
+# ---------------------------------------------------------------------------
+
+PID_DIR: Final[Path] = MEMORY_DIR / "pids"
+PIPELINES_DIR: Final[Path] = CONFIG_DIR / "pipelines"
+
+# ---------------------------------------------------------------------------
+# Fichiers de configuration
+# ---------------------------------------------------------------------------
+
+ADAPTERS_CONFIG: Final[Path] = CONFIG_DIR / "adapters.yaml"
+PROFILES_FILE: Final[Path] = CONFIG_DIR / "agent_profiles.json"
+ROUTING_CONFIG: Final[Path] = CONFIG_DIR / "agent_routing.yaml"
+TRIGGERS_CONFIG: Final[Path] = CONFIG_DIR / "toolbox_triggers.yaml"
+CYBER_KEYWORDS_CONFIG: Final[Path] = CONFIG_DIR / "cyber_workflow_keywords.yaml"
+DIAGNOSTIC_CONFIG: Final[Path] = CONFIG_DIR / "diagnostic_tools.yaml"
+CONSENT_FILE: Final[Path] = CONFIG_DIR / ".diagnostic_consent"
+CYBER_WORKFLOWS_CONFIG: Final[Path] = CONFIG_DIR / "cyber_workflows.json"
+SKILLS_CONFIG: Final[Path] = CONFIG_DIR / "skills.json"
+REQUIREMENTS_FILE: Final[Path] = ROOT / "requirements.txt"
+
+# ---------------------------------------------------------------------------
+# Fichiers de logs
+# ---------------------------------------------------------------------------
+
+LOG_FILE: Final[Path] = LOGS_DIR / "api.json"
+
+# ---------------------------------------------------------------------------
+# Sous-répertoires portable Python (par plateforme)
+# ---------------------------------------------------------------------------
+
+PORTABLE_WIN: Final[Path] = PORTABLE_DIR / "win"
+PORTABLE_LINUX: Final[Path] = PORTABLE_DIR / "linux"
+PORTABLE_MAC: Final[Path] = PORTABLE_DIR / "mac"
+
+# ---------------------------------------------------------------------------
+# Binaires plateforme-dépendants (fonctions pour testabilité)
+# ---------------------------------------------------------------------------
+
+def get_ollama_exe() -> Path:
+    """Retourne le chemin du binaire Ollama pour la plateforme courante."""
+    if IS_WINDOWS:
+        return BIN_WIN / "ollama.exe"
+    if IS_MACOS:
+        return BIN_MAC / "ollama"
+    return BIN_LINUX / "ollama"
 
 
-# --- Sous-répertoires portable Python ---
-PORTABLE_WIN = os.path.join(PORTABLE_DIR, "win")
-PORTABLE_LINUX = os.path.join(PORTABLE_DIR, "linux")
-PORTABLE_MAC = os.path.join(PORTABLE_DIR, "mac")
+def get_portable_python() -> Path:
+    """Retourne le chemin de l'exécutable Python portable pour la plateforme courante."""
+    if IS_WINDOWS:
+        return PORTABLE_WIN / "python.exe"
+    if IS_MACOS:
+        return PORTABLE_MAC / "bin" / "python3"
+    return PORTABLE_LINUX / "python3"
 
-# --- Binaires (plateforme dépendante) ---
-if IS_WINDOWS:
-    OLLAMA_EXE = os.path.join(BIN_WIN, "ollama.exe")
-    PORTABLE_PYTHON_EXE = os.path.join(PORTABLE_WIN, "python.exe")
-elif SYSTEM == "darwin":
-    OLLAMA_EXE = os.path.join(BIN_MAC, "ollama")
-    PORTABLE_PYTHON_EXE = os.path.join(PORTABLE_MAC, "bin", "python3")
-else:
-    OLLAMA_EXE = os.path.join(BIN_LINUX, "ollama")
-    PORTABLE_PYTHON_EXE = os.path.join(PORTABLE_LINUX, "python3")
 
-# Port custom JARVIS (≠ 11434) pour ne pas confliter avec une instance Ollama systeme deja lancee
-OLLAMA_PORT = 11436
-OLLAMA_HOST = f"127.0.0.1:{OLLAMA_PORT}"
+# Aliases pour compat ascendante (déprécié — utiliser les fonctions ci-dessus).
+OLLAMA_EXE: Final[Path] = get_ollama_exe()
+PORTABLE_PYTHON_EXE: Final[Path] = get_portable_python()
+
+# ---------------------------------------------------------------------------
+# Configuration réseau Ollama (port custom pour éviter conflit système)
+# ---------------------------------------------------------------------------
+
+OLLAMA_PORT: Final[int] = 11436
+OLLAMA_HOST: Final[str] = f"127.0.0.1:{OLLAMA_PORT}"
+
+# ---------------------------------------------------------------------------
+# Exports
+# ---------------------------------------------------------------------------
+
+__all__ = [
+    # Racine & plateforme
+    "ROOT",
+    "SYSTEM",
+    "IS_WINDOWS",
+    "IS_MACOS",
+    "IS_LINUX",
+    # Répertoires racine
+    "BIN_DIR",
+    "CONFIG_DIR",
+    "MODELS_DIR",
+    "PORTABLE_DIR",
+    "STATIC_DIR",
+    "MEMORY_DIR",
+    "LOGS_DIR",
+    "LIB_DIR",
+    # Sous-répertoires binaires
+    "BIN_WIN",
+    "BIN_LINUX",
+    "BIN_MAC",
+    "BIN_DIAGNOSTIC",
+    # Modèles & lib
+    "MODELS_OLLAMA",
+    "OLLAMA_LIB",
+    # Mémoire & config
+    "PID_DIR",
+    "PIPELINES_DIR",
+    # Fichiers de config
+    "ADAPTERS_CONFIG",
+    "PROFILES_FILE",
+    "ROUTING_CONFIG",
+    "TRIGGERS_CONFIG",
+    "CYBER_KEYWORDS_CONFIG",
+    "DIAGNOSTIC_CONFIG",
+    "CONSENT_FILE",
+    "CYBER_WORKFLOWS_CONFIG",
+    "SKILLS_CONFIG",
+    "REQUIREMENTS_FILE",
+    # Logs
+    "LOG_FILE",
+    # Portable Python
+    "PORTABLE_WIN",
+    "PORTABLE_LINUX",
+    "PORTABLE_MAC",
+    # Binaires (fonctions + aliases compat)
+    "get_ollama_exe",
+    "get_portable_python",
+    "OLLAMA_EXE",
+    "PORTABLE_PYTHON_EXE",
+    # Réseau
+    "OLLAMA_PORT",
+    "OLLAMA_HOST",
+]
