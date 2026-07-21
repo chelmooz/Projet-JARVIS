@@ -13,6 +13,9 @@ Responsabilités (SRP)
 Le cache de profils reste un attribut de **classe** volontairement :
 ``PROFILES_PATH`` est un *hook* de substitution (tests, sous-classes) et
 doit rester override-able. Le verrou garantit l'atomicité du refresh.
+
+NOTE: Le contexte (`context: dict[str, Any]`) est non typé. Cible :
+TypedDict `AgentContext` dans models/ pour typer le contrat d'entrée.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Protocol, TypedDict
 
 from config.paths import PROFILES_FILE
@@ -65,11 +69,11 @@ class _ToolboxLike(Protocol):
 # L'ordre d'insertion fixe la priorité de détection (powershell > bash > py).
 # ---------------------------------------------------------------------------
 
-_CODE_FENCE_TO_EXT: dict[str, str] = {
+_CODE_FENCE_TO_EXT: MappingProxyType[str, str] = MappingProxyType({
     "```powershell": "ps1",
     "```bash": "sh",
     "```python": "py",
-}
+})
 
 
 class BaseAgent(ABC):
@@ -130,18 +134,18 @@ class BaseAgent(ABC):
     # Composition du prompt
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _with_skills(system: str) -> str:
+    @classmethod
+    def _with_skills(cls, system: str) -> str:
         """Ajoute le texte des skills activés au system prompt (DRY).
 
         Dégradation silencieuse : si ``skills.json`` est illisible, le
         prompt LLM n'est jamais cassé (l'erreur est loggée en amont).
         """
-        skills_text = BaseAgent._enabled_skills()
+        skills_text = cls._enabled_skills()
         return f"{system}\n\n{skills_text}" if skills_text else system
 
-    @staticmethod
-    def _enabled_skills() -> str:
+    @classmethod
+    def _enabled_skills(cls) -> str:
         """Texte des skills activés (toggle Skills), ``''`` si aucun/erreur.
 
         Import paresseux pour éviter tout cycle avec ``services.skills``.
@@ -150,12 +154,12 @@ class BaseAgent(ABC):
 
         try:
             return get_enabled_skills_text()
-        except Exception as exc:  # noqa: BLE001 - dégradation tolérée
+        except (ImportError, OSError, ValueError) as exc:
             _logger.warning("Skills ignorés (toggle inactif): %s", exc)
             return ""
 
-    @staticmethod
-    def _similar_cases_block(context: dict[str, Any]) -> str:
+    @classmethod
+    def _similar_cases_block(cls, context: dict[str, Any]) -> str:
         """Texte des cas similaires récents (max 3), ou ``''``."""
         similar = context.get("similar_cases", [])
         if not similar:
@@ -163,9 +167,9 @@ class BaseAgent(ABC):
         items = "\n".join(f"  - {s.get('text', '')[:200]}" for s in similar[:3])
         return f"\nCas similaires récents :\n{items}"
 
-    @staticmethod
+    @classmethod
     def _render_context_blocks(
-        profile: dict[str, Any], context: dict[str, Any],
+        cls, profile: dict[str, Any], context: dict[str, Any],
     ) -> tuple[str, str]:
         """Construit les blocs réutilisables ``(tools_desc, similar_text)``."""
         tools = profile.get("tools", {})
@@ -175,7 +179,7 @@ class BaseAgent(ABC):
             if tools
             else ""
         )
-        return tools_desc, BaseAgent._similar_cases_block(context)
+        return tools_desc, cls._similar_cases_block(context)
 
     def _toolbox_block(self) -> str:
         """Description de la toolbox injectée, préfixée d'un saut de ligne."""
@@ -184,14 +188,13 @@ class BaseAgent(ABC):
         toolbox_desc = self.toolbox.describe_tools()
         return f"\n{toolbox_desc}" if toolbox_desc else ""
 
-    def _profile_prompt(
+    def _compose_parts(
         self,
         profile_key: str,
-        task: str,
         context: dict[str, Any],
         default_prompt: str | None = None,
-    ) -> str:
-        """Prompt monolithe (system + outils + contexte + tâche).
+    ) -> tuple[str, str, str, str]:
+        """Facteur commun : retourne ``(system, tools_desc, similar_text, toolbox_desc)``.
 
         ``default_prompt`` remplace le system prompt du profil (agents
         spécialisés : domaine cyber, prompt métier…).
@@ -200,6 +203,20 @@ class BaseAgent(ABC):
         system = default_prompt if default_prompt is not None else profile.get("system_prompt", "")
         system = self._with_skills(system)
         tools_desc, similar_text = self._render_context_blocks(profile, context)
+        toolbox_desc = self._toolbox_block()
+        return system, tools_desc, similar_text, toolbox_desc
+
+    def _profile_prompt(
+        self,
+        profile_key: str,
+        task: str,
+        context: dict[str, Any],
+        default_prompt: str | None = None,
+    ) -> str:
+        """Prompt monolithe (system + outils + contexte + tâche)."""
+        system, tools_desc, similar_text, _ = self._compose_parts(
+            profile_key, context, default_prompt,
+        )
         history = context.get("recent_tasks", [])
         return f"{system}{tools_desc}\nContexte récent : {history}{similar_text}\nTâche : {task}"
 
@@ -215,13 +232,11 @@ class BaseAgent(ABC):
         La description de la toolbox y est ajoutée côté *user* (contrairement
         à :meth:`_profile_prompt` qui la place côté *system*) : cette
         répartition est conservée telle quelle pour éviter toute régression
-        de prompt. ``default_prompt`` remplace le system prompt du profil.
+        de prompt.
         """
-        profile = self._load_profile(profile_key)
-        system = default_prompt if default_prompt is not None else profile.get("system_prompt", "")
-        system = self._with_skills(system)
-        tools_desc, similar_text = self._render_context_blocks(profile, context)
-        toolbox_desc = self._toolbox_block()
+        system, tools_desc, similar_text, toolbox_desc = self._compose_parts(
+            profile_key, context, default_prompt,
+        )
         history = context.get("recent_tasks", [])
         user = f"{tools_desc}{toolbox_desc}\nContexte récent : {history}{similar_text}\nTâche : {task}"
         return system.strip(), user.strip()
