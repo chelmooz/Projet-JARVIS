@@ -1,34 +1,62 @@
 """Route API — Kill Coding : analyse SOLID/TDD/Clean Code/KISS."""
-from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
 
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Query
+
+from controllers.responses import fail, ok
 from services.analysis import Analyzer as KillCodingAnalyzer
 
 router = APIRouter()
-_analyzer = KillCodingAnalyzer()
+
+
+def get_analyzer() -> KillCodingAnalyzer:
+    """Dépendance : fournit une instance de l'analyseur Kill Coding."""
+    return KillCodingAnalyzer()
 
 
 @router.get("/api/kill-coding/analyze")
-def analyze_file(path: str = Query(..., description="Chemin absolu du fichier Python")):
-    # Laisse sync : analyse disque/CPU bloquant (lecture + parse du fichier).
-    """Analyse un fichier Python selon les regles SOLID/TDD/Clean Code/KISS."""
-    report = _analyzer.analyze_file(path)
-    return report
+def analyze_file(
+    path: str = Query(..., description="Chemin absolu du fichier Python"),
+    analyzer: KillCodingAnalyzer = Depends(get_analyzer),
+):
+    """Analyse un fichier Python selon les règles SOLID/TDD/Clean Code/KISS.
+
+    Laisse sync : analyse disque/CPU bloquant (lecture + parse du fichier).
+    """
+    report = analyzer.analyze_file(path)
+    return ok(report)
 
 
 @router.get("/api/kill-coding/project")
-def analyze_project(path: str = Query(".", description="Chemin du repertoire racine")):
-    # Laisse sync : audit complet (lecture/parse de tous les fichiers, CPU/IO).
-    """Audit complet d'un projet Python."""
-    report = _analyzer.generate_global_report(root=path)
-    return report
+def analyze_project(
+    path: str = Query(".", description="Chemin du répertoire racine"),
+    analyzer: KillCodingAnalyzer = Depends(get_analyzer),
+):
+    """Audit complet d'un projet Python.
+
+    Laisse sync : audit complet (lecture/parse de tous les fichiers, CPU/IO).
+    """
+    report = analyzer.generate_global_report(root=path)
+    return ok(report)
 
 
 @router.get("/api/kill-coding/check-test")
-def check_test(path: str = Query(..., description="Chemin absolu du fichier source")):
-    # Laisse sync : parcours disque bloquant (recherche de fichiers de test).
-    """Verifie si un fichier source a des tests associes (TDD)."""
-    result = _analyzer.check_test_exists(path)
-    if result["test_found"]:
-        return {"status": "ok", "message": "Test trouve", "test_paths": result["test_paths"]}
-    return JSONResponse({"status": "missing", "message": "Aucun test associe"}, status_code=404)
+def check_test(
+    path: str = Query(..., description="Chemin absolu du fichier source"),
+    analyzer: KillCodingAnalyzer = Depends(get_analyzer),
+):
+    """Vérifie si un fichier source a des tests associés (TDD).
+
+    Laisse sync : parcours disque bloquant (recherche de fichiers de test).
+    """
+    result = analyzer.check_test_exists(path)
+    if result.get("test_found"):
+        return ok({
+            "message": "Test trouvé",
+            "test_paths": result.get("test_paths", []),
+        })
+    return fail("Aucun test associé", status_code=404)
+
+
+__all__ = ["router"]
