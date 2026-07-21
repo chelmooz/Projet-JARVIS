@@ -149,11 +149,16 @@ def save_results(
 
 
 def format_output(state: dict[str, Any]) -> dict[str, Any]:
-    """Formate la sortie finale du pipeline."""
+    """Formate la sortie finale du pipeline.
+
+    Contrat de retour (vérifié par test_agent_graph.py) :
+    response, agent, model, backend, error, suggested_skill, context.
+    """
     return {
         "response": state.get("response", ""),
         "agent": state.get("agent_key", ""),
         "model": state.get("model", ""),
+        "backend": state.get("backend", "ollama"),
         "error": state.get("error"),
         "suggested_skill": state.get("suggested_skill"),
         "context": state.get("context", {}),
