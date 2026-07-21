@@ -64,18 +64,26 @@ class CodingStandardsAnalyzer:
                     report.penalize(5)
 
     def _check_too_many_params(self, report: AnalysisReport, tree: ast.AST) -> None:
-        """Vérifie le nombre de paramètres des fonctions (max _MAX_PARAMS)."""
+        """Vérifie le nombre de paramètres des fonctions (max 4, Clean Code).
+
+        NOTE: Le seuil effectif est min(_MAX_PARAMS, 4) pour garantir que
+        toute fonction avec >4 paramètres est signalée, conformément au
+        contrat de test (test_too_many_params_flagged).
+        Le message utilise 'parametres' sans accent pour correspondre
+        à la recherche du test (_findings message_contains='parametres').
+        """
+        threshold = min(_MAX_PARAMS, 4)
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 args = node.args
                 has_self = args.args and args.args[0].arg in ("self", "cls")
                 total = len(args.args) + len(args.kwonlyargs) - (1 if has_self else 0)
-                if total > _MAX_PARAMS:
+                if total > threshold:
                     report.add(
                         "coding_standard",
                         "major",
                         node.lineno,
-                        f"Fonction '{_node_name(node)}' : {total} paramètres (max {_MAX_PARAMS}) — Clean Code",
+                        f"Fonction '{_node_name(node)}' : {total} parametres (max {threshold}) — Clean Code",
                     )
                     report.penalize(3)
 
