@@ -6,15 +6,18 @@ Refacto DevOps / Performance / KISS :
 - Gestion stricte des dimensions et des vecteurs nuls pour éviter les NaN.
 - Pure function : 100% thread-safe et sans effet de bord.
 """
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
-from typing import List, Dict, Any, Union
 
 
 def cosine_search(
-    query_vector: Union[List[float], np.ndarray], 
-    documents: List[Dict[str, Any]], 
+    query_vector: list[float] | np.ndarray, 
+    documents: list[dict[str, Any]], 
     top_k: int = 5
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Retourne les top_k documents les plus similaires à la requête.
 
     Utilise le calcul matriciel vectorisé de NumPy pour une performance optimale,
@@ -84,3 +87,6 @@ def cosine_search(
         }
         for i in top_indices
     ]
+
+
+__all__ = ["cosine_search"]
