@@ -6,13 +6,15 @@ Refacto DevOps / SOLID / Thread-Safe :
 - Résilience : en cas de corruption, le fichier est sauvegardé en .bak avant réinitialisation.
 - Cohérence du schéma de données garanti.
 """
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 import os
 import shutil
 import threading
-from typing import Optional
+from typing import Any
 
 from services.file_utils import write_json_atomic
 
@@ -22,7 +24,7 @@ _logger = logging.getLogger("jarvis.vector.index")
 class VectorIndex:
     """Stocke et persiste les documents de l'index vectoriel (responsabilité IO stricte)."""
 
-    def __init__(self, data: dict, path: str, lock: threading.RLock):
+    def __init__(self, data: dict[str, Any], path: str, lock: threading.RLock) -> None:
         """
         Args:
             data: Le dictionnaire de données partagé (doit contenir "documents").
@@ -38,7 +40,7 @@ class VectorIndex:
         self._text_hashes: set[str] = set()
         self._rebuild_hash_index()
 
-    def _rebuild_hash_index(self):
+    def _rebuild_hash_index(self) -> None:
         """Reconstruit l'index de hachage O(1) à partir des données existantes."""
         self._text_hashes.clear()
         for doc in self._data.get("documents", []):
@@ -49,15 +51,19 @@ class VectorIndex:
         """Calcule le hash SHA-256 d'un texte pour la déduplication."""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-    def add_document(self, text: str, metadata: Optional[dict]) -> bool:
-        """Ajoute un document (dedup O(1) par hash). Retourne True si ajouté."""
+    def add_document(self, text: str, metadata: dict[str, Any] | None = None) -> bool:
+        """
+        Ajoute un document en mémoire (dedup O(1) par hash). 
+        Retourne True si ajouté, False si déjà présent.
+        Note : Ne persiste pas automatiquement sur disque (appeler `save()` séparément).
+        """
         text_hash = self._get_text_hash(text)
         
         with self._lock:
             if text_hash in self._text_hashes:
                 return False  # Déjà présent
             
-            # Ajout sécurisé
+            # Ajout sécurisé en mémoire
             self._data["documents"].append({
                 "text": text,
                 "metadata": metadata or {},
@@ -67,12 +73,12 @@ class VectorIndex:
             return True
 
     def exists(self, text: str) -> bool:
-        """Vérifie si un texte est déjà indexé (O(1))."""
+        """Vérifie si un texte est déjà indexé en mémoire (O(1))."""
         text_hash = self._get_text_hash(text)
         with self._lock:
             return text_hash in self._text_hashes
 
-    def save(self):
+    def save(self) -> None:
         """Persiste l'index sur disque de manière atomique et thread-safe."""
         with self._lock:
             try:
@@ -81,8 +87,11 @@ class VectorIndex:
                 _logger.error("Échec critique de la sauvegarde de l'index vectoriel : %s", e)
                 raise
 
-    def load_secure(self) -> dict:
-        """Charge l'index depuis le disque avec gestion robuste de la corruption."""
+    def load_secure(self) -> dict[str, Any]:
+        """
+        Charge l'index depuis le disque avec gestion robuste de la corruption.
+        Retourne un nouveau dictionnaire (ne mute pas self._data directement).
+        """
         if not os.path.exists(self._path):
             return {"documents": [], "embedding_dim": None}
         
@@ -95,16 +104,15 @@ class VectorIndex:
                 # S'assurer que la clé embedding_dim existe pour la cohérence
                 data.setdefault("embedding_dim", None)
                 return data
-            else:
-                raise ValueError("Structure de données JSON invalide")
+            raise ValueError("Structure de données JSON invalide")
                 
         except (json.JSONDecodeError, OSError, ValueError) as e:
             _logger.critical(
                 "Fichier d'index vectoriel corrompu (%s). Sauvegarde et réinitialisation.", 
                 self._path
             )
-            # Sauvegarde du fichier corrompu pour analyse
-            backup_path = self._path + ".corrupted.bak"
+            # Sauvegarde du fichier corrompu pour analyse forensique
+            backup_path = f"{self._path}.corrupted.bak"
             try:
                 if os.path.exists(self._path):
                     shutil.copy2(self._path, backup_path)
@@ -114,3 +122,6 @@ class VectorIndex:
             
             # Retourne un état vide mais schématiquement correct
             return {"documents": [], "embedding_dim": None}
+
+
+__all__ = ["VectorIndex"]
