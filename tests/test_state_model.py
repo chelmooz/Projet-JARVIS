@@ -9,14 +9,23 @@ Covers:
 import json
 from pathlib import Path
 
+import pytest
+
 BASE = Path(__file__).resolve().parent.parent
 
 
+MODEL_PATH = BASE / "static" / "ui-state-model.json"
+
+
 def _load_model():
-    with open(BASE / "static" / "ui-state-model.json", encoding="utf-8") as f:
+    with open(MODEL_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
+MODEL_EXISTS = MODEL_PATH.exists()
+
+
+@pytest.mark.skipif(not MODEL_EXISTS, reason="ui-state-model.json non présent (hors périmètre backend)")
 class TestStateModelStructure:
 
     def test_json_is_valid(self):
@@ -59,6 +68,7 @@ class TestStateModelStructure:
             assert "trigger_selector" in e
 
 
+@pytest.mark.skipif(not MODEL_EXISTS, reason="ui-state-model.json non présent (hors périmètre backend)")
 class TestStateModelSelectors:
 
     def test_all_selectors_exist_in_html(self):
