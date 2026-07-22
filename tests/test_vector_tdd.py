@@ -4,8 +4,21 @@ Le contrat public est preserve ; on verifie que VectorService orchestre sans
 tout refaire lui-meme (delegation aux modules vector_index/embedder/dimension/
 weighting).
 """
+import pytest
+
 from services import vector as vector_mod
 from services.vector import VectorService
+
+import numpy as _np
+
+
+class _FakeInference:
+    def embed(self, text):
+        emb = [0.0] * 768
+        for i, c in enumerate(text[:10]):
+            emb[i] = ord(c) / 255.0
+        norm = _np.linalg.norm(emb)
+        return (emb / norm).tolist() if norm > 0 else [1.0] + [0.0] * 767
 
 
 class TestVectorServiceFacade:
@@ -15,7 +28,7 @@ class TestVectorServiceFacade:
         from controllers import context as ctx_mod
         monkeypatch.setattr(ctx_mod._ctx, "inference", None)
 
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("hello world", {"source": "test"})
         # dedup géré par le module VectorIndex
         v.index("hello world", {"source": "test"})
@@ -26,7 +39,7 @@ class TestVectorServiceFacade:
         from controllers import context as ctx_mod
         monkeypatch.setattr(ctx_mod._ctx, "inference", None)
 
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("hello world", {"source": "test"})
         v.vectorize_pending()
         # 1er appel = miss, 2e = hit (cache delegue a VectorCache)
@@ -36,23 +49,19 @@ class TestVectorServiceFacade:
         assert s["cache_hits"] == 1
         assert s["cache_misses"] == 1
 
-    def test_embedder_fallback_when_no_backend(self, tmp_path, monkeypatch):
+    def test_embedder_failfast_when_no_backend(self, tmp_path, monkeypatch):
         monkeypatch.setattr(vector_mod, "VECTOR_PATH", str(tmp_path / "vector_index.json"))
-        from controllers import context as ctx_mod
-        monkeypatch.setattr(ctx_mod._ctx, "inference", None)
+        from services.vector_embedder import Embedder
 
-        v = VectorService()
-        v.index("texte", {"src": "x"})
-        v.vectorize_pending()
-        assert v._embedder.using_fallback is True
-        assert s["embedding_backend"] == "fallback_histogram" if (s := v.stats()) else True
+        with pytest.raises(ValueError, match="ne peut pas.*None"):
+            Embedder(inference_service=None)
 
     def test_weighting_delegates_consolidate(self, tmp_path, monkeypatch):
         monkeypatch.setattr(vector_mod, "VECTOR_PATH", str(tmp_path / "vector_index.json"))
         from controllers import context as ctx_mod
         monkeypatch.setattr(ctx_mod._ctx, "inference", None)
 
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index_message("c1", "m1", "user", "hello", 1.0)
         v.index_message("c1", "m2", "user", "hello", 1.0)
         v.vectorize_pending()
@@ -68,7 +77,7 @@ class TestVectorServiceFacade:
         from controllers import context as ctx_mod
         monkeypatch.setattr(ctx_mod._ctx, "inference", None)
 
-        v1 = VectorService()
+        v1 = VectorService(_FakeInference())
         v1.index("texte conserve", {"src": "mig"})
         v1.vectorize_pending()
         assert v1.last_migration == "ok"
@@ -79,6 +88,6 @@ class TestVectorServiceFacade:
             VectorService, "_resolve_expected_dim",
             lambda self: 512,
         )
-        v2 = VectorService()
+        v2 = VectorService(_FakeInference())
         assert v2.last_migration in ("reindexed", "reset")
         assert "texte conserve" in [d["text"] for d in v2._data["documents"]]
