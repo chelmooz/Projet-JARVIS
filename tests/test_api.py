@@ -111,6 +111,7 @@ def _apply_mocks():
 _apply_mocks()
 
 from controllers.router import app
+app.state.context = ctx._ctx
 
 client = TestClient(app)
 
@@ -152,10 +153,11 @@ class TestStatus:
         assert resp.status_code == 200
         # /api/status est enveloppé par le wrapper de réponse `ok()` -> {"data": ..., "error": null}
         data = resp.json()["data"]
-        assert data["backend"] == "ollama"
         assert "ollama" in data
-        assert "memory_ok" in data
-        assert "vector_ok" in data
+        assert "memory" in data
+        assert "vector" in data
+        assert "conversations" in data
+        assert "version" in data
 
 
 class TestJarvis:
@@ -182,8 +184,7 @@ class TestJarvisNoDoubleWrite:
     """Règle : un POST /api/jarvis réussit n'écrit la conversation QU'UNE fois
     (1 user + 1 assistant) — pas d'effet de bord dupliqué (cf. ADR-004 / audit)."""
 
-    def test_full_post_writes_conversation_once(self):
-        import controllers.routes.jarvis as jr
+    def test_full_post_writes_conversation_once(self, monkeypatch):
         from services.orchestrator import OrchestratorService
 
         fake_inf = FakeInference()
@@ -206,15 +207,14 @@ class TestJarvisNoDoubleWrite:
         )
 
         fake_analytics = MagicMock()
-        old_ctx = jr._ctx
-        jr._ctx = lambda: (orch, fake_analytics, spy_conv)
-        try:
-            resp = client.post("/api/jarvis", json={"task": "test", "conversation_id": "abc123"})
-            assert resp.status_code == 200
-            # 1 user + 1 assistant, écrits UNE seule fois par le routeur
-            assert spy_conv.add_message.call_count == 2
-        finally:
-            jr._ctx = old_ctx
+        monkeypatch.setattr(app.state.context, "orchestrator", orch)
+        monkeypatch.setattr(app.state.context, "analytics", fake_analytics)
+        monkeypatch.setattr(app.state.context, "conversations", spy_conv)
+
+        resp = client.post("/api/jarvis", json={"task": "test", "conversation_id": "abc123"})
+        assert resp.status_code == 200
+        # 1 user + 1 assistant, écrits UNE seule fois par le routeur
+        assert spy_conv.add_message.call_count == 2
 
 
 class TestAgents:
@@ -266,13 +266,13 @@ class TestConversations:
     def test_create_returns_201(self):
         resp = client.post("/api/conversations")
         assert resp.status_code == 200
-        assert "conversation_id" in resp.json()
+        assert "conversation_id" in resp.json()["data"]
 
     def test_list_returns_paginated(self):
         client.post("/api/conversations")
         resp = client.get("/api/conversations")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "conversations" in data
         assert "total" in data
         assert data["limit"] == 20
@@ -310,7 +310,7 @@ class TestDocuments:
         resp = client.post("/api/ingest", json={
             "documents": [{"text": "hello world", "metadata": {"source": "test"}}]
         })
-        assert resp.json()["ingested"] == 1
+        assert resp.json()["data"]["ingested"] == 1
 
     def test_search_no_query(self):
         resp = client.get("/api/search")
@@ -330,24 +330,24 @@ class TestDocuments:
 
     def test_vectorize_conversations_returns_200(self):
         resp = client.post("/api/conversations", json={"title": "vec_test"})
-        cid = resp.json()["conversation_id"]
-        ctx.conversations.add_message(cid, "user", "Bonjour")
-        ctx.conversations.add_message(cid, "assistant", "Salut")
+        cid = resp.json()["data"]["conversation_id"]
+        ctx._ctx.conversations.add_message(cid, "user", "Bonjour")
+        ctx._ctx.conversations.add_message(cid, "assistant", "Salut")
 
         resp = client.post("/api/vectorize/conversations")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert "vectorized" in resp.json()["data"]
 
     def test_vectorize_conversations_returns_fields(self):
         resp = client.post("/api/conversations", json={"title": "vec_test2"})
-        cid = resp.json()["conversation_id"]
-        ctx.conversations.add_message(cid, "user", "Msg1")
-        ctx.conversations.add_message(cid, "user", "Msg2")
-        ctx.conversations.add_message(cid, "assistant", "Msg3")
+        cid = resp.json()["data"]["conversation_id"]
+        ctx._ctx.conversations.add_message(cid, "user", "Msg1")
+        ctx._ctx.conversations.add_message(cid, "user", "Msg2")
+        ctx._ctx.conversations.add_message(cid, "assistant", "Msg3")
 
         resp = client.post("/api/vectorize/conversations")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["vectorized"] == 3
         assert data["conversations"] == 1
         assert "remaining" in data
@@ -397,7 +397,7 @@ class TestFeedback:
             "conv_id": "test1234", "msg_id": "abc123", "signal": 1
         })
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["status"] == "ok"
         assert data["adjusted"] == 1
 
@@ -412,7 +412,7 @@ class TestFeedback:
             "conv_id": "test1234", "msg_id": "abc123", "type": "copy"
         })
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["status"] == "ok"
         assert data["type"] == "copy"
         assert data["delta"] > 0
