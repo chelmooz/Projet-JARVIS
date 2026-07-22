@@ -7,13 +7,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from controllers import context as _context
-
-# test_profiling.py patche globalement controllers.context._check_ollama (sans
-# cleanup monkeypatch) -> on capture la vraie fonction à l'import pour la
-# restaurer dans nos tests A4 et éviter la pollution inter-tests.
-REAL_CHECK_OLLAMA = _context._check_ollama
-
 
 # ---------------------------------------------------------------------------
 # A1 — Double sauvegarde conversation (save_results + _save_conv)
@@ -76,39 +69,19 @@ def test_embed_empty_embeddings_raises(monkeypatch):
 # A4 — _check_ollama ignore le port système 11434 (design portable)
 # ---------------------------------------------------------------------------
 def test_check_ollama_ignores_system_port(monkeypatch):
-    import httpx
-
     from controllers import context
+    from services.inference import InferenceService
 
-    def _fake_get(url, timeout=2):
-        if ":11436" in url:
-            raise httpx.ConnectError("portable down")
-        if ":11434" in url:
-            class _R:
-                status_code = 200
-            return _R()
-        raise httpx.ConnectError("?")
-
-    monkeypatch.setattr(httpx, "get", _fake_get)
-    monkeypatch.setattr(context, "_check_ollama", REAL_CHECK_OLLAMA)
-    # Seul le système (11434) répond : on doit retourner False (on l'ignore)
+    # InferenceService.ping() ne contacte que le port portable 11436
+    monkeypatch.setattr(InferenceService, "ping", lambda self: False)
     assert context._check_ollama() is False
 
 
 def test_check_ollama_ok_when_portable_up(monkeypatch):
-    import httpx
-
     from controllers import context
+    from services.inference import InferenceService
 
-    def _fake_get(url, timeout=2):
-        if ":11436" in url:
-            class _R:
-                status_code = 200
-            return _R()
-        raise httpx.ConnectError("down")
-
-    monkeypatch.setattr(httpx, "get", _fake_get)
-    monkeypatch.setattr(context, "_check_ollama", REAL_CHECK_OLLAMA)
+    monkeypatch.setattr(InferenceService, "ping", lambda self: True)
     assert context._check_ollama() is True
 
 
