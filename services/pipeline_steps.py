@@ -63,6 +63,10 @@ def query_model(state: dict[str, Any], provider: Any, agents: dict[str, object],
     model = model_selector(agent_key, state.get("model"), provider)
     task = state.get("task", "")
     context = state.get("context", {})
+    if not task:
+        state["error"] = "Tâche vide — rien à exécuter"
+        state["response"] = "Je n'ai pas reçu de tâche à exécuter."
+        return state
     prompt = task
     if context:
         context_str = "\n".join(f"- {k}: {v}" for k, v in context.items())

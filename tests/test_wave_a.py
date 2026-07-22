@@ -175,7 +175,7 @@ def test_query_model_empty_task_sets_error():
 
     out = query_model(state, fake_inf, fake_agents, fake_toolbox, lambda *a: "m")
     assert out["error"] is not None
-    assert out["response"] == ""
+    assert out["response"] != ""
 
 
 # ---------------------------------------------------------------------------
