@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config.constants import CORS_ORIGIN, JARVIS_PORT, MAX_BODY_SIZE
-from services.profiling import SLOW_THRESHOLD, record_slow
+from services import profiling
 from services.ratelimit import MAX_REQUESTS, check_rate_limit
 
 _logger = logging.getLogger(__name__)
@@ -102,10 +102,10 @@ def _setup_middlewares(app: FastAPI) -> None:
         debut = time.monotonic()
         resp = await call_next(request)
         duree = time.monotonic() - debut
-        if duree >= SLOW_THRESHOLD:
-            record_slow(request.url.path, duree)
+        if duree >= profiling.SLOW_THRESHOLD:
+            profiling.record_slow(request.url.path, duree)
             _logger.warning(
-                "SLOW ENDPOINT %s — %.3fs (> %ss)", request.url.path, duree, SLOW_THRESHOLD,
+                "SLOW ENDPOINT %s — %.3fs (> %ss)", request.url.path, duree, profiling.SLOW_THRESHOLD,
             )
         return resp
 

@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 import controllers.context as ctx_mod
 from controllers.router import app
 
+app.state.context = ctx_mod._ctx
 client = TestClient(app)
 
 
@@ -36,10 +37,10 @@ def _fake_vector():
         {"text": f"doc {i}", "metadata": {"source": "test"}, "score": round(1.0 - i * 0.1, 4)}
         for i in range(5)
     ]
-    original = ctx_mod.vector
-    ctx_mod.vector = _FakeVector(results)
+    original = ctx_mod._ctx.vector
+    ctx_mod._ctx.vector = _FakeVector(results)
     yield
-    ctx_mod.vector = original
+    ctx_mod._ctx.vector = original
 
 
 class TestSearchPagination:
@@ -49,7 +50,7 @@ class TestSearchPagination:
         # limit=2 doit renvoyer <= 2 items + champ total
         resp = client.get("/api/search?q=test&limit=2&offset=0")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert len(data["results"]) <= 2
         assert data["total"] == 5
         assert data["limit"] == 2
@@ -59,7 +60,7 @@ class TestSearchPagination:
         # limit=0 doit renvoyer une liste vide (pas d'erreur)
         resp = client.get("/api/search?q=test&limit=0")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["results"] == []
         assert data["total"] == 5
 
@@ -67,7 +68,7 @@ class TestSearchPagination:
         # offset > total doit renvoyer une liste vide
         resp = client.get("/api/search?q=test&offset=100")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["results"] == []
         assert data["total"] == 5
 
@@ -75,13 +76,13 @@ class TestSearchPagination:
         # La limite doit être plafonnée à 100 côté serveur
         resp = client.get("/api/search?q=test&limit=500")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["limit"] <= 100
 
     def test_default_total_present(self):
         # Le champ total doit toujours être présent par défaut
         resp = client.get("/api/search?q=test")
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "total" in data
         assert data["total"] == 5

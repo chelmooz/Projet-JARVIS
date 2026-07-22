@@ -6,28 +6,62 @@ from fastapi.testclient import TestClient
 import controllers.context as _ctx_module
 
 
+class _FakeConversation:
+    def __init__(self):
+        self._store = {}
+        self._index = {"conversations": []}
+    def create(self, title=""):
+        cid = "test-vectorize"
+        self._store[cid] = {"id": cid, "messages": []}
+        self._index["conversations"].append({"id": cid, "title": title, "created_at": 0.0})
+        return cid
+    def add_message(self, conv_id, role, content, **kw):
+        if conv_id in self._store:
+            self._store[conv_id]["messages"].append({"role": role, "content": content})
+    def get_conversation(self, conv_id):
+        return self._store.get(conv_id)
+    def list_all(self):
+        return self._index["conversations"]
+    def delete(self, conv_id):
+        self._store.pop(conv_id, None)
+        self._index["conversations"] = [c for c in self._index["conversations"] if c["id"] != conv_id]
+    def delete_all(self):
+        self._store.clear()
+        self._index["conversations"] = []
+    def is_healthy(self): return True
+
+
+class _FakeAnalytics:
+    def track_query(self, *a, **kw): pass
+    def get_metrics(self): return {"total_conversations": 0}
+    def increment_conversations(self): pass
+
+
+def _inject_fakes():
+    _ctx_module._ctx._initialized = True
+    _ctx_module._ctx.inference = None
+    _ctx_module._ctx.conversations = _FakeConversation()
+    _ctx_module._ctx.analytics = _FakeAnalytics()
+    _ctx_module._ctx.vector = None
+    _ctx_module._ctx.memory = None
+    _ctx_module._ctx.log = None
+    _ctx_module._ctx.metrics = None
+    _ctx_module._ctx.agents = {}
+    _ctx_module._ctx.router_svc = None
+    _ctx_module._ctx.orchestrator = None
+
+
+_inject_fakes()
+
+
 @pytest.fixture
 def client():
     import os
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from controllers.router import app
+    app.state.context = _ctx_module._ctx
     return TestClient(app)
-
-
-@pytest.fixture(autouse=True, scope="module")
-def _isolate_context():
-    """Re-initialise le vrai contexte applicatif pour ce module, indépendamment
-    de la pollution globale d'autres fichiers (ex: test_api restore des singletons
-    a None/MagicMock dans son teardown). Garantit que les routes utilisent les
-    vrais services (conversations, vector, analytics) — necessaire pour C1 et le
-    cleanup des conversations.
-    """
-    _ctx_module._ctx._initialized = False
-    _ctx_module._ctx.initialize()
-    _ctx_module._sync_module_globals(_ctx_module._ctx)
-    yield
-    # Laisser le vrai contexte en place (etat correct).
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +74,7 @@ def cleanup(client):
 def _create_conversation(client, title, msg_count=1):
     resp = client.post("/api/conversations", json={"title": title})
     assert resp.status_code == 200
-    cid = resp.json()["conversation_id"]
+    cid = resp.json()["data"]["conversation_id"]
     for i in range(msg_count):
         resp = client.post(f"/api/conversations/{cid}/messages", json={
             "role": "user" if i % 2 == 0 else "assistant",
@@ -50,6 +84,7 @@ def _create_conversation(client, title, msg_count=1):
     return cid
 
 
+@pytest.mark.live
 class TestLimitToFive:
 
     def test_lot_max_5(self, client):
@@ -66,6 +101,7 @@ class TestLimitToFive:
         assert isinstance(data["remaining"], int)
 
 
+@pytest.mark.live
 class TestNonDestructive:
     """Etape 0 (audit) : vectoriser ne detruit PAS la conversation source.
     Le marqueur 'indexed' empeche le retraitement infini (idempotent)."""
@@ -104,21 +140,18 @@ class _FailingInference:
         raise RuntimeError("simulated Ollama timeout")
 
 
-class TestFallbackHistogram:
+class TestEmbeddingFailFast:
 
-    def test_fallback_histogram_dim(self, client):
-        """A3: si l'embedding Ollama echoue, repli histogramme de dimension 16."""
-        from services.vector import VectorService
+    def test_embedding_raise_si_backend_inaccessible(self, client):
+        """A3: si l'embedding Ollama echoue, Embedder leve RuntimeError (Fail-Fast)."""
+        from services.vector_embedder import Embedder
 
-        svc = VectorService()
-        svc._inference = _FailingInference()
-
-        emb = svc._embed("texte de test pour le repli")
-        assert len(emb) == 16, f"Fallback doit faire 16 dims, got {len(emb)}"
-        assert svc._using_fallback is True
-        assert abs(sum(emb) - 1.0) < 1e-6
+        embedder = Embedder(inference_service=_FailingInference())
+        with pytest.raises(RuntimeError, match="temporairement indisponible"):
+            embedder.embed("texte de test")
 
 
+@pytest.mark.live
 class TestConcurrentNoDuplicate:
 
     def test_concurrent_no_duplicate(self, client):

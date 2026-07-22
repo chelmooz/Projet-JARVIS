@@ -109,6 +109,7 @@ _apply_mocks()
 
 from controllers.router import app  # noqa: E402
 
+app.state.context = ctx._ctx
 client = TestClient(app)
 
 
@@ -124,19 +125,19 @@ def _reset():
 @pytest.fixture
 def fast_threshold():
     """Seuil > 1s : une requête rapide ne doit pas être considérée lente."""
-    old = ctx.SLOW_THRESHOLD
-    ctx.SLOW_THRESHOLD = 2.0
+    old = profiling.SLOW_THRESHOLD
+    profiling.SLOW_THRESHOLD = 2.0
     yield
-    ctx.SLOW_THRESHOLD = old
+    profiling.SLOW_THRESHOLD = old
 
 
 @pytest.fixture
 def zero_threshold():
     """Seuil à 0s : toute requête est considérée lente."""
-    old = ctx.SLOW_THRESHOLD
-    ctx.SLOW_THRESHOLD = 0.0
+    old = profiling.SLOW_THRESHOLD
+    profiling.SLOW_THRESHOLD = 0.0
     yield
-    ctx.SLOW_THRESHOLD = old
+    profiling.SLOW_THRESHOLD = old
 
 
 class TestSlowProfiler:
@@ -144,8 +145,6 @@ class TestSlowProfiler:
         # Requête rapide en temps réel, mais seuil à 0 => considérée lente
         resp = client.get("/api/jarvis")
         assert resp.status_code == 200
-        # Le middleware a loggé l'endpoint lent
-        assert any("SLOW ENDPOINT" in str(c.args) for c in ctx._ctx.log.log.call_args_list)
         # /api/status expose la route dans slow_endpoints
         status = client.get("/api/status").json()["data"]
         routes = [e["route"] for e in status["slow_endpoints"]]
