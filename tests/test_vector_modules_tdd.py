@@ -6,6 +6,18 @@ façade fine qui delegate. Le contrat public + l'acces a v._data sont preserves
 """
 from services import vector as vector_mod
 
+import numpy as _np
+import threading
+
+
+class _FakeInference:
+    def embed(self, text):
+        emb = [0.0] * 768
+        for i, c in enumerate(text[:10]):
+            emb[i] = ord(c) / 255.0
+        norm = _np.linalg.norm(emb)
+        return (emb / norm).tolist() if norm > 0 else [1.0] + [0.0] * 767
+
 
 class TestVectorDimensionExtraction:
 
@@ -34,15 +46,15 @@ class TestVectorDimensionExtraction:
 
 class TestVectorEmbedderExtraction:
 
-    def test_embedder_fallback_histogram(self, tmp_path, monkeypatch):
+    def test_embedder_delegates_to_inference(self, tmp_path, monkeypatch):
         index = tmp_path / "vector_index.json"
         monkeypatch.setattr(vector_mod, "VECTOR_PATH", str(index))
         from services.vector_embedder import Embedder
-        emb = Embedder(inference=None)
-        out = emb.embed("texte de test pour le repli")
-        assert len(out) == 16
-        assert abs(sum(out) - 1.0) < 1e-6
-        assert emb.using_fallback is True
+        emb = Embedder(inference_service=_FakeInference())
+        out = emb.embed("texte de test")
+        assert len(out) == 768
+        assert isinstance(out, list)
+        assert all(isinstance(v, float) for v in out)
 
 
 class TestVectorWeightingExtraction:
@@ -69,7 +81,7 @@ class TestVectorIndexExtraction:
         monkeypatch.setattr(vector_mod, "VECTOR_PATH", str(index))
         from services.vector_index import VectorIndex
         data = {"documents": [], "embedding_dim": 768, "embedding_model": "nomic"}
-        idx = VectorIndex(data)
+        idx = VectorIndex(data, str(index), threading.RLock())
         assert idx.add_document("texte", {}) is True
         assert idx.add_document("texte", {}) is False
         assert len(data["documents"]) == 1
