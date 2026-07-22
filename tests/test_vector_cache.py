@@ -7,6 +7,18 @@ from services.vector import VECTOR_CACHE_TTL_SECONDS, VectorService
 from services.vector_cache import VectorCache
 
 
+import numpy as _np
+
+
+class _FakeInference:
+    def embed(self, text):
+        emb = [0.0] * 768
+        for i, c in enumerate(text[:10]):
+            emb[i] = ord(c) / 255.0
+        norm = _np.linalg.norm(emb)
+        return (emb / norm).tolist() if norm > 0 else [1.0] + [0.0] * 767
+
+
 @pytest.fixture(autouse=True)
 def _isolated_index(tmp_path, monkeypatch):
     """Isole l'index vectoriel sur disque et force le fallback embedding
@@ -70,7 +82,7 @@ class TestVectorCache:
         assert cache.get("b", 1, now=4.0) is None
 
     def test_index_batch_clears_cache(self):
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("doc alpha", {"source": "test"})
         v.vectorize_pending()
         # Remplir le cache
@@ -84,7 +96,7 @@ class TestVectorCache:
         assert v.search("doc", top_k=1)  # nouveau résultat cohérent
 
     def test_clear_cache_public(self):
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("doc gamma", {"source": "test"})
         v.vectorize_pending()
         v.search("doc", top_k=1)
@@ -93,7 +105,7 @@ class TestVectorCache:
         assert len(v._cache) == 0
 
     def test_cache_entry_expires_after_ttl(self):
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("doc delta", {"source": "test"})
         v.vectorize_pending()
         now = [1000000.0]
@@ -117,7 +129,7 @@ class TestVectorCache:
         assert v._cache_hits == 1
 
     def test_search_hits_cache_twice(self):
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("doc epsilon", {"source": "test"})
         v.vectorize_pending()
         now = [2000000.0]
