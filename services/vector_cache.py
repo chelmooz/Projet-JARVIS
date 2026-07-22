@@ -72,11 +72,9 @@ class VectorCache:
                 self._store.popitem(last=False)
 
     def clear(self) -> None:
-        """Vide intégralement le cache et réinitialise les compteurs."""
+        """Vide les entrées du cache sans réinitialiser les compteurs de stats."""
         with self._lock:
             self._store.clear()
-            self._hits = 0
-            self._misses = 0
 
     @property
     def hits(self) -> int:
