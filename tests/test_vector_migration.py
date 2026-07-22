@@ -6,6 +6,17 @@ reset propre sans crash.
 """
 from services.vector import EXPECTED_DIM, VectorService
 
+import numpy as _np
+
+
+class _FakeInference:
+    def embed(self, text):
+        emb = [0.0] * 768
+        for i, c in enumerate(text[:10]):
+            emb[i] = ord(c) / 255.0
+        norm = _np.linalg.norm(emb)
+        return (emb / norm).tolist() if norm > 0 else [1.0] + [0.0] * 767
+
 
 class TestVectorDimensionMigration:
 
@@ -14,7 +25,7 @@ class TestVectorDimensionMigration:
         index = tmp_path / "vector_index.json"
         monkeypatch.setattr("services.vector.VECTOR_PATH", str(index))
 
-        v = VectorService()
+        v = VectorService(_FakeInference())
         v.index("document alpha", {"src": "test"})
         v.vectorize_pending()
 
@@ -31,7 +42,7 @@ class TestVectorDimensionMigration:
         monkeypatch.setattr("services.vector.VECTOR_PATH", str(index))
 
         # 1) Index initial avec la dimension courante (768).
-        v1 = VectorService()
+        v1 = VectorService(_FakeInference())
         v1.index("texte conservé", {"src": "mig"})
         v1.vectorize_pending()
         assert v1._data["embedding_dim"] == EXPECTED_DIM
@@ -47,7 +58,7 @@ class TestVectorDimensionMigration:
             lambda self, text: [0.0] * 512,
         )
 
-        v2 = VectorService()  # init -> doit détecter le mismatch
+        v2 = VectorService(_FakeInference())  # init -> doit détecter le mismatch
         # Le mismatch a été détecté et la migration planifiée (re-index possible).
         assert v2.last_migration in ("reindexed", "reset")
         # Les documents (texte) sont conservés pour permettre le re-index.
@@ -80,7 +91,7 @@ class TestVectorDimensionMigration:
             "services.vector.VectorService._resolve_expected_dim",
             lambda self: 1024,
         )
-        v = VectorService()
+        v = VectorService(_FakeInference())
         # Pas de texte à re-indexer -> reset propre.
         assert v.last_migration == "reset"
         assert v._data["embedding_dim"] == 1024
