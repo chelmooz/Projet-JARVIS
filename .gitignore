@@ -1,61 +1,47 @@
-venv/
-node_modules/
-package-lock.json
-package.json
+# --- Python ---
 __pycache__/
-*.pyc
-*.pyo
-.env*
-!.env.example
-*.db
-*.bak
-logs/
-memory/
-models/*.gguf
-models/ollama/blobs/
-config/*.env
-config/model_preferences.json
-config/components.json
-config/fallback_settings.json
-config/vector_index.json
-portable_python/
-lib/ollama/
-tests/.pytest_cache/
-bin/ollama*
-bin/*.exe
-bin/*.dll
-bin/win/
-bin/linux/
-bin/mac/
-bin/diagnostic/
-models/ollama/manifests/
-tmp/
-.pytest-temp/
-.coverage
-.pytest_cache/
-.ruff_cache/
-server_*.txt
-tree.txt
-skills/tree.txt
-*.log
-TODOLIST.md
-# Build artifacts
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.egg-info/
-
-# Artefacts de session
-pytest_output.txt
-ruff_output.txt
-
-# Anciens chemins (avant rangement MVC)
-/install.py
-/install_pour_linux
-/install_pour_mac
-/install_pour_windows
-/start.bat
-
-# Artefacts binaires / modèles ignorés
-*.png
-Modelfile.*
-*.bak.ps1
-scripts/*.bak.ps1
+.eggs/
+dist/
 build/
+
+# --- Environnement virtuel ---
+.venv/
+venv/
+env/
+
+# --- Caches d'outils (Tests, Linters) ---
+.pytest_cache/
+.pytest-temp/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# --- Node (pour .opencode) ---
+node_modules/
+.opencode/node_modules/
+
+# --- Données d'exécution locales (Ne pas committer) ---
+memory/
+logs/
+*.log
+
+# --- Variables d'environnement ---
+.env
+.env.local
+
+# --- Fichiers temporaires à la racine ---
+fix_test.py
+pytest_*.txt
+tree.txt
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

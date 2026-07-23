@@ -109,13 +109,13 @@ _apply_mocks()
 
 from controllers.router import app  # noqa: E402
 
-app.state.context = ctx._ctx
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
 def _reset():
     """Réapplique les mocks avant chaque test (isolation vis-à-vis de test_api)."""
+    app.state.context = ctx._ctx
     _apply_mocks()
     profiling.reset_profiling()
     yield

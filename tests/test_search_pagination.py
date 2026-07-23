@@ -8,10 +8,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 import controllers.context as ctx_mod
+from controllers.di import AppContext
 from controllers.router import app
 
-app.state.context = ctx_mod._ctx
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _setup_ctx():
+    app.state.context = ctx_mod._ctx
+    yield
+    app.state.context = AppContext()
+    app.state.context.initialize()
 
 
 class _FakeVector:

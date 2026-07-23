@@ -111,24 +111,21 @@ def _apply_mocks():
 _apply_mocks()
 
 from controllers.router import app
-app.state.context = ctx._ctx
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
 def _restore_ctx():
-    # Re-applique les fakes avant chaque test (isolation vis-a-vis des autres modules)
+    app.state.context = ctx._ctx
     _apply_mocks()
     yield
-    # Restaure les VRAIS services (et non les valeurs None/MagicMock sauvegardees)
-    # pour ne pas polluer les autres fichiers de test (ex: test_vectorize C1,
-    # qui utilise le vrai analytics/conversations). test_api garde ses fakes
-    # pendant son execution (appliques a l'import, build_app etant short-circuite
-    # par _initialized=True).
     ctx._ctx._initialized = False
     ctx._ctx.initialize()
     ctx._sync_module_globals(ctx._ctx)
+    from controllers.di import AppContext
+    app.state.context = AppContext()
+    app.state.context.initialize()
 
 
 class TestRoot:
