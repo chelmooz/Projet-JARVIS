@@ -31,9 +31,13 @@ class OllamaAdapter(LLMAdapter):
         self._models_cache: list[str] | None = None
         self._models_cache_ts: float = 0.0
         self._timeout: int | None = None
+        # CORRECTION : Flag pour éviter les requêtes après fermeture
+        self._closed = False
 
     def close(self) -> None:
-        """Libère le client HTTP (sockets) en fin d'usage pour ne pas leisser de sockets ouverts."""
+        """Libère le client HTTP (sockets) en fin d'usage pour ne pas laisser de sockets ouverts."""
+        # CORRECTION : Marquer comme fermé AVANT de fermer le client
+        self._closed = True
         if self._http is not None:
             with contextlib.suppress(Exception):
                 self._http.close()
@@ -49,16 +53,16 @@ class OllamaAdapter(LLMAdapter):
     @staticmethod
     def _check_endpoint(url: str) -> bool:
         try:
-            return httpx.get(f"{url}/api/tags", timeout=2).status_code == 200
+            return httpx.get(f"{url}/api/tags", timeout=0.5).status_code == 200
         except Exception:
             return False
 
     def _get_http(self) -> "httpx.Client":
-        """Retourne un client HTTP valide, le recreant si None (annulation requete).
+        """Retourne un client HTTP valide, le recréant si None (annulation requête).
 
-        `close()` (appele par `cancel_current()` au timeout AgentSupervisor) remet
-        `self._http` a None ; le prochain appel recree le client. Le thread en vol
-        garde la reference de l'ancien client (ferme) qui leve -> pas de zombie.
+        `close()` (appelé par `cancel_current()` au timeout AgentSupervisor) remet
+        `self._http` à None ; le prochain appel recrée le client. Le thread en vol
+        garde la référence de l'ancien client (fermé) qui lève -> pas de zombie.
         """
         if self._http is None:
             self._http = httpx.Client(timeout=httpx.Timeout(30.0, connect=1.0))
@@ -66,7 +70,7 @@ class OllamaAdapter(LLMAdapter):
 
     @staticmethod
     def _load_base_url() -> str:
-        """ load base url."""
+        """Load base url."""
         try:
             with open(ADAPTERS_PATH) as f:
                 cfg = yaml.safe_load(f) or {}
@@ -91,14 +95,25 @@ class OllamaAdapter(LLMAdapter):
     def _call_with_retry(self, endpoint: str, payload: dict, timeout: int | None = None) -> dict:
         """Appelle l'endpoint Ollama avec re-essais sur erreurs transitoires.
 
-        `_max_retries` tentatives reelles (defaut 3) ; on attend 1s entre deux
-        echecs avant de reessayer. Leve RuntimeError seulement apres epuisement.
+        `_max_retries` tentatives réelles (défaut 3) ; on attend 1s entre deux
+        échecs avant de réessayer. Lève RuntimeError seulement après épuisement.
         """
+        # CORRECTION : Garde-fou immédiat
+        if getattr(self, "_closed", False):
+            raise RuntimeError(f"Ollama echec: adapter fermé, requete abandonnee sur {endpoint}")
+            
         timeout = timeout or self._load_timeout()
         t = httpx.Timeout(timeout, connect=1.0)
-        client = self._get_http()
         last_error: Exception | None = None
+        
         for attempt in range(self._max_retries):
+            # CORRECTION : Garde-fou dans la boucle (au cas où close() est appelé entre 2 tentatives)
+            if getattr(self, "_closed", False):
+                break
+                
+            # CORRECTION : Le client est récupéré À CHAQUE tentative, pas avant la boucle
+            client = self._get_http()
+            
             try:
                 r = client.post(endpoint, json=payload, timeout=t)
                 r.raise_for_status()
@@ -146,7 +161,7 @@ class OllamaAdapter(LLMAdapter):
             return Result.fail(error=str(e), agent="system", model=model)
 
     def _fetch_models(self) -> list[str]:
-        """ fetch models (cache 30s pour eviter 1 HTTP call par resolve_model)."""
+        """Fetch models (cache 30s pour eviter 1 HTTP call par resolve_model)."""
         now = time.time()
         if self._models_cache is not None and now - self._models_cache_ts < MODELS_CACHE_TTL:
             return self._models_cache
@@ -198,11 +213,11 @@ class OllamaAdapter(LLMAdapter):
         return self._matches(self._fetch_models(), model)
 
     def resolve_model(self, model: str) -> str | None:
-        """Retourne le tag Ollama reel correspondant a un nom court de config.
+        """Retourne le tag Ollama réel correspondant à un nom court de config.
 
         'qwen2.5' -> 'qwen2.5:latest'
         'phi-4-mini-instruct-abliterated' -> 'hf.co/Melvin56/...-GGUF:Q4_K_M'
-        Renvoie None si aucun modele ne matche.
+        Renvoie None si aucun modèle ne matche.
         """
         if not model:
             return None
