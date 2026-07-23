@@ -20,7 +20,8 @@ class TestSystemConstants:
     def test_base_dir_ends_with_projet_jarvis(self):
         # Tolérant au nom de dossier réel : "Projet JARVIS" (espace, clé USB)
         # ou "Projet-JARVIS" (tiret, nom du repo GitHub au clone).
-        norm = BASE_DIR.replace("-", " ").lower()
+        # CORRECTION : cast BASE_DIR (Path) en str pour utiliser .replace()
+        norm = str(BASE_DIR).replace("-", " ").lower()
         assert "projet jarvis" in norm, f"BASE_DIR inattendu : {BASE_DIR}"
 
     def test_system_is_lowercase_string(self):
@@ -28,11 +29,13 @@ class TestSystemConstants:
 
     def test_bin_dir_is_absolute(self):
         assert os.path.isabs(BIN_DIR)
-        assert BIN_DIR.endswith("bin")
+        # CORRECTION : .name donne le dernier composant du chemin (méthode Path native)
+        assert BIN_DIR.name == "bin"
 
     def test_portable_dir_is_absolute(self):
         assert os.path.isabs(PORTABLE_DIR)
-        assert PORTABLE_DIR.endswith("portable_python")
+        # CORRECTION : idem, .name au lieu de .endswith()
+        assert PORTABLE_DIR.name == "portable_python"
 
 
 class TestFindPython:
