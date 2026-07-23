@@ -82,7 +82,13 @@ def write_json_atomic(path: str, data: Any, **json_kwargs: Any) -> None:
     Garantit que le fichier n'est jamais corrompu : soit l'écriture entière
     réussit, soit le fichier original reste intact. Un verrou par chemin
     évite les écritures concurrentes.
+    
+    CORRECTION : Conversion explicite de ``path`` en ``str`` pour compatibilité
+    avec les objets ``pathlib.Path`` (WindowsPath/PosixPath).
     """
+    # CORRECTION : Cast path en str pour compatibilité Path/str
+    path = str(path)
+    
     lock = _get_lock(path)
     with lock:
         tmp = path + ".tmp"
