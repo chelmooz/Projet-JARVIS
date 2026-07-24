@@ -513,7 +513,10 @@ async function pollStatus() {
     setSide('st-ollama', s.ollama ? 'OK' : 'HS', s.ollama ? 'ok' : 'err');
     setSide('st-memory', s.memory_ok ? 'OK' : 'ERR', s.memory_ok ? 'ok' : 'err');
     setSide('st-vector', s.vector_ok ? 'OK' : 'ERR', s.vector_ok ? 'ok' : 'err');
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('st-backend').innerHTML = '<span class="status-dot dot-err"></span>HS';
+    document.getElementById('st-ollama').innerHTML = '<span class="status-dot dot-err"></span>HS';
+  }
   try {
     const mr = await fetch('/api/metrics');
     const m = await mr.json();
@@ -863,6 +866,11 @@ document.addEventListener('keydown', e => {
 // --- Settings persistence ---
 document.getElementById('s-default-model').addEventListener('change', e => {
   localStorage.setItem('jarvis_default_model', e.target.value);
+  fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: 'default_model', value: e.target.value }),
+  }).catch(() => {});
 });
 document.getElementById('s-offline').addEventListener('change', e => {
   const checked = e.target.checked;
@@ -1111,3 +1119,4 @@ document.getElementById('fb-cancel-btn')?.addEventListener('click', closeBrowser
 document.getElementById('fb-select-btn')?.addEventListener('click', browserSelect);
 document.getElementById('fb-back')?.addEventListener('click', browserGoUp);
 document.getElementById('fp-browse')?.addEventListener('click', openBrowser);
+document.getElementById('fp-path')?.addEventListener('keydown', e => { if (e.key === 'Enter') authorizePath(); });

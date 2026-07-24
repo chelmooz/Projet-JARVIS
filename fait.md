@@ -311,3 +311,22 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 
 ### Vérification
 - ✅ Tests : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression
+
+---
+## Session #7 — Pipeline RAG Phase 3 (24/07/2026)
+
+### 3.1 TypeError dans query_model()
+- ✅ `services/pipeline_steps.py:76` : `agent.run(prompt, model=model)` → `agent.run(prompt, model=model, context=state.get("context", {}))`
+- ✅ Test : 45 passed (pipeline + agents + orchestrator)
+
+### 3.2 Mismatch vector_results vs similar_cases
+- ✅ `services/pipeline_steps.py:49` : `context["vector_results"]` → `context["similar_cases"]`
+- ✅ Aligné sur `_similar_cases_block()` dans `agents/base.py:164`
+
+### 3.3 Chemin vision — similar_cases hardcodé vide
+- ✅ `services/orchestrator.py:155` : `"similar_cases": []` → `self.vector.search(task, top_k=3) if self.vector else []`
+- ✅ `tests/conftest.py` : `FakeVectorService` implémente l'interface complète `VectorPort` (index, search, stats, preload, is_healthy)
+
+### Vérification
+- ✅ Tests pipeline/agents/orchestrator : 45 passed (0 failed)
+- ✅ Suite complète : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression
