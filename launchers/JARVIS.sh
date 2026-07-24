@@ -36,6 +36,9 @@ case "$OS" in
     PY_DIR="$ROOT/portable_python/mac"
     PY_BIN="$PY_DIR/bin/python3"
     OLLAMA_BIN="$ROOT/bin/mac/ollama"
+    if [ ! -f "$OLLAMA_BIN" ]; then
+      OLLAMA_BIN="$(command -v ollama 2>/dev/null)"
+    fi
     if [ ! -f "$PY_BIN" ]; then
       PY_BIN="$(command -v python3)"
       if [ -z "$PY_BIN" ]; then

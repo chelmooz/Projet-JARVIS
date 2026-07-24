@@ -330,3 +330,28 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 ### Vérification
 - ✅ Tests pipeline/agents/orchestrator : 45 passed (0 failed)
 - ✅ Suite complète : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression
+
+---
+## Session #8 — Phases 4-5 (24/07/2026)
+
+### 4.1 Modèle par défaut — persistance serveur
+- ✅ `s-default-model` change → `fetch('PUT /api/settings', {key:'default_model', value})` en plus du localStorage
+- ✅ Même pattern que `s-offline`
+
+### 4.2 Enter sur #fp-path
+- ✅ `fp-path` keydown Enter → `authorizePath()`
+
+### 4.3 Status Bar — feedback d'erreur visible
+- ✅ Premier `catch(e){}` → affiche "HS" (dot-err) sur st-backend et st-ollama
+- ✅ Deuxième catch inchangé (métriques non critiques)
+
+### 5.1 Ctrl+L — vider le chat
+- ✅ `document.addEventListener('keydown', ...)` avec `e.ctrlKey && e.key === 'l'`
+- ✅ `e.preventDefault() + clearChat()`
+
+### 5.2 Help box visible
+- ✅ `style="display:none"` retiré de `<details class="help-box">` dans index.html
+- ✅ La help box est désormais visible (dépliante via `<summary>Aide</summary>`)
+
+### Vérification
+- ✅ Suite complète : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression

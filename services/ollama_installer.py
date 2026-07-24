@@ -26,7 +26,7 @@ from config.constants import (
     LAUNCHER_WAIT_TIMEOUT,
     OLLAMA_VERSION,
 )
-from services.system import BASE_DIR, BIN_DIR, SYSTEM, get_ollama_path
+from services.system import BASE_DIR, BIN_DIR, BIN_LINUX, SYSTEM, get_ollama_path
 
 _logger = logging.getLogger("jarvis.ollama_installer")
 
@@ -156,12 +156,12 @@ def _install_linux_tar(log: _LogFn) -> str | None:
             log("Ollama", "Binaire Linux rejeté (SHA256 mismatch)", False)
             return None
         
-        os.makedirs(BIN_DIR, exist_ok=True)
+        os.makedirs(BIN_LINUX, exist_ok=True)
         _extract_tar_zst(dl, dl_bin, log)
         
         src = os.path.join(dl_bin, "bin", "ollama")
         if os.path.exists(src):
-            dest_bin = os.path.join(BIN_DIR, "ollama")
+            dest_bin = os.path.join(BIN_LINUX, "ollama")
             shutil.copy(src, dest_bin)
             os.chmod(dest_bin, 0o755)
         

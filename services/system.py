@@ -20,6 +20,8 @@ _logger = logging.getLogger(__name__)
 
 from config.paths import (
     BIN_DIR,
+    BIN_LINUX,
+    BIN_MAC,
     OLLAMA_EXE,
     PORTABLE_DIR,
     PORTABLE_LINUX,
