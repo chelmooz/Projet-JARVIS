@@ -361,6 +361,12 @@ textarea:focus-visible,
 .analytics-chart-box canvas { max-height: 220px; flex: 1; min-height: 0; }
 @media (max-width: 768px) { .analytics-chart-row { grid-template-columns: 1fr; } }
 
+.doc-upload-section { margin-top: 20px; padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.doc-upload-section h3 { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.doc-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; margin-bottom: 8px; box-sizing: border-box; }
+.doc-textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; margin-bottom: 8px; box-sizing: border-box; resize: vertical; font-family: inherit; }
+.doc-upload-row { display: flex; align-items: center; gap: 12px; }
+
 /* --- Responsive --- */
 #hamburger { display: none; position: fixed; top: 10px; left: 10px; z-index: 500; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 22px; padding: 6px 12px; cursor: pointer; }
 #hamburger:hover { background: var(--panel-2); }

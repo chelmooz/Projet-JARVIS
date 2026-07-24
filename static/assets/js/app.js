@@ -852,6 +852,46 @@ document.getElementById('btn-vectorize-convs')?.addEventListener('click', async 
   }
 });
 
+// --- Bouton ingestion document ---
+document.getElementById('btn-ingest-doc')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-ingest-doc');
+  const status = document.getElementById('ingest-status');
+  const nameInput = document.getElementById('doc-name');
+  const contentInput = document.getElementById('doc-content');
+  const content = contentInput.value.trim();
+  if (!content) {
+    status.textContent = '⚠️ Veuillez saisir un contenu';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '⏳ Ingestion...';
+  status.textContent = '';
+  try {
+    const doc = { text: content };
+    const name = nameInput.value.trim();
+    if (name) doc.metadata = { title: name };
+    const resp = await fetch('/api/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documents: [doc], source: 'manual' }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      status.textContent = `❌ ${data.error}`;
+    } else {
+      status.textContent = `✅ ${data.ingested} document(s) ingere(s)`;
+      contentInput.value = '';
+      if (name) nameInput.value = '';
+      refreshAnalytics();
+    }
+  } catch (e) {
+    status.textContent = `❌ Erreur : ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📄 Ingérer le document';
+  }
+});
+
 loadConvs();
 fetchModels();
 
