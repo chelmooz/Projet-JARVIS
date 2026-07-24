@@ -15,10 +15,13 @@ Dettes signalées (non corrigées ici) :
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
