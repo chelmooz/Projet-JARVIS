@@ -1,5 +1,5 @@
 # Micro-tâches Projet JARVIS — TDD + Audit
-Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
+Dernière mise à jour : 24/07/2026 (session #11 — Phase S + Phase 7 ADR-008)
 
 ## Légende
 - ✅ = Terminé
@@ -442,3 +442,92 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 | Stockage | 10/12 → **11/12** (+ backup scripté) |
 | Stabilité | 9/12 → **10/12** (+ restauration documentée) |
 | **Score estimé** | 72/100 → **~79/100** |
+
+---
+## Session #11 — Phase S (Stabilisation) + Phase 7 (ADR-008 RAG amélio continue)
+### Date : 24/07/2026
+
+### S.1 — Régression LLMAdapter (Protocol incomplet)
+- ✅ `services/adapters/protocols.py` : 11 méthodes restaurées dans LLMAdapter (query_multimodal, chat, is_available, first_available, list_models, resolve_model, embed, get_active_backend, ping, close)
+- ✅ `pytest tests/test_inference.py -q` : 5 failed → **11 passed**
+- Commit : `fix(ports): restaure les méthodes manquantes de LLMAdapter`
+
+### S.2 — Bug d'écrasement JSONL (JsonlTraceStore.append)
+- ✅ `services/trace_sidecar.py` : `write_text()` → `open("a")` mode ajout
+- ✅ `tests/test_trace_sidecar.py` : nouveau test `test_jsonl_trace_store_appends_multiple_records` (2 appels → 2 lignes)
+- ✅ `pytest tests/test_trace_sidecar.py -q` : **2 passed**
+- Commit : `fix(trace_sidecar): corrige l'écrasement JSONL, append au lieu de write`
+
+### S.3 — Contenu ADR-008 erroné (CSS ctOS)
+- ✅ `docs/adr/ADR-008-rag-diagnostic-amelioration-continue.md` : restauré avec le vrai contenu ADR-008 v2
+- ✅ `docs/adr/README.md` : statut "Proposé" → "Accepté — implémentation en cours"
+- Commit : `docs(adr): restaure le contenu réel d'ADR-008, corrige le statut`
+
+### 7.1 — Brancher le juge isolé sur la capitalisation
+- ✅ `services/pipeline.py` : injection `IResponseJudge`, `_build_trace_record()` appelle `evaluate()` avec chunks + response réels
+- ✅ `tests/test_pipeline_capitalization.py` : nouveau test `test_build_trace_record_calls_judge`
+- ✅ 5 passed
+- Commit : `feat(pipeline): branche le juge isolé sur la capitalisation de trace`
+
+### 7.2 — Score composite (feedback + récidive + juge)
+- ✅ `services/score.py` : `compute_composite_score()` fonction pure
+- ✅ `config/constants.py` : 6 constantes (JUDGE_WEIGHT, FEEDBACK_WEIGHT, FEEDBACK_THUMBS_UP/DOWN, FEEDBACK_ABSENT, RECIDIVE_PENALTY)
+- ✅ `tests/test_score_composite.py` : 6 tests (threshold, bad, absent, recidive, clamp bas, clamp haut)
+- ✅ 6 passed
+- Commit : `feat(rag): ajoute le calcul du score composite`
+
+### 7.3 — Rétropropagation de score (chunks)
+- ℹ️ `update_score()` et `consolidate()` déjà existants dans `services/vector.py` — refactor uniquement
+- ✅ `services/vector.py` : magic numbers `3` et `-2.0` → `BAD_COUNT_PRUNING_THRESHOLD` et `SCORE_PRUNING_THRESHOLD`
+- ✅ `config/constants.py` : 2 constantes ajoutées
+- ✅ ADR-008 : ratio 0.6 → bad_count 3 pour correspondre au code réel
+- Commit : `refactor(vector): extrait les seuils de consolidation en constantes nommées`
+
+### 7.4 — Boucle adaptative (HyDE + retry + arrêt mécanique)
+- ✅ `services/pipeline.py` : `_run_adaptive()` + `_run_attempt()` + `_is_stagnant()` + `_build_hyde_query()` + `_write_checkpoint()`
+- ✅ `services/adapters/protocols.py` : ajout `status: str = ""` à TraceRecord
+- ✅ `config/constants.py` : `MAX_ADAPTIVE_ATTEMPTS = 3`
+- ✅ `tests/test_pipeline_capitalization.py` : 3 tests (threshold, retry+HyDE, stagnation)
+- ✅ 57 passed (tous les tests pertinents)
+- Commit : `feat(pipeline): boucle adaptative HyDE + retry + arrêt mécanique`
+
+### Commits (cette session)
+| Hash | Message |
+|------|---------|
+| `4c1142a` | fix(ports): restaure les méthodes manquantes de LLMAdapter |
+| `2eebb27` | fix(trace_sidecar): corrige l'écrasement JSONL, append au lieu de write |
+| `612605c` | docs(adr): restaure le contenu réel d'ADR-008, corrige le statut |
+| `a0c44b9` | feat(pipeline): branche le juge isolé sur la capitalisation de trace |
+| `adfa9d7` | feat(rag): ajoute le calcul du score composite |
+| `fb30a52` | refactor(vector): extrait les seuils de consolidation en constantes nommées |
+| `ba4301e` | feat(pipeline): boucle adaptative HyDE + retry + arrêt mécanique |
+
+### Fichiers modifiés/créés (14)
+- `services/adapters/protocols.py` (S.1 + 7.4)
+- `services/trace_sidecar.py` (S.2)
+- `services/pipeline.py` (7.1 + 7.4)
+- `services/score.py` (créé, 7.2)
+- `services/vector.py` (7.3)
+- `config/constants.py` (7.2 + 7.3 + 7.4)
+- `docs/adr/ADR-008-rag-diagnostic-amelioration-continue.md` (S.3)
+- `docs/adr/README.md` (S.3)
+- `tests/test_trace_sidecar.py` (S.2)
+- `tests/test_pipeline_capitalization.py` (7.1 + 7.4)
+- `tests/test_score_composite.py` (créé, 7.2)
+
+### Test final
+- Suites pertinentes : **57 passed, 0 failed** (inference, trace_sidecar, pipeline, score, vector)
+- Magic numbers : 0 (tous dans config/constants.py)
+- LangChain : 0 (100% Python natif)
+
+---
+## Session #12 — D6 Upload Documents (frontend)
+### Date : 24/07/2026
+
+### D6 — Branchement backend upload Documents
+- ✅ `static/index.html` : Ajout section "Ajouter un document" dans l'onglet Analytics (input nom + textarea + bouton)
+- ✅ `static/assets/js/app.js` : Handler `btn-ingest-doc` → POST `/api/ingest` avec validation + feedback + refresh analytics
+- ✅ `static/assets/css/style.css` : Styles `.doc-upload-section`, `.doc-input`, `.doc-textarea`, `.doc-upload-row`
+- ✅ `node -c static/assets/js/app.js` : Syntaxe JS valide
+- ✅ Tests backend : 57 passed, 0 failed
+- Commit : `feat(frontend): branche upload document dans l'onglet Analytics (D6)`
