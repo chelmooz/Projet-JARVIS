@@ -68,6 +68,17 @@ WEIGHT_MIN: Final[float] = -5.0
 WEIGHT_MAX: Final[float] = 5.0
 RECENCY_DECAY: Final[float] = 0.05  # Perte 5 % par heure, plancher 0.5 après ~10h.
 
+# ---------------------------------------------------------------------------
+# Score composite (ADR-008 §3)
+# ---------------------------------------------------------------------------
+
+JUDGE_WEIGHT: Final[float] = 0.6
+FEEDBACK_WEIGHT: Final[float] = 0.4
+FEEDBACK_THUMBS_UP: Final[float] = 1.0
+FEEDBACK_THUMBS_DOWN: Final[float] = 0.0
+FEEDBACK_ABSENT: Final[float] = 0.5
+RECIDIVE_PENALTY: Final[float] = -0.3
+
 if not (WEIGHT_MIN < WEIGHT_MAX):
     raise ValueError(f"WEIGHT_MIN ({WEIGHT_MIN}) must be < WEIGHT_MAX ({WEIGHT_MAX})")
 
@@ -206,6 +217,13 @@ __all__ = [
     "WEIGHT_MIN",
     "WEIGHT_MAX",
     "RECENCY_DECAY",
+    # Score composite (ADR-008 §3)
+    "JUDGE_WEIGHT",
+    "FEEDBACK_WEIGHT",
+    "FEEDBACK_THUMBS_UP",
+    "FEEDBACK_THUMBS_DOWN",
+    "FEEDBACK_ABSENT",
+    "RECIDIVE_PENALTY",
     # Consolidation
     "CONSOLIDATE_DEDUP_SIMILARITY",
     "CONSOLIDATE_PRUNE_WEIGHT",
