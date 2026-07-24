@@ -40,6 +40,9 @@ Le projet est aussi un terrain d'apprentissage et d'expérimentation autour de l
 | 🔁 **RAG auto-apprenant** | Chaque diagnostic capitalisé, jugé et réinjecté — voir section *Amélioration continue* ci-dessous |
 | 👍 **Feedback** | Notation 👍/👎 des réponses, repondère la mémoire vectorielle |
 | 📄 **Ingestion de documents** | Upload + chunking sémantique avec overlap, recherche RAG |
+| 📷 **Image dans le chat** | Glisser/joindre une image directement dans la conversation (pas seulement l'onglet Vision) |
+| 🔧 **Onglet Outils** | Diagnostic système en direct (CPU, RAM, GPU, disque, réseau) via `/api/diag` |
+| 💾 **Sauvegarde & restauration** | Scripts `backup.ps1` / `backup.sh` + vérification d'intégrité — voir section dédiée ci-dessous |
 | 💬 **Conversations persistantes** | Historique CRUD complet |
 | 📁 **Contrôle d'accès fichiers** | Autorisation granulaire par dossier |
 
@@ -543,6 +546,30 @@ python -m pytest tests/ -v
 make test     # lance pytest
 make lint     # vérifie le style avec ruff
 ```
+
+---
+
+## 💾 Sauvegarde & restauration
+
+JARVIS embarque des scripts de sauvegarde pour protéger vos conversations, votre mémoire vectorielle et votre configuration (`memory/`, `logs/`, `config/`).
+
+```bash
+# Windows (PowerShell)
+scripts\backup.ps1              # crée backups\jarvis-backup-YYYYMMDD_HHMMSS.zip
+scripts\backup.ps1 -WhatIf      # simulation, sans écrire de fichier
+
+# Linux / macOS
+./scripts/backup.sh              # crée backups/jarvis-backup-YYYYMMDD_HHMMSS.tar.gz
+./scripts/backup.sh --dry-run    # simulation, sans écrire de fichier
+```
+
+Pour vérifier l'intégrité d'une sauvegarde (ou la restaurer) :
+
+```bash
+python scripts/restore_backup.py --check backups/jarvis-backup-XXXXXXXX_XXXXXX.zip
+```
+
+> Les dossiers sources absents (ex. `logs/` pas encore créé) sont ignorés proprement, sans faire échouer la sauvegarde.
 
 ---
 
