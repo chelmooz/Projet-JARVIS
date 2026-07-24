@@ -1,9 +1,15 @@
+# TODO: réactiver en session frontend (cf. décision du 24/07/2026)
+# Raison: ui-state-model.json non présent (hors périmètre backend)
 """Tests for UI state model validation (P5 Ch5).
 
 Covers:
 - Validate that ui-state-model.json is valid JSON with correct structure
 - Validate that all selectors exist in index.html
 - Validate edge references (from/to) point to existing nodes
+
+NOTE: Ces tests sont désactivés car ui-state-model.json fait partie du frontend
+et n'est pas inclus dans le périmètre backend. Ils seront réactivés lors de
+l'intégration frontend.
 """
 
 import json

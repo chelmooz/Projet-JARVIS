@@ -4,6 +4,10 @@
 **Date :** 2026-05-28
 **Décideur :** Tech Lead + équipe JARVIS
 
+> ⚠️ **CORRECTIF Phase 7 :** Le serveur Rust dédié (Shimmy) mentionné dans les alternatives
+> a été **supprimé** du codebase. L'architecture repose désormais exclusivement sur
+> Ollama portable + Python embarqué. Ignorer toute référence à Shimmy.
+
 ## Contexte
 
 JARVIS doit fonctionner sur clé USB, branchée sur n'importe quelle machine Linux sans GPU. L'environnement est sandboxé : pas d'accès au réseau après installation, pas de dépendances système.
@@ -26,4 +30,4 @@ JARVIS doit fonctionner sur clé USB, branchée sur n'importe quelle machine Lin
 ## Alternatives
 
 - Ollama + GPU : nécessite CUDA, pas portable
-- Serveur Rust dédié (Shimmy supprimé en phase 7)
+- Serveur Rust dédié (Shimmy) : **supprimé en Phase 7**, voir correctif ci-dessus

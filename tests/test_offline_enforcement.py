@@ -2,6 +2,9 @@
 
 Verifies that POST /api/jarvis is blocked server-side when offline=true.
 """
+import os
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -94,13 +97,11 @@ class TestOfflineEnforcement:
 class TestMonkeyEngine:
     """Ch4.1 — monkey-engine.js must have simulateNetworkCondition."""
 
-    MONKEY_PATH = r"J:\Projet JARVIS\static\monkey-engine.js"
+    MONKEY_PATH = Path(__file__).resolve().parent.parent / "static" / "monkey-engine.js"
 
     def test_simulate_network_condition_exists(self):
         """simulateNetworkCondition function must be defined in monkey-engine.js."""
-        import os
-        if not os.path.exists(self.MONKEY_PATH):
+        if not self.MONKEY_PATH.exists():
             pytest.skip("monkey-engine.js not found")
-        with open(self.MONKEY_PATH, encoding="utf-8") as f:
-            content = f.read()
+        content = self.MONKEY_PATH.read_text(encoding="utf-8")
         assert "simulateNetworkCondition" in content, "Fonction manquante"

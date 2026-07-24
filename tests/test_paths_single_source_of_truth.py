@@ -48,7 +48,7 @@ class TestPathsSingleSourceOfTruth:
         depuis config.paths plutôt que de les redéfinir avec une valeur littérale
         (ex: Path(__file__).parent...)."""
         constants_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "Projet JARVIS", "config", "constants.py"
+            os.path.dirname(os.path.abspath(__file__)), "..", "config", "constants.py"
         )
         if not os.path.exists(constants_path):
             pytest.skip(f"config/constants.py introuvable à {constants_path}")

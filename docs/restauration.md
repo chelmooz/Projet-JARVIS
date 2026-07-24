@@ -73,12 +73,11 @@ L'ordre de résolution est :
 Si aucun répertoire de backup n'est trouvé, le script affiche une erreur explicite
 et renvoie le code de sortie `1`.
 
-## 3. Alternative PowerShell (legacy)
-`scripts/restore.ps1` restaure directement depuis un `.zip` (demande le numéro
-du backup si aucun fichier n'est précisé) :
-```powershell
-pwsh .\scripts\restore.ps1 -BackupFile backups\jarvis-backup-AAAAmmjj_HHMMSS.zip
-```
+## 3. Scripts legacy (obsolètes)
+
+> ⚠️ **Note :** Le script PowerShell `scripts/restore.ps1` documenté historiquement
+> n'existe plus dans le dépôt. Utilisez exclusivement `scripts/restore_backup.py`
+> (Python, sans dépendance externe) pour toutes les opérations de restauration.
 
 ## Résumé des codes de sortie
 | Code | Signification |
