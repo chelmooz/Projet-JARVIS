@@ -15,7 +15,7 @@ import yaml
 from config.constants import DEFAULT_MODEL, PROJECT_DIR
 from models import Pipeline, PipeStep
 from ports.pipeline import PipelinePort
-from services.adapters.protocols import ITraceStore, IVectorSearch, TraceRecord
+from services.adapters.protocols import ITraceStore, IResponseJudge, IVectorSearch, TraceRecord
 
 _logger = logging.getLogger("jarvis.pipeline")
 
@@ -44,6 +44,7 @@ class PipelineService(PipelinePort):
         model_selector: Any | None = None,
         trace_store: ITraceStore | None = None,
         vector_search: IVectorSearch | None = None,
+        judge: IResponseJudge | None = None,
         max_retries: int = 3,
     ) -> None:
         self._agent_runner = agent_runner
@@ -52,6 +53,7 @@ class PipelineService(PipelinePort):
         self._model_selector = model_selector
         self._trace_store = trace_store
         self._vector_search = vector_search
+        self._judge = judge
         self._max_retries = max_retries
         self._pipelines: dict[str, Pipeline] = {}
 
@@ -134,15 +136,18 @@ class PipelineService(PipelinePort):
         """Exécute un pipeline complet avec récupération pré-pipeline et capitalisation."""
         pipeline = self._resolve_pipeline(pipeline_id)
         ctx = {**(context or {})}
-        
-        self._inject_similar_cases(task, ctx)
-        
+
+        similar_cases = self._retrieve_similar_cases(task)
+        if similar_cases:
+            ctx["similar_cases"] = similar_cases
+
         results = self._execute_all_steps(pipeline, task, ctx)
 
         if self._has_fatal_error(results):
             return self._build_failure(pipeline_id, results)
 
-        self._capitalize_trace(pipeline_id, task)
+        final_response = results[-1]["response"] if results else ""
+        self._capitalize_trace(pipeline_id, task, similar_cases, final_response)
 
         return {
             "pipeline": pipeline_id,
@@ -161,12 +166,6 @@ class PipelineService(PipelinePort):
         return pipeline
 
     # ─── Récupération pré-pipeline (MT 7.2) ───────────────────────────
-
-    def _inject_similar_cases(self, task: str, ctx: dict[str, Any]) -> None:
-        """Injecte les cas similaires dans le contexte si vector_search est configuré."""
-        similar_cases = self._retrieve_similar_cases(task)
-        if similar_cases:
-            ctx["similar_cases"] = similar_cases
 
     def _retrieve_similar_cases(self, task: str) -> list[dict[str, Any]]:
         """Recherche les cas similaires via le port IVectorSearch."""
@@ -324,27 +323,40 @@ class PipelineService(PipelinePort):
 
     # ─── Capitalisation (MT 7.1) ──────────────────────────────────────
 
-    def _capitalize_trace(self, pipeline_id: str, task: str) -> None:
+    def _capitalize_trace(self, pipeline_id: str, task: str, chunks: list[dict[str, Any]], response: str) -> None:
         """Écrit la trace dans le sidecar si un store est configuré."""
         if not self._trace_store:
             return
         try:
-            record = self._build_trace_record(pipeline_id, task)
+            record = self._build_trace_record(pipeline_id, task, chunks, response)
             self._trace_store.append(record)
         except Exception:
             _logger.exception(
                 "Échec capitalisation trace pipeline='%s'", pipeline_id
             )
 
-    def _build_trace_record(self, pipeline_id: str, task: str) -> TraceRecord:
+    def _build_trace_record(
+        self, pipeline_id: str, task: str,
+        chunks: list[dict[str, Any]], response: str,
+    ) -> TraceRecord:
         """Construit un TraceRecord pour la capitalisation post-pipeline."""
+        chunk_ids = [c["id"] for c in chunks] if chunks else []
+        chunk_texts = [c["text"] for c in chunks] if chunks else []
+
+        judge_score = 0.0
+        judge_reason = ""
+        if self._judge:
+            result = self._judge.evaluate(task, chunk_texts, response)
+            judge_score = result.get("score", 0.0)
+            judge_reason = result.get("reason", "")
+
         return TraceRecord(
             trace_id=str(uuid.uuid4()),
             pipeline_id=pipeline_id,
             query=task,
-            retrieved_chunk_ids=[],
-            judge_score=0.0,
-            judge_reason="",
+            retrieved_chunk_ids=chunk_ids,
+            judge_score=judge_score,
+            judge_reason=judge_reason,
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 

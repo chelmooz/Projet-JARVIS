@@ -44,6 +44,15 @@ def mock_agent_runner():
 
 # ─── Tests MT 7.1 — Capitalisation post-pipeline ─────────────────────
 
+@pytest.fixture
+def mock_judge():
+    """Mock de IResponseJudge pour isoler le test."""
+    from services.adapters.protocols import IResponseJudge
+    judge = MagicMock(spec=IResponseJudge)
+    judge.evaluate.return_value = {"score": 0.85, "reason": "Bon diagnostic"}
+    return judge
+
+
 def test_pipeline_capitalizes_trace_on_success(
     mock_trace_store, simple_pipeline, mock_agent_runner
 ):
@@ -99,6 +108,40 @@ def test_pipeline_works_without_trace_store(simple_pipeline, mock_agent_runner):
     assert result["error"] is None
     assert result["steps"] == 1
     assert result["results"][0]["response"] == "Response from agent1"
+
+
+def test_build_trace_record_calls_judge(
+    mock_trace_store, mock_judge, mock_agent_runner, simple_pipeline
+):
+    """RED→GREEN : Le pipeline doit appeler judge.evaluate() et intégrer le score/raison dans TraceRecord."""
+
+    # ARRANGE
+    pipeline_service = PipelineService(
+        agent_runner=mock_agent_runner,
+        trace_store=mock_trace_store,
+        judge=mock_judge,
+    )
+    pipeline_service.register(simple_pipeline)
+
+    # ACT
+    result = pipeline_service.run(
+        pipeline_id="test_pipeline",
+        task="Test diagnostic task",
+        context={}
+    )
+
+    # ASSERT
+    assert result["error"] is None
+
+    mock_judge.evaluate.assert_called_once()
+    call_args = mock_judge.evaluate.call_args[0]
+    assert call_args[0] == "Test diagnostic task"
+
+    mock_trace_store.append.assert_called_once()
+    record = mock_trace_store.append.call_args[0][0]
+    assert isinstance(record, TraceRecord)
+    assert record.judge_score == 0.85
+    assert record.judge_reason == "Bon diagnostic"
 
 
 # ─── Tests MT 7.2 — Récupération pré-pipeline ────────────────────────
