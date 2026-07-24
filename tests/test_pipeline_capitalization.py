@@ -137,11 +137,94 @@ def test_build_trace_record_calls_judge(
     call_args = mock_judge.evaluate.call_args[0]
     assert call_args[0] == "Test diagnostic task"
 
-    mock_trace_store.append.assert_called_once()
-    record = mock_trace_store.append.call_args[0][0]
-    assert isinstance(record, TraceRecord)
-    assert record.judge_score == 0.85
-    assert record.judge_reason == "Bon diagnostic"
+    # Checkpoint (attempt 0) + trace finale
+    assert mock_trace_store.append.call_count == 2
+    checkpoint = mock_trace_store.append.call_args_list[0][0][0]
+    assert checkpoint.status == "checkpoint"
+    final_record = mock_trace_store.append.call_args_list[1][0][0]
+    assert isinstance(final_record, TraceRecord)
+    assert final_record.judge_score == 0.85
+    assert final_record.judge_reason == "Bon diagnostic"
+
+
+# ─── Tests MT 7.4 — Boucle adaptative HyDE + retry ────────────────────
+
+@pytest.fixture
+def mock_judge_threshold():
+    from services.adapters.protocols import IResponseJudge
+    judge = MagicMock(spec=IResponseJudge)
+    judge.evaluate.return_value = {"score": 0.85, "reason": "Bon diagnostic"}
+    return judge
+
+
+@pytest.fixture
+def mock_judge_retry():
+    from services.adapters.protocols import IResponseJudge
+    judge = MagicMock(spec=IResponseJudge)
+    judge.evaluate.side_effect = [
+        {"score": 0.3, "reason": "Insuffisant"},
+        {"score": 0.9, "reason": "Amélioré"},
+    ]
+    return judge
+
+
+@pytest.fixture
+def mock_judge_stagnation():
+    from services.adapters.protocols import IResponseJudge
+    judge = MagicMock(spec=IResponseJudge)
+    judge.evaluate.side_effect = [
+        {"score": 0.3, "reason": "Manque de détails"},
+        {"score": 0.4, "reason": "Manque de détails"},
+    ]
+    return judge
+
+
+def test_adaptive_loop_stops_on_threshold(
+    mock_trace_store, mock_judge_threshold, mock_agent_runner, simple_pipeline
+):
+    pipeline_service = PipelineService(
+        agent_runner=mock_agent_runner,
+        trace_store=mock_trace_store,
+        judge=mock_judge_threshold,
+    )
+    pipeline_service.register(simple_pipeline)
+    result = pipeline_service.run(
+        pipeline_id="test_pipeline", task="Test diagnostic task", context={}
+    )
+    assert result["error"] is None
+    mock_judge_threshold.evaluate.assert_called_once()
+
+
+def test_adaptive_loop_retries_with_hyde_on_low_score(
+    mock_trace_store, mock_judge_retry, mock_agent_runner, simple_pipeline
+):
+    pipeline_service = PipelineService(
+        agent_runner=mock_agent_runner,
+        trace_store=mock_trace_store,
+        judge=mock_judge_retry,
+    )
+    pipeline_service.register(simple_pipeline)
+    result = pipeline_service.run(
+        pipeline_id="test_pipeline", task="Test diagnostic task", context={}
+    )
+    assert result["error"] is None
+    assert mock_judge_retry.evaluate.call_count == 2
+
+
+def test_adaptive_loop_stops_on_stagnation(
+    mock_trace_store, mock_judge_stagnation, mock_agent_runner, simple_pipeline
+):
+    pipeline_service = PipelineService(
+        agent_runner=mock_agent_runner,
+        trace_store=mock_trace_store,
+        judge=mock_judge_stagnation,
+    )
+    pipeline_service.register(simple_pipeline)
+    result = pipeline_service.run(
+        pipeline_id="test_pipeline", task="Test diagnostic task", context={}
+    )
+    assert result["error"] is None
+    assert mock_judge_stagnation.evaluate.call_count == 2
 
 
 # ─── Tests MT 7.2 — Récupération pré-pipeline ────────────────────────

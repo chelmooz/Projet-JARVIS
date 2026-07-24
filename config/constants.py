@@ -86,6 +86,12 @@ RECIDIVE_PENALTY: Final[float] = -0.3
 SCORE_PRUNING_THRESHOLD: Final[float] = -2.0
 BAD_COUNT_PRUNING_THRESHOLD: Final[int] = 3
 
+# ---------------------------------------------------------------------------
+# Boucle adaptative HyDE (ADR-008 §5)
+# ---------------------------------------------------------------------------
+
+MAX_ADAPTIVE_ATTEMPTS: Final[int] = 3
+
 if not (WEIGHT_MIN < WEIGHT_MAX):
     raise ValueError(f"WEIGHT_MIN ({WEIGHT_MIN}) must be < WEIGHT_MAX ({WEIGHT_MAX})")
 
@@ -234,6 +240,8 @@ __all__ = [
     # Score de chunk (ADR-008 §4)
     "SCORE_PRUNING_THRESHOLD",
     "BAD_COUNT_PRUNING_THRESHOLD",
+    # Boucle adaptative HyDE (ADR-008 §5)
+    "MAX_ADAPTIVE_ATTEMPTS",
     # Consolidation
     "CONSOLIDATE_DEDUP_SIMILARITY",
     "CONSOLIDATE_PRUNE_WEIGHT",

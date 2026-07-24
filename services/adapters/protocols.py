@@ -24,6 +24,7 @@ class TraceRecord:
     judge_reason: str
     timestamp: str = ""
     feedback: str | None = None
+    status: str = ""
 
 
 class ITraceStore(Protocol):
