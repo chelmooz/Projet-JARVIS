@@ -52,3 +52,22 @@ class LLMAdapter(Protocol):
     def query(self, prompt: str, model: str) -> Any:
         """Envoie un prompt au modèle et retourne la réponse brute."""
         ...
+
+
+class IResponseJudge(Protocol):
+    """Port pour le juge isolé (Verifier Sub-Agent).
+
+    Respecte SKILL.md §6 : le juge ne voit PAS le raisonnement de l'acteur.
+    Il évalue uniquement : requête + chunks + réponse finale.
+    """
+
+    def evaluate(self, query: str, chunks: list[str], response: str) -> dict[str, Any]:
+        """Évalue la qualité d'une réponse.
+
+        Retourne un dict structuré :
+        - score: float (0.0 à 1.0)
+        - reason: str (justification concise)
+
+        Lève JudgeParseError si le JSON est invalide ou incomplet.
+        """
+        ...
