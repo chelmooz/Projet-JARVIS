@@ -42,7 +42,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'agents') refreshAgents();
-    if (btn.dataset.tab === 'tools') refreshSkills();
+    if (btn.dataset.tab === 'tools') refreshTools();
     if (btn.dataset.tab === 'settings') refreshPathAuth();
     if (btn.dataset.tab === 'analytics') refreshAnalytics();
     if (btn.dataset.tab === 'conversations') loadConvs('conv-list-main');
@@ -59,6 +59,7 @@ function autoResize(el) {
 const chat = document.getElementById('chat-messages');
 const input = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
+let pendingImage = null;
 
 function addMsg(role, content, meta) {
   const div = document.createElement('div');
@@ -199,6 +200,17 @@ input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
 sendBtn.addEventListener('click', send);
+document.getElementById('vision-btn').addEventListener('click', () => document.getElementById('image-input').click());
+document.getElementById('image-input').addEventListener('change', handleImageSelect);
+document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('vision-file').click());
+
+function handleImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) { pendingImage = ev.target.result; };
+  reader.readAsDataURL(file);
+}
 
 // --- Vision ---
 function handleVisionFile(input) {
@@ -403,6 +415,27 @@ function escHtml(s) {
 }
 
 // --- Cyber Workflows ---
+// --- Tools (Diagnostic) ---
+async function refreshTools() {
+  const grid = document.querySelector('#tab-tools .tools-grid');
+  try {
+    const resp = await fetch('/api/diag');
+    if (!resp.ok) { grid.innerHTML = '<div class="tools-empty">API /api/diag indisponible (HTTP ' + resp.status + ')</div>'; return; }
+    const data = await resp.json();
+    const sections = ['host', 'cpu', 'ram', 'gpu', 'disk', 'python', 'binaries', 'network'];
+    grid.innerHTML = sections.map(key => {
+      const section = data[key] || {};
+      let items = '';
+      for (const [k, v] of Object.entries(section)) {
+        items += `<div class="tools-item"><span class="tools-key">${k}</span><span class="tools-val">${escHtml(String(v))}</span></div>`;
+      }
+      return `<div class="tools-section"><h4>${key.toUpperCase()}</h4><div class="tools-items">${items}</div></div>`;
+    }).join('');
+  } catch (e) {
+    grid.innerHTML = '<div class="tools-empty">Erreur: ' + escHtml(e.message) + '</div>';
+  }
+}
+
 // --- Skills ---
 async function refreshSkills() {
   const grid = document.getElementById('skills-grid');
@@ -497,6 +530,8 @@ setInterval(refreshAnalytics, 30000);
 // --- Conversations ---
 let currentConvId = null;
 let convsExpanded = true;
+document.getElementById('sidebar-convs-header').addEventListener('click', toggleConvs);
+document.getElementById('clear-convs-btn').addEventListener('click', clearAllConvs);
 
 function toggleConvs() {
   convsExpanded = !convsExpanded;
@@ -640,6 +675,7 @@ async function send() {
       currentConvId = (cd.data || cd).conversation_id;
     }
     const body = { task: taskText, conversation_id: currentConvId };
+    if (pendingImage) { body.image = pendingImage; pendingImage = null; }
     const resp = await fetch('/api/jarvis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
