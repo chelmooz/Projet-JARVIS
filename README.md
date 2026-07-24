@@ -6,9 +6,9 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/Tests-673_✓_2026--07--20-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-754_✓_2026--07--24-brightgreen)
 ![CI](https://github.com/chelmooz/Projet-JARVIS/actions/workflows/ci.yml/badge.svg)
-![Ollama](https://img.shields.io/badge/Ollama-0.134.0-orange)
+![Ollama](https://img.shields.io/badge/Ollama-0.30.10-orange)
 ![Platform](https://img.shields.io/badge/Platform-Windows_|_Linux_|_macOS-lightgrey)
 
 </div>
@@ -37,6 +37,9 @@ Le projet est aussi un terrain d'apprentissage et d'expérimentation autour de l
 | 🛡️ **Cyber workflows** | NVISO security workflows intégrés |
 | 🔧 **Système de Skills** | Règles injectées dynamiquement dans le contexte |
 | 🧩 **Mémoire vectorielle** | Recherche sémantique via embeddings Ollama |
+| 🔁 **RAG auto-apprenant** | Chaque diagnostic capitalisé, jugé et réinjecté — voir section *Amélioration continue* ci-dessous |
+| 👍 **Feedback** | Notation 👍/👎 des réponses, repondère la mémoire vectorielle |
+| 📄 **Ingestion de documents** | Upload + chunking sémantique avec overlap, recherche RAG |
 | 💬 **Conversations persistantes** | Historique CRUD complet |
 | 📁 **Contrôle d'accès fichiers** | Autorisation granulaire par dossier |
 
@@ -62,15 +65,23 @@ graph TD
     classDef api fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
     classDef core fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff;
     classDef infra fill:#64748b,stroke:#334155,stroke-width:2px,color:#fff;
+    classDef rag fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff;
 
     UI["Interface Web<br><code>static/</code> (HTML/CSS/JS)<br><code>localhost:8000</code>"]:::client
     CTRL["controllers / routes<br><code>agents, jarvis, conversations, documents, analytics, files, skills</code><br>+ <code>context.py</code> (CSP, ratelimit)"]:::api
     PORTS["ports /<br>Protocols abstraits (<code>InferencePort</code>, <code>FilePort</code>...)"]:::core
-    
+
     subgraph Core Logic ["Logique Métier & Orchestration"]
         AGENTS["agents/<br>Factory + profils (5 agents)"]:::core
-        SERVICES["services/<br>Inference, vector, memory, launcher, sanitize, skills"]:::core
+        SERVICES["services/<br>Inference, memory, launcher, sanitize, skills"]:::core
         GRAPH["graph/<br>Orchestration <code>AgentGraph</code> séquentiel"]:::core
+        PIPELINE["services/pipeline.py<br>Pipelines diagnostic + boucle adaptative<br>(HyDE + retry + arrêt mécanique)"]:::core
+    end
+
+    subgraph RAG ["RAG auto-apprenant (ADR-008)"]
+        VECTOR[("VectorService<br><code>vector.py</code><br>chunks + score + consolidate()")]:::rag
+        JUDGE["rag_judge.py<br>Juge isolé (score 0-1)<br>ne voit pas le raisonnement acteur"]:::rag
+        TRACE[("trace_sidecar.py<br>JSONL append-only")]:::rag
     end
 
     ADAPT["adapters/<br><code>ollama_adapter.py</code>"]:::infra
@@ -82,8 +93,16 @@ graph TD
     PORTS --> AGENTS
     PORTS --> SERVICES
     PORTS --> GRAPH
+    GRAPH --> PIPELINE
     SERVICES --> ADAPT
     ADAPT --> OLLAMA
+
+    %% Boucle RAG
+    PIPELINE -->|1 - cas similaires| VECTOR
+    PIPELINE -->|2 - evaluate réponse| JUDGE
+    JUDGE -->|score + reason| PIPELINE
+    PIPELINE -->|3 - capitalise la trace| TRACE
+    PIPELINE -->|4 - update_score par chunk| VECTOR
 ```
 
 **Flux d'une requête** : l'UI appelle `POST /api/jarvis` → `graph/AgentGraph` (orchestrateur
@@ -91,6 +110,20 @@ séquentiel) → résolution du modèle via `selector.py` → `services/inferenc
 `adapters/ollama_adapter.py` génère la réponse → la conversation est persistée par
 `conversation.py`. Voir [docs/architecture.md](docs/architecture.md) pour le détail et
 [docs/DEVELOP.md](docs/DEVELOP.md) pour contribuer.
+
+---
+
+## 🔁 Amélioration continue (RAG auto-apprenant)
+
+Chaque diagnostic exécuté par un pipeline nourrit sa propre mémoire :
+
+1. **Capitalisation** — la trace de l'exécution (requête, chunks utilisés, réponse) est écrite dans un sidecar JSONL append-only (`services/trace_sidecar.py`).
+2. **Jugement isolé** — un juge LLM (`services/rag_judge.py`) note la réponse (0.0 → 1.0) sans voir le raisonnement de l'acteur qui l'a produite, pour éviter le biais de complaisance.
+3. **Score composite** — combine le jugement et le feedback 👍/👎 de l'utilisateur.
+4. **Rétropropagation** — `VectorService.update_score()` renforce ou pénalise les *chunks* précis utilisés (pas le document entier) ; `consolidate()` élague les chunks devenus toxiques.
+5. **Boucle adaptative** — si le score est insuffisant, le pipeline retente avec une reformulation HyDE, avec arrêt mécanique (seuil de score ou détection de stagnation) plutôt qu'une boucle non bornée.
+
+Détail architectural complet : [docs/adr/ADR-008-rag-diagnostic-amelioration-continue.md](docs/adr/ADR-008-rag-diagnostic-amelioration-continue.md).
 
 ---
 
@@ -466,16 +499,31 @@ python3 jarvis.py            # ou ./launchers/JARVIS.sh (repli Python système s
 |---------|-------|-------------|
 | `GET` | `/` | Page d'accueil |
 | `GET` | `/api/status` | Statut des services |
+| `GET` | `/api/diag` | Diagnostic complet (OS, CPU, RAM, GPU, ports...) |
 | `POST` | `/api/jarvis` | Envoyer une tâche |
 | `GET` | `/api/agents` | Profils des agents |
 | `POST` | `/api/agents/assign` | Assigner un modèle |
 | `POST` | `/api/vision` | Analyser une image |
 | `GET/POST` | `/api/conversations` | CRUD conversations |
-| `POST` | `/api/ingest` | Ingérer des documents |
+| `GET/DELETE` | `/api/conversations/{id}` | Détail / suppression d'une conversation |
+| `GET` | `/api/conversations/{id}/messages` | Messages d'une conversation |
+| `POST` | `/api/ingest` | Ingérer des documents (chunking sémantique) |
+| `POST` | `/api/vectorize/conversations` | Vectoriser les conversations non indexées |
 | `GET` | `/api/search` | Recherche vectorielle |
+| `POST` | `/api/feedback` | Feedback 👍/👎 explicite (repondère la mémoire) |
+| `POST` | `/api/feedback/implicit` | Feedback implicite |
 | `GET` | `/api/analytics` | Statistiques |
+| `GET` | `/api/analytics/peak` | Pics d'utilisation |
 | `GET` | `/api/skills` | Skills disponibles |
+| `POST` | `/api/skills/toggle` | Activer/désactiver un skill |
+| `GET` | `/api/skills/context` | Contexte skills injecté |
+| `GET/POST` | `/api/pipelines` | Pipelines de diagnostic disponibles |
+| `POST` | `/api/pipelines/run` | Exécuter un pipeline |
+| `GET` | `/api/cyber/workflows` | Workflows sécurité NVISO |
+| `GET/POST` | `/api/settings` | Paramètres serveur |
 | `POST` | `/api/files/authorize` | Autoriser un dossier |
+| `GET` | `/api/files/authorized` | Dossiers autorisés |
+| `GET` | `/api/files/browse` \| `/drives` \| `/list` \| `/find` \| `/read` | Navigation fichiers |
 
 > **Embeddings :** `/api/embed` n'expose **pas** d'endpoint public. Les embeddings
 > sont calculés en interne par `services/vector_embedder.py` (VectorService) — l'API
@@ -487,7 +535,9 @@ python3 jarvis.py            # ou ./launchers/JARVIS.sh (repli Python système s
 
 ```bash
 python -m pytest tests/ -v
-# 673 passed, 30 skipped, 1 xfailed ✅
+# 754 passed, 22 skipped, 0 failed, 1 xfailed ✅ (2026-07-24)
+# Les tests d'intégration Ollama (marker "live") sont exclus par defaut,
+# voir docs/RUNBOOK.md#integration pour les lancer via le script portable.
 
 # Via le Makefile (équivalent)
 make test     # lance pytest
