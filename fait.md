@@ -355,3 +355,58 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 
 ### Vérification
 - ✅ Suite complète : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression
+
+---
+## Session #9 — Phase 6 Portabilité (24/07/2026)
+
+### 6.1 Linux — incohérence bin/ollama vs bin/linux/ollama
+- ✅ `services/ollama_installer.py:159,164` : `BIN_DIR` → `BIN_LINUX` (installe sous `bin/linux/` au lieu de `bin/`)
+- ✅ `services/system.py` : ajout `BIN_LINUX, BIN_MAC` aux exports depuis `config.paths`
+- ✅ `services/ollama_installer.py` : import `BIN_LINUX` depuis `services.system`
+
+### 6.2 macOS — fallback explicite dans JARVIS.sh
+- ✅ `launchers/JARVIS.sh:39-41` : si `bin/mac/ollama` absent, `OLLAMA_BIN=$(command -v ollama)`
+- ✅ Même pattern que le fallback Python portable déjà existant
+
+### Vérification
+- ✅ Suite complète : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression
+
+---
+## Bilan final — Toutes phases ROADMAP (Phases 1-6)
+
+### Résumé
+| Phase | Description | Statut |
+|-------|-------------|--------|
+| Phase 1 | Bloquants utilisateur (6 micro-tâches) | ✅ 6/6 |
+| Phase 2 | Boutons fantômes & onglets morts (4 micro-tâches) | ✅ 4/4 |
+| Phase 3 | Pipeline RAG (3 micro-tâches) | ✅ 3/3 |
+| Phase 4 | Réglages & Status Bar (3 micro-tâches) | ✅ 3/3 |
+| Phase 5 | Raccourcis & Extensions (2 micro-tâches) | ✅ 2/2 |
+| Phase 6 | Portabilité (2 micro-tâches) | ✅ 2/2 |
+| **Total** | **ROADMAP complet** | **✅ 20/20** |
+
+### Commits
+| Hash | Message |
+|------|---------|
+| `08f57c5` | Phase 1 frontend : déballe ok() + câble bouton Envoyer |
+| `555557d` | Phase 2 frontend : boutons fantômes + onglets morts |
+| `4ef2280` | Phase 3 pipeline RAG : vector_results → similar_cases + context arg |
+| `8164f3a` | Phase 4 settings : persistance serveur + Enter fp-path + status bar HS |
+| `edb1315` | Phase 5 raccourcis : Ctrl+L clear chat + help box visible |
+| `65253ba` | Phase 6 portabilité : Linux bin/linux/ + macOS fallback |
+
+### Tests
+- Avant ROADMAP : 724 passed, 0 failed, 43 skipped, 1 xfailed
+- Après ROADMAP : **724 passed, 0 failed, 43 skipped, 1 xfailed** — 0 régression
+
+### Fichiers modifiés (toutes phases)
+- `ROADMAP.md` (créé)
+- `static/assets/js/app.js` (Phases 1-5 : 18 modifications)
+- `static/index.html` (Phases 2, 5 : 2 modifications)
+- `services/pipeline_steps.py` (Phase 3 : 2 modifications)
+- `services/orchestrator.py` (Phase 3 : 1 modification)
+- `tests/conftest.py` (Phase 3 : 1 modification)
+- `services/ollama_installer.py` (Phase 6 : 1 modification)
+- `services/system.py` (Phase 6 : 1 modification)
+- `launchers/JARVIS.sh` (Phase 6 : 1 modification)
+- `fait.md` (mise à jour)
