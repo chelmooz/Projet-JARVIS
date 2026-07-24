@@ -1,8 +1,15 @@
 # ADR-005 — Pipeline RAG pour runbooks
 
-- **Statut :** Accepte
+- **Statut :** Partiellement obsolète (corrigé le 24/07/2026)
 - **Date :** 2026-07-01
 - **Auteur :** Data/Secu/Docs (JARVIS)
+
+> ⚠️ **Correctif du 24/07/2026 :** deux points ci-dessous ne correspondent
+> plus (ou n'ont jamais correspondu) au code réel. Voir les notes inline
+> `[CORRECTIF]` : (1) aucun `FileWatcher` n'existe dans le dépôt, l'ingestion
+> est déclenchée manuellement (`POST /api/ingest`, `POST
+> /api/vectorize/conversations`) ; (2) le fallback histogramme a été
+> supprimé, voir [ADR-009](ADR-009-fail-fast-embedding-sans-fallback.md).
 
 ---
 
@@ -25,8 +32,15 @@ Le service VectorService existe deja dans le codebase et assure la gestion des e
 ```
 [User] -> /api/search -> VectorService.search() -> [Response]
                                 |
-[FileWatcher] -> /api/ingest -> VectorService.add() -> hash dedup -> vector_index.json
+[Déclenchement manuel] -> POST /api/ingest ou POST /api/vectorize/conversations
+                        -> VectorService.add() -> hash dedup -> vector_index.json
 ```
+
+> **[CORRECTIF 24/07/2026]** Le schéma d'origine mentionnait un `FileWatcher`
+> déclenchant automatiquement l'ingestion. Aucune classe `FileWatcher`
+> n'existe dans le dépôt (vérifié par recherche exhaustive) : l'ingestion est
+> toujours déclenchée manuellement, via un appel API (bouton "vectoriser"
+> côté UI, ou `POST /api/ingest` direct).
 
 ### Composants utilises
 

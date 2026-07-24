@@ -200,6 +200,7 @@ input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
 sendBtn.addEventListener('click', send);
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'l') { e.preventDefault(); clearChat(); } });
 document.getElementById('vision-btn').addEventListener('click', () => document.getElementById('image-input').click());
 document.getElementById('image-input').addEventListener('change', handleImageSelect);
 document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('vision-file').click());
