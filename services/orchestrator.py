@@ -152,7 +152,7 @@ class OrchestratorService:
         context: dict[str, Any] = {
             "image": image,
             "recent_tasks": self.memory.get_habits(),
-            "similar_cases": [],
+            "similar_cases": self.vector.search(task, top_k=3) if self.vector else [],
         }
 
         try:

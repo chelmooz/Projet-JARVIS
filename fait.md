@@ -285,3 +285,29 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 ### 1.6 enhanceLastAssistant() cassé
 - ✅ app.js:147-149 : `conv.data || conv` déballé pour messages
 - ✅ Boutons feedback 👍👎 visibles après réponse assistant
+- ✅ Tests : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression
+
+---
+## Session #6 — Frontend Phase 2 (24/07/2026)
+
+### 2.1 Bouton 📷 chat câblé
+- ✅ `vision-btn` click → `image-input` click
+- ✅ `image-input` change → `handleImageSelect` lit base64 → `pendingImage`
+- ✅ `send()` inclut `image: pendingImage` dans le body
+
+### 2.2 Onglet Vision — clic zone upload
+- ✅ `upload-zone` click → `vision-file` click
+- ✅ `handleVisionFile` existant prend le relais
+
+### 2.3 Onglet Outils (🔧) — refreshTools()
+- ✅ `async function refreshTools()` fetch `GET /api/diag` → `.tools-grid`
+- ✅ `tab-btn[data-tab="tools"]` appelle désormais `refreshTools()` au lieu de `refreshSkills()`
+- ✅ Affichage CPU/RAM/GPU/DISK/PYTHON/BINARIES/NETWORK
+
+### 2.4 Sidebar — toggle + "Tout effacer"
+- ✅ `sidebar-convs-header` click → `toggleConvs()` (masque/affiche liste)
+- ✅ `clear-convs-btn` click → `clearAllConvs()`
+- ✅ `style="display:none"` retiré du bouton dans index.html
+
+### Vérification
+- ✅ Tests : 724 passed, 0 failed, 43 skipped, 1 xfailed — 0 régression

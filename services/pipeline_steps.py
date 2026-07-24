@@ -46,7 +46,7 @@ def retrieve_context(state: dict[str, Any], memory: Any, vector_store: Any, prov
         try:
             results = vector_store.search(state.get("task", ""), top_k=3)
             if results:
-                context["vector_results"] = results
+                context["similar_cases"] = results
         except Exception as e:
             _logger.debug("Vector store indisponible : %s", e)
     state["context"] = context
@@ -73,7 +73,7 @@ def query_model(state: dict[str, Any], provider: Any, agents: dict[str, object],
         prompt = f"Contexte:\n{context_str}\n\nTâche: {task}"
     try:
         if hasattr(agent, "run"):
-            result = agent.run(prompt, model=model)
+            result = agent.run(prompt, model=model, context=state.get("context", {}))
         elif hasattr(agent, "query"):
             result = agent.query(prompt, model=model)
         else:

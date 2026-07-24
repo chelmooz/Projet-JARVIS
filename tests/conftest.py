@@ -74,6 +74,13 @@ class FakeMemoryService:
 class FakeVectorService:
     def __init__(self):
         self.store = {}
+    def index(self, text: str, metadata: dict | None = None): pass
+    def index_batch(self, documents: list[tuple[str, dict]]): pass
+    def vectorize_pending(self) -> int: return 0
+    def search(self, query: str, top_k: int = 5) -> list[dict]: return []
+    def stats(self) -> dict: return {}
+    def preload(self): pass
+    def is_healthy(self) -> bool: return True
 
 
 class FakeLogService:
