@@ -56,12 +56,12 @@ Avec :
 
 - `update_score(chunk_id: str, delta: float)` — incrémente le score
   cumulé d'un chunk (positif si bon résultat, négatif si mauvais)
-- `consolidate()` — élague les chunks toxiques (score < `-2.0` ou ratio
-  bad/total > `0.6`)
+- `consolidate()` — élague les chunks toxiques (score < `SCORE_PRUNING_THRESHOLD`
+  (`-2.0`) ou `bad_count > BAD_COUNT_PRUNING_THRESHOLD` (`3`))
 
 Les seuils sont des constantes nommées dans `config/constants.py` :
 - `SCORE_PRUNING_THRESHOLD = -2.0`
-- `BAD_RATIO_PRUNING_THRESHOLD = 0.6`
+- `BAD_COUNT_PRUNING_THRESHOLD = 3`
 
 ### Brique 4 — Boucle adaptative (HyDE + retry + arrêt mécanique)
 

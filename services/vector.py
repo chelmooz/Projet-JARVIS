@@ -21,12 +21,14 @@ from typing import Any
 import numpy as np
 
 from config.constants import (
+    BAD_COUNT_PRUNING_THRESHOLD,
     CONSOLIDATE_DEDUP_SIMILARITY,
     CONSOLIDATE_GRACE_HOURS,
     CONSOLIDATE_MAX_ITER,
     CONSOLIDATE_PRUNE_WEIGHT,
     MAX_VECTOR_DOCS,
     MEMORY_DIR,
+    SCORE_PRUNING_THRESHOLD,
     WEIGHT_MAX,
     WEIGHT_MIN,
 )
@@ -384,7 +386,7 @@ class VectorService(VectorPort):
                 score = float(metadata.get("score", 0.0))
                 bad_count = int(metadata.get("bad_count", 0))
                 
-                if bad_count > 3 or score < -2.0:
+                if bad_count > BAD_COUNT_PRUNING_THRESHOLD or score < SCORE_PRUNING_THRESHOLD:
                     toxic_indices.add(idx)
             
             kept_docs = [

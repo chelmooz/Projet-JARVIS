@@ -79,6 +79,13 @@ FEEDBACK_THUMBS_DOWN: Final[float] = 0.0
 FEEDBACK_ABSENT: Final[float] = 0.5
 RECIDIVE_PENALTY: Final[float] = -0.3
 
+# ---------------------------------------------------------------------------
+# Score de chunk (rétropropagation ADR-008 §4)
+# ---------------------------------------------------------------------------
+
+SCORE_PRUNING_THRESHOLD: Final[float] = -2.0
+BAD_COUNT_PRUNING_THRESHOLD: Final[int] = 3
+
 if not (WEIGHT_MIN < WEIGHT_MAX):
     raise ValueError(f"WEIGHT_MIN ({WEIGHT_MIN}) must be < WEIGHT_MAX ({WEIGHT_MAX})")
 
@@ -224,6 +231,9 @@ __all__ = [
     "FEEDBACK_THUMBS_DOWN",
     "FEEDBACK_ABSENT",
     "RECIDIVE_PENALTY",
+    # Score de chunk (ADR-008 §4)
+    "SCORE_PRUNING_THRESHOLD",
+    "BAD_COUNT_PRUNING_THRESHOLD",
     # Consolidation
     "CONSOLIDATE_DEDUP_SIMILARITY",
     "CONSOLIDATE_PRUNE_WEIGHT",
