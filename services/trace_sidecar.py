@@ -16,7 +16,8 @@ class JsonlTraceStore:
         filepath = self._build_filepath()
         filepath.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps(self._clean(record))
-        filepath.write_text(line + "\n", encoding="utf-8")
+        with filepath.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
 
     def _build_filepath(self) -> Path:
         today = datetime.now().strftime(DATE_FORMAT)
