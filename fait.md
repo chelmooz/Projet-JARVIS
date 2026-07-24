@@ -255,3 +255,33 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 | MT-DEB-5 : Logs simulation | ✅ | Aucun bruit inattendu |
 | MT-DEB-6 : Dette technique | ✅ | 4 TODOs non bloquants |
 | **Suite complète** | ✅ | 724 passed / 0 failed |
+
+---
+## Session #5 — Frontend Phase 1 (24/07/2026)
+
+### ROADMAP.md créé
+- ✅ ROADMAP.md déposé à la racine du projet (6 phases, 15 micro-tâches, règles de validation)
+
+### 1.1 Bouton Envoyer mort
+- ✅ `sendBtn.addEventListener('click', send)` ajouté après le listener Ctrl+Enter (app.js:200)
+- ✅ Clic Envoyer déclenche désormais send()
+
+### 1.2 Création de conversation cassée
+- ✅ app.js:638 : `cd.conversation_id` → `(cd.data || cd).conversation_id`
+- ✅ currentConvId reçoit la bonne valeur
+
+### 1.3 Liste des conversations vide
+- ✅ app.js:514 : `data.conversations` → `(data.data || data).conversations`
+- ✅ Sidebar liste les conversations existantes
+
+### 1.4 Chargement d'une conversation vide
+- ✅ app.js:550-554 : `conv.data || conv` déballé pour id, error, messages
+- ✅ Clic sur conversation → messages affichés
+
+### 1.5 Faux échec Appliquer (Agents)
+- ✅ app.js:316 : `res.status === 'ok'` → `res.data && !res.error`
+- ✅ Toast vert "Modèle X assigné à Y"
+
+### 1.6 enhanceLastAssistant() cassé
+- ✅ app.js:147-149 : `conv.data || conv` déballé pour messages
+- ✅ Boutons feedback 👍👎 visibles après réponse assistant

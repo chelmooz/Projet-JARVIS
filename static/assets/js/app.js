@@ -145,8 +145,9 @@ async function enhanceLastAssistant(convId) {
   try {
     const resp = await fetch('/api/conversations/' + convId);
     const conv = await resp.json();
-    if (conv.error) return;
-    const msgs = conv.messages || [];
+    const c = conv.data || conv;
+    if (c.error) return;
+    const msgs = c.messages || [];
     let target = null;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === 'assistant' && msgs[i].id) { target = msgs[i]; break; }
@@ -197,6 +198,7 @@ function updateBadges(agent, model, backend) {
 input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
+sendBtn.addEventListener('click', send);
 
 // --- Vision ---
 function handleVisionFile(input) {
@@ -312,7 +314,7 @@ async function refreshAgents() {
             body: JSON.stringify({ profile, model })
           });
           const res = await r.json();
-          if (res.status === 'ok') toast('Modele ' + model + ' assigne a ' + profile, 'success');
+          if (res.data && !res.error) toast('Modele ' + model + ' assigne a ' + profile, 'success');
           else toast('Echec assignation: ' + (res.error || '?'), 'error');
         } catch (err) {
           toast('Erreur reseau: ' + err.message, 'error');
@@ -510,7 +512,7 @@ async function loadConvs(targetId) {
   try {
     const resp = await fetch('/api/conversations');
     const data = await resp.json();
-    const convs = data.conversations || [];
+    const convs = (data.data || data).conversations || [];
     const className = convs.length === 0 ? 'sidebar-convs-list empty' : 'sidebar-convs-list';
     const html = convs.length === 0
       ? 'Aucune conversation'
@@ -547,11 +549,12 @@ async function loadConv(id) {
   try {
     const resp = await fetch('/api/conversations/' + id);
     const conv = await resp.json();
-    if (conv.error) return;
-    currentConvId = conv.id;
+    const c = conv.data || conv;
+    if (c.error) return;
+    currentConvId = c.id;
     const chat = document.getElementById('chat-messages');
     chat.innerHTML = '';
-    for (const msg of (conv.messages || [])) {
+    for (const msg of (c.messages || [])) {
       if (msg.role === 'assistant') {
         chat.appendChild(renderAssistantMsg(conv.id, msg));
         continue;
@@ -634,7 +637,7 @@ async function send() {
         body: JSON.stringify({ title: titleText })
       });
       const cd = await cr.json();
-      currentConvId = cd.conversation_id;
+      currentConvId = (cd.data || cd).conversation_id;
     }
     const body = { task: taskText, conversation_id: currentConvId };
     const resp = await fetch('/api/jarvis', {
