@@ -1,165 +1,136 @@
+# ADR-008 : RAG d'amélioration continue pour les pipelines de diagnostic
 
----
+**Statut :** Accepté — implémentation en cours (Phase S puis Phase 7)  
+**Date :** 2026-07-24  
+**Décideur :** Tech Lead + équipe JARVIS  
 
-## 2️⃣ Design System "ctOS par rubrique" — Maquette CSS
+## Contexte
 
-Voici le CSS pour le thème "ctOS" appliqué **uniquement** à l'onglet Outils (🔧) :
+Le pipeline RAG existant (ADR-005) injecte des cas similaires dans le prompt
+du LLM pour améliorer les diagnostics. Cependant, il ne tire aucun
+enseignement de ses propres résultats :
 
-```css
-/* ============================================================================
-   Thème ctOS — Onglet Outils uniquement (scope #tab-tools)
-   Inspiration Watch Dogs : scan de nœuds, terminal vert, topologie réseau
-   ========================================================================= */
+1. Aucune capitalisation des diagnostics passés (erreurs, feedbacks,
+   scores) — chaque exécution repart de zéro.
+2. Aucune rétropropagation de score vers les chunks de la base vectorielle
+   — un chunk qui produit systématiquement de mauvais diagnostics n'est
+   jamais pénalisé ni élagué.
+3. Pas de boucle adaptative : si le diagnostic est insuffisant, le pipeline
+   ne fait pas de seconde tentative (HyDE, reformulation).
+4. Le score du juge isolé (`LlmResponseJudge`) existe mais n'est pas
+   branché sur la capitalisation (codé en dur à `0.0`/`""`).
 
-/* Variables locales au thème ctOS */
-#tab-tools {
-  --ctos-cyan: #00f0ff;
-  --ctos-green: #00ff41;
-  --ctos-dark: #0a0f14;
-  --ctos-panel: rgba(10, 15, 20, 0.95);
-  --ctos-border: rgba(0, 240, 255, 0.3);
-  --ctos-scanline: rgba(0, 240, 255, 0.03);
-}
+## Décision
 
-/* Fond avec grille hexagonale subtile */
-#tab-tools .tools-area {
-  background:
-    radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.05) 0%, transparent 50%),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      var(--ctos-scanline) 2px,
-      var(--ctos-scanline) 4px
-    ),
-    var(--ctos-dark);
-  position: relative;
-  overflow: hidden;
-}
+On ajoute au pipeline RAG existant un **système d'amélioration continue**
+en 4 briques indépendantes, chacune derrière son port (Protocol).
 
-/* Effet de scanline animé */
-#tab-tools .tools-area::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(0, 240, 255, 0.1) 50%,
-    transparent 100%
-  );
-  animation: scanline 8s linear infinite;
-  pointer-events: none;
-}
+### Brique 1 — Sidecar JSONL (trace quotidienne)
 
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
+Chaque exécution de pipeline produit un `TraceRecord` persisté dans un
+fichier JSONL quotidien (`traces/pipelines/YYYY-MM-DD.jsonl`).
 
-/* Cartes de diagnostic — style "panneau de contrôle" */
-#tab-tools .tools-section {
-  background: var(--ctos-panel);
-  border: 1px solid var(--ctos-border);
-  border-left: 3px solid var(--ctos-cyan);
-  border-radius: 4px;
-  padding: 16px;
-  position: relative;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
-  transition: all 0.3s ease;
-}
+- **Port :** `ITraceStore.append(record: TraceRecord) -> None`
+- **Format :** une ligne JSON par trace, mode ajout (pas d'écrasement —
+  corrigé Phase S.2)
+- **Contenu :** `trace_id`, `pipeline_id`, `query`, `retrieved_chunk_ids`,
+  `judge_score`, `judge_reason`, `timestamp`, `feedback`
 
-#tab-tools .tools-section:hover {
-  border-left-color: var(--ctos-green);
-  box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
-  transform: translateX(4px);
-}
+### Brique 2 — Score composite
 
-/* Titres de section — style terminal */
-#tab-tools .tools-section h4 {
-  color: var(--ctos-cyan);
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 240, 255, 0.3);
-  position: relative;
-}
+Le score final pour la rétropropagation combine :
 
-#tab-tools .tools-section h4::before {
-  content: '>';
-  color: var(--ctos-green);
-  margin-right: 8px;
-  animation: blink 1s infinite;
-}
+```
+composite = 0.6 * judge_score + 0.4 * feedback_score
+```
 
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
-}
+Avec :
+- `judge_score` : sortie du `IResponseJudge.evaluate()` (0.0 à 1.0)
+- `feedback_score` : `1.0` si 👍, `0.0` si 👎, `0.5` si absent
+- `recidive` : booléen (même erreur que la trace précédente) → pénalité
+  `-0.3` si vrai
 
-/* Items de diagnostic — style "ligne de log" */
-#tab-tools .tools-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
-}
+### Brique 3 — Rétropropagation par chunk
 
-#tab-tools .tools-item:last-child {
-  border-bottom: none;
-}
+`VectorService` expose deux nouvelles opérations :
 
-#tab-tools .tools-key {
-  color: var(--ctos-cyan);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
+- `update_score(chunk_id: str, delta: float)` — incrémente le score
+  cumulé d'un chunk (positif si bon résultat, négatif si mauvais)
+- `consolidate()` — élague les chunks toxiques (score < `-2.0` ou ratio
+  bad/total > `0.6`)
 
-#tab-tools .tools-val {
-  color: var(--ctos-green);
-  font-weight: 600;
-}
+Les seuils sont des constantes nommées dans `config/constants.py` :
+- `SCORE_PRUNING_THRESHOLD = -2.0`
+- `BAD_RATIO_PRUNING_THRESHOLD = 0.6`
 
-/* Statuts OK/HS — style "LED" */
-#tab-tools .tools-val::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
-  box-shadow: 0 0 10px currentColor;
-  animation: pulse-led 2s infinite;
-}
+### Brique 4 — Boucle adaptative (HyDE + retry + arrêt mécanique)
 
-#tab-tools .tools-val:not(:contains('HS'))::before {
-  background: var(--ctos-green);
-  color: var(--ctos-green);
-}
+```python
+for attempt in range(max_attempts):
+    checkpoint_sidecar()                      # avant chaque tentative
+    response = generate(query, similar_cases)
+    score = judge.evaluate(query, chunks, response)
+    if score >= JUDGE_THRESHOLD: break         # arrêt sur qualité suffisante
+    if stagnation_detected(attempt): break     # arrêt sur stagnation mécanique
+    query = build_hyde_query(query, response)  # reformulation HyDE au 2ᵉ essai
+```
 
-#tab-tools .tools-val:contains('HS')::before {
-  background: #ff0040;
-  color: #ff0040;
-}
+- `max_attempts = 3` (constante nommée)
+- `JUDGE_THRESHOLD = 0.8` (constante partagée avec `rag_judge.py`)
+- Stagnation : 2 tentatives consécutives avec la même `judge_reason`
+- HyDE : la réponse précédente est utilisée comme pseudo-document pour
+  reformuler la requête
 
-@keyframes pulse-led {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+## Décisions dérivées (D1–D11)
 
-/* Responsive */
-@media (max-width: 768px) {
-  #tab-tools .tools-section {
-    margin-bottom: 12px;
-  }
-}
+| ID | Décision | Justification |
+|----|----------|---------------|
+| D1 | Les traces sont stockées en JSONL (pas SQLite, pas CSV) | Append-only, ligne = 1 record, lisible sans outil, compatible avec l'existant (fichiers plats) |
+| D2 | Un fichier par jour calendaire (pas 1 fichier global) | Évite la dérive taille fichier, backup naturel par date |
+| D3 | `TraceRecord` est un dataclass frozen, pas un dict | Contrat de type explicite, hashable, sérialisable via `asdict()` |
+| D4 | Le juge isolé (`IResponseJudge`) est un port séparé (pas noyé dans le pipeline) | SRP — le pipeline ne sait pas COMMENT on juge, il utilise le port |
+| D5 | Le juge ne voit pas le raisonnement de l'acteur (uniquement requête + chunks + réponse) | Isolation Verifier Sub-Agent (SKILL.md §6) |
+| D6 | `JUDGE_THRESHOLD = 0.8` en constante partagée | Cohérence pipeline / juge, modifiable sans refonte |
+| D7 | Score composite = weighted average de 2 sources (pas de ML) | KISS — une formule linéaire est suffisante et testable unitairement |
+| D8 | Rétropropagation au niveau chunk (pas document) | Plus granulaire, permet d'élaguer des chunks précis sans perdre le document entier |
+| D9 | `consolidate()` est une méthode synchrone, pas un background job | Mono-utilisateur offline (ADR-007), pas de besoin de file d'attente |
+| D10 | Boucle adaptative max 3 essais (pas de while True) | Évite les boucles infinies, condition d'arrêt mécanique vérifiable par assertion |
+| D11 | Checkpoint sidecar AVANT chaque tentative (pas seulement à la fin) | Cohérent avec loop-engineering.md — principe de checkpoint avant effet de bord irréversible |
+
+## Conséquences
+
+**Positives :**
+- Les diagnostics passés capitalisent via la trace JSONL (exploitable pour
+  fine-tuning futur).
+- Les chunks toxiques sont automatiquement élagués.
+- Le pipeline s'auto-améliore sans intervention humaine.
+- Chaque brique est testable isolément (ports + mocks).
+
+**Négatives :**
+- Complexité ajoutée au pipeline (boucle adaptative, checkpoints).
+- La rétropropagation nécessite une `consolidate()` périodique (coût
+  O(n) sur l'index).
+- La boucle adaptative peut multiplier par 2–3 le temps d'exécution d'un
+  pipeline en cas de scores bas.
+
+## Implémentation
+
+### Phases
+
+| Phase | Contenu | Fichiers concernés | Dépendances |
+|-------|---------|-------------------|-------------|
+| S     | Stabilisation : LLMAdapter, trace_sidecar, ADR-008 | `protocols.py`, `trace_sidecar.py` | Aucune |
+| 7.1   | Brancher juge isolé sur capitalisation | `pipeline.py` | S.1, S.2 |
+| 7.2   | Score composite | `config/constants.py`, `pipeline.py` | 7.1 |
+| 7.3   | Rétropropagation par chunk | `vector.py`, `config/constants.py` | 7.2 |
+| 7.4   | Boucle adaptative HyDE + retry | `pipeline.py` | 7.3 |
+
+### Ports impliqués (inchangés après S.1)
+
+Tous dans `services/adapters/protocols.py` :
+- `LLMAdapter` — génération de texte et multimodal (restauré S.1)
+- `ITraceStore` — persistance des traces
+- `IVectorSearch` — recherche et bientôt rétropropagation
+- `IResponseJudge` — évaluation isolée de la qualité réponse
+
+\newpage
