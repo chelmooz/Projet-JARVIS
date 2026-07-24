@@ -15,13 +15,14 @@ import yaml
 from config.constants import DEFAULT_MODEL, PROJECT_DIR
 from models import Pipeline, PipeStep
 from ports.pipeline import PipelinePort
-from services.adapters.protocols import ITraceStore, TraceRecord
+from services.adapters.protocols import ITraceStore, IVectorSearch, TraceRecord
 
 _logger = logging.getLogger("jarvis.pipeline")
 
 PIPELINES_DIR = os.path.join(PROJECT_DIR, "config", "pipelines")
 RETRY_DELAY = 0.5
 MAX_ERROR_LENGTH = 200
+DEFAULT_TOP_K = 3
 
 
 class PipelineError(Exception):
@@ -42,6 +43,7 @@ class PipelineService(PipelinePort):
         memory: Any | None = None,
         model_selector: Any | None = None,
         trace_store: ITraceStore | None = None,
+        vector_search: IVectorSearch | None = None,
         max_retries: int = 3,
     ) -> None:
         self._agent_runner = agent_runner
@@ -49,6 +51,7 @@ class PipelineService(PipelinePort):
         self._memory = memory
         self._model_selector = model_selector
         self._trace_store = trace_store
+        self._vector_search = vector_search
         self._max_retries = max_retries
         self._pipelines: dict[str, Pipeline] = {}
 
@@ -128,9 +131,12 @@ class PipelineService(PipelinePort):
     def run(
         self, pipeline_id: str, task: str, context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        """Exécute un pipeline complet et capitalise la trace."""
+        """Exécute un pipeline complet avec récupération pré-pipeline et capitalisation."""
         pipeline = self._resolve_pipeline(pipeline_id)
         ctx = {**(context or {})}
+        
+        self._inject_similar_cases(task, ctx)
+        
         results = self._execute_all_steps(pipeline, task, ctx)
 
         if self._has_fatal_error(results):
@@ -153,6 +159,24 @@ class PipelineService(PipelinePort):
         if not pipeline:
             raise PipelineError(f"Pipeline '{pipeline_id}' introuvable")
         return pipeline
+
+    # ─── Récupération pré-pipeline (MT 7.2) ───────────────────────────
+
+    def _inject_similar_cases(self, task: str, ctx: dict[str, Any]) -> None:
+        """Injecte les cas similaires dans le contexte si vector_search est configuré."""
+        similar_cases = self._retrieve_similar_cases(task)
+        if similar_cases:
+            ctx["similar_cases"] = similar_cases
+
+    def _retrieve_similar_cases(self, task: str) -> list[dict[str, Any]]:
+        """Recherche les cas similaires via le port IVectorSearch."""
+        if not self._vector_search:
+            return []
+        try:
+            return self._vector_search.search(task, top_k=DEFAULT_TOP_K)
+        except Exception:
+            _logger.exception("Échec récupération cas similaires task='%s'", task)
+            return []
 
     # ─── Exécution des étapes ─────────────────────────────────────────
 

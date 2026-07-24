@@ -5,7 +5,7 @@ sans connaître les implémentations concrètes.
 """
 
 from typing import Protocol, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,20 @@ class ITraceStore(Protocol):
 
     def append(self, record: TraceRecord) -> None:
         """Ajoute une trace au store."""
+        ...
+
+
+class IVectorSearch(Protocol):
+    """Port pour la recherche vectorielle (RAG)."""
+
+    def search(self, query: str, top_k: int = 3) -> list[dict[str, Any]]:
+        """Recherche les chunks les plus similaires à la requête.
+
+        Retourne une liste de dicts avec au minimum :
+        - id: str (chunk_id)
+        - text: str (contenu du chunk)
+        - score: float (similarité cosine)
+        """
         ...
 
 
