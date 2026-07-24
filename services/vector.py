@@ -6,6 +6,7 @@ Refacto DevOps / SOLID / Thread-Safe :
 - Gestion robuste des fichiers corrompus (backup automatique + alerte).
 - Plus d'exposition de _data (encapsulation respectée).
 - Index secondaire pour déduplication O(1) au lieu de O(N).
+- MT 7.4 : Rétropropagation de score sur les chunks (update_score + élagage toxique).
 """
 from __future__ import annotations
 
@@ -307,7 +308,7 @@ class VectorService(VectorPort):
         self.vectorize_pending()
 
     # ==============================================================================
-    # PONDÉRATION ET CONSOLIDATION (Thread-Safe)
+    # PONDÉRATION, SCORE ET CONSOLIDATION (Thread-Safe)
     # ==============================================================================
 
     def adjust_weight(
@@ -332,17 +333,63 @@ class VectorService(VectorPort):
             
             return count
 
+    def update_score(self, chunk_id: str, delta: float) -> int:
+        """Met à jour le score et le bad_count d'un chunk spécifique (MT 7.4).
+
+        Retourne le nombre de chunks mis à jour (0 ou 1).
+        """
+        count = 0
+        with self._lock:
+            for doc in self._data["documents"]:
+                metadata = doc.get("metadata", {})
+                if metadata.get("chunk_id") == chunk_id:
+                    current_score = float(metadata.get("score", 0.0))
+                    current_bad_count = int(metadata.get("bad_count", 0))
+
+                    metadata["score"] = current_score + delta
+                    if delta < 0:
+                        metadata["bad_count"] = current_bad_count + 1
+
+                    count += 1
+
+            if count > 0:
+                self._save_secure()
+                self.clear_cache()
+
+        return count
+
     def consolidate(self) -> None:
-        """Consolidation hors ligne : dedup + prune (thread-safe)."""
+        """Consolidation hors ligne : dedup + prune + élagage des chunks toxiques (thread-safe)."""
         with self._lock:
             docs = self._data["documents"]
+            
+            # MT 7.4 : Initialiser les métadonnées manquantes (backward compat)
+            for d in docs:
+                metadata = d.get("metadata", {})
+                metadata.setdefault("score", 0.0)
+                metadata.setdefault("bad_count", 0)
+            
             wc = WeightConsolidator(docs)
             
             to_remove = wc.dedup(CONSOLIDATE_DEDUP_SIMILARITY, CONSOLIDATE_MAX_ITER)
             kept = wc.prune(CONSOLIDATE_PRUNE_WEIGHT, CONSOLIDATE_GRACE_HOURS, self._now())
             
+            # MT 7.4 : élagage des chunks toxiques
+            toxic_indices = set()
+            for idx, d in enumerate(docs):
+                if idx in to_remove or d not in kept:
+                    continue
+                
+                metadata = d.get("metadata", {})
+                score = float(metadata.get("score", 0.0))
+                bad_count = int(metadata.get("bad_count", 0))
+                
+                if bad_count > 3 or score < -2.0:
+                    toxic_indices.add(idx)
+            
             kept_docs = [
-                d for idx, d in enumerate(docs) if idx not in to_remove and d in kept
+                d for idx, d in enumerate(docs) 
+                if idx not in to_remove and d in kept and idx not in toxic_indices
             ]
             
             # Limitation de la taille de l'index
