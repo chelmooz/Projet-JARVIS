@@ -64,15 +64,18 @@ def _get_lock(path: str) -> threading.Lock:
 def read_json(path: str, default: Any = None) -> Any:
     """Lit un fichier JSON avec fallback silencieux.
 
-    En cas d'erreur (fichier absent, JSON invalide), retourne ``default``
-    si fourni, sinon un dictionnaire vide ``{}``.
+    Utilise le même verrou que ``write_json_atomic`` pour éviter les lectures
+    concurrentes pendant une écriture atomique.
     """
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        _logger.debug("Failed to read JSON %s: %s", path, e)
-        return default if default is not None else {}
+    path = str(path)
+    lock = _get_lock(path)
+    with lock:
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            _logger.debug("Failed to read JSON %s: %s", path, e)
+            return default if default is not None else {}
 
 
 @retry()

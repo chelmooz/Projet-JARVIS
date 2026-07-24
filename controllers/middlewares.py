@@ -134,7 +134,6 @@ def _setup_middlewares(app: FastAPI) -> None:
         )
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["X-Frame-Options"] = "DENY"
-        resp.headers["X-XSS-Protection"] = "1; mode=block"
         return resp
 
     @app.middleware("http")

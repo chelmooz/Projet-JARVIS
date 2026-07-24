@@ -45,21 +45,22 @@ _SKIPPED_DIR_NAMES = {
     "venv",
 }
 
-_MAX_PROJECT_FILES = 500
+_MAX_PROJECT_FILES = 500  # Limite le parcours récursif (évite OOM sur gros projets)
 
 # ---------------------------------------------------------------------------
 # Seuils d'analyse (clean code / complexité)
+# Valeurs issues du Clean Code (Martin) et des recommandations PEP 8.
 # ---------------------------------------------------------------------------
 
-_MAX_CYCLOMATIC = 10
-_MAX_DUPLICATE_LINES = 3
-_MAX_NESTED_LOOPS = 2
-_MAX_BRANCHES = 8
-_MAX_FUNC_LINES = 20
-_MAX_PARAMS = 3
-_MAX_NESTING = 3
-_MAX_CLASS_LINES = 150
-_MAX_FILE_LINES = 500
+_MAX_CYCLOMATIC = 10      # McCabe : au-delà, la fonction est difficile à tester
+_MAX_DUPLICATE_LINES = 3  # 3+ lignes identiques = copier-coller probable
+_MAX_NESTED_LOOPS = 2     # Au-delà, la complexité cognitive explose (Defensive Programming)
+_MAX_BRANCHES = 8         # Limite de branches dans une fonction (Keep It Simple)
+_MAX_FUNC_LINES = 20      # Clean Code : une fonction fait une chose (~1 écran)
+_MAX_PARAMS = 3           # Clean Code : max 3 paramètres, sinon viol de DIP/ISP
+_MAX_NESTING = 3          # 3+ niveaux d'indentation = refactor recommandé
+_MAX_CLASS_LINES = 150    # SRP : une classe trop longue viole le principe
+_MAX_FILE_LINES = 500     # Au-delà, le fichier fait trop de choses (SoC)
 
 # Pondération des axes d'audit (somme = 1.0).
 _WEIGHTS = {"code_quality": 0.40, "tests": 0.30, "structure": 0.15, "documentation": 0.15}

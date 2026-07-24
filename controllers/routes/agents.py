@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from config.paths import CONFIG_DIR, PROFILES_FILE
-from controllers.context import get_app_context
+from controllers.context import get_app_context, _ctx
 from controllers.di import AppContext
 from controllers.responses import fail, ok
 from models.schemas import AssignRequest, VisionRequest
@@ -31,6 +31,10 @@ _logger = logging.getLogger(__name__)
 
 PREFERENCES_PATH = CONFIG_DIR / "model_preferences.json"
 TOKEN_ESTIMATE_DIVISOR = 4  # estimation grossière : ~4 caractères par token
+
+# Exposition de services au niveau module (Étape 9 fusionnée)
+log = _ctx.log
+analytics = _ctx.analytics
 
 router = APIRouter()
 
@@ -138,9 +142,9 @@ def handle_vision(body: VisionRequest, context: AppContext = Depends(get_app_con
     vision_context = {"image": image}
     try:
         result = vision_agent.run(task, model_name, vision_context)
-    except Exception as e:  # noqa: BLE001 - défensif : erreur agent non propagée brute au client
-        context.log.log("ERROR", f"Vision failed: {e}")
-        return JSONResponse({"error": str(e), "agent": "vision"}, status_code=500)
+    except Exception:
+        _logger.error("Vision failed", exc_info=True)
+        return JSONResponse({"error": "Erreur interne de l'agent vision", "agent": "vision"}, status_code=500)
     context.memory.update_habits({"task": task, "agent": "vision"})
     latency = round((time.time() - start) * 1000, 1)
     context.analytics.track_query(

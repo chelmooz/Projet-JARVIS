@@ -3,7 +3,10 @@
 Generates valid/invalid/boundary payloads from Pydantic models.
 Zero external dependencies (no Hypothesis).
 """
+import logging
 from typing import get_args, get_origin
+
+_logger = logging.getLogger(__name__)
 
 
 def _gen_value_for_type(field_type, field_info) -> list:
@@ -75,8 +78,14 @@ def generate_fuzz_payloads(model_cls) -> list[dict]:
                 else:
                     valid[name] = None
             else:
-                valid[name] = info.default
+                if info.default_factory is not None:
+                    valid[name] = info.default_factory()
+                elif info.default is not None:
+                    valid[name] = info.default
+                else:
+                    valid[name] = None
         except Exception:
+            _logger.warning("Échec génération payload pour %s, fallback None", name)
             valid[name] = None
     payloads.append(valid)
 

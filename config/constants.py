@@ -42,6 +42,7 @@ MAX_CONVERSATION_MESSAGES: Final[int] = 200  # Fenêtre glissante par conversati
 AGENT_TIMEOUT_SECONDS: Final[int] = 120  # Garde-fou wall-clock par agent.
 MAX_VECTOR_DOCS: Final[int] = 5000  # Borne de l'index vectoriel sur clef USB.
 MAX_FIND_FILES: Final[int] = 1000  # Borne des résultats de find_files.
+EMBEDDING_DIM: Final[int] = 768  # Dimension des embeddings nomic-embed-text-v2-moe.
 
 # ---------------------------------------------------------------------------
 # Backend par défaut
@@ -195,6 +196,7 @@ __all__ = [
     "AGENT_TIMEOUT_SECONDS",
     "MAX_VECTOR_DOCS",
     "MAX_FIND_FILES",
+    "EMBEDDING_DIM",
     # Backend
     "DEFAULT_MODEL",
     "DEFAULT_BACKEND",

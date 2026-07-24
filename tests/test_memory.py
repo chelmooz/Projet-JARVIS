@@ -6,6 +6,7 @@ import sys
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _PROJECT_DIR)
 
+import config.constants as constants
 from services.memory import MemoryService
 
 
@@ -43,9 +44,9 @@ class TestMemoryService:
 
     def test_update_habits_trims_at_200(self):
         m = MemoryService()
-        m._habits = [{"task": f"t{i}"} for i in range(200)]
+        m._habits = [{"task": f"t{i}"} for i in range(constants.MAX_HABITS)]
         m.update_habits({"task": "last"})
-        assert len(m._habits) == 200
+        assert len(m._habits) == constants.MAX_HABITS
         assert m._habits[-1]["task"] == "last"
 
     def test_is_healthy_returns_bool(self):

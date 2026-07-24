@@ -30,7 +30,7 @@ def _kill_windows(port: int) -> None:
     r = subprocess.run(["netstat", "-ano"], capture_output=True, timeout=KILL_TIMEOUT)
     stdout = r.stdout.decode("utf-8", errors="replace")
     for line in stdout.splitlines():
-        if _extract_port(line) != port or "LISTENING" not in line:
+        if _extract_port(line) != port:
             continue
         parts = line.strip().split()
         if parts and parts[-1].isdigit():

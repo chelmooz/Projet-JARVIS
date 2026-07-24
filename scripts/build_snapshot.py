@@ -16,6 +16,7 @@ Usage:
 import argparse
 import datetime
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -26,6 +27,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import config.paths as paths
 from services.file_utils import write_json_atomic
 from services.ollama_installer import _sha256_of
+
+_logger = logging.getLogger(__name__)
 
 # Racines de l'environnement déployé (relatives a ROOT).
 DEFAULT_ROOTS = ["portable_python", "bin", "venv", "config", "models"]
@@ -41,6 +44,7 @@ def _git_head(base: str) -> str | None:
             ["git", "rev-parse", "HEAD"], cwd=base, stderr=subprocess.DEVNULL
         ).decode().strip() or None
     except Exception:
+        _logger.warning("Impossible de lire le HEAD git dans %s", base)
         return None
 
 

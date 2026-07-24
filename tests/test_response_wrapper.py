@@ -16,7 +16,6 @@ if _ROOT not in sys.path:
 from controllers import context as ctx  # noqa: E402
 from controllers.responses import fail, ok  # noqa: E402
 
-# ─── Fakes minimaux (pas de réseau) ─────────────────────────────────────────
 
 class FakeInference:
     def get_active_backend(self):
@@ -32,22 +31,26 @@ class FakeMetrics:
         return {"requests": 0, "uptime_seconds": 0}
 
 
-ctx._ctx._initialized = True
-ctx._ctx.inference = FakeInference()
-ctx._ctx.memory = MagicMock()
-ctx._ctx.memory.is_healthy.return_value = True
-ctx._ctx.vector = MagicMock()
-ctx._ctx.vector.is_healthy.return_value = True
-ctx._ctx.vector.stats.return_value = {}
-ctx._ctx.conversations = MagicMock()
-ctx._ctx.agents = {k: MagicMock() for k in ("cyber", "dev", "network", "hardware", "vision")}
-ctx._ctx.log = MagicMock()
-ctx._ctx.analytics = MagicMock()
-ctx._ctx.router_svc = MagicMock()
-ctx._ctx.orchestrator = MagicMock()
-ctx._ctx.orchestrator.handle_request.return_value = {"response": "ok"}
-ctx._ctx.metrics = FakeMetrics()
-ctx._sync_module_globals(ctx._ctx)
+def _setup_context():
+    """Configure _ctx avec des fakes pour les tests."""
+    ctx._ctx._initialized = True
+    ctx._ctx.inference = FakeInference()
+    ctx._ctx.memory = MagicMock()
+    ctx._ctx.memory.is_healthy.return_value = True
+    ctx._ctx.vector = MagicMock()
+    ctx._ctx.vector.is_healthy.return_value = True
+    ctx._ctx.vector.stats.return_value = {}
+    ctx._ctx.conversations = MagicMock()
+    ctx._ctx.agents = {k: MagicMock() for k in ("cyber", "dev", "network", "hardware", "vision")}
+    ctx._ctx.log = MagicMock()
+    ctx._ctx.analytics = MagicMock()
+    ctx._ctx.router_svc = MagicMock()
+    ctx._ctx.orchestrator = MagicMock()
+    ctx._ctx.orchestrator.handle_request.return_value = {"response": "ok"}
+    ctx._ctx.metrics = FakeMetrics()
+
+
+_setup_context()
 
 
 class TestResponseWrapperHelper:
@@ -75,6 +78,7 @@ class TestResponseWrapperEndpoints:
 
         from controllers.router import app
 
+        _setup_context()
         self.client = TestClient(app)
 
     def test_agents_uses_wrapper(self):

@@ -80,7 +80,12 @@ class CommandExecutor:
             )
         
         if extra_kwargs:
-            args = [a.format(**extra_kwargs) for a in args]
+            safe_args = []
+            for a in args:
+                for key, value in extra_kwargs.items():
+                    a = a.replace(f"{{{key}}}", str(value))
+                safe_args.append(a)
+            args = safe_args
         
         return args
 

@@ -6,15 +6,17 @@ Fournit les constantes de chemins et les utilitaires pour :
 - Installer les dépendances.
 - Localiser les binaires externes (ex: Ollama).
 """
-
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import shutil
 import subprocess
 import sys
 from typing import Any, Callable
+
+_logger = logging.getLogger(__name__)
 
 from config.paths import (
     BIN_DIR,
@@ -28,7 +30,8 @@ from config.paths import (
     SYSTEM,
 )
 
-BASE_DIR: str = ROOT
+# CORRECTION : Cast explicite de ROOT (Path) en str pour éviter les erreurs de concaténation
+BASE_DIR: str = str(ROOT)
 PYTHON: str = sys.executable
 VENV_DIR: str = os.path.join(BASE_DIR, "venv")
 
@@ -104,6 +107,7 @@ def _install_deps(python_path: str, requirements: str, log: Callable[..., Any]) 
             [python_path, "-m", "pip", "install", "--quiet", "--upgrade", "pip"],
             capture_output=True, timeout=30,
         )
+        _logger.info("pip mis à jour avec succès")
     
     r = subprocess.run(
         [python_path, "-m", "pip", "install", "--quiet", "-r", requirements],
@@ -176,8 +180,7 @@ def get_ollama_path() -> str | None:
     Returns:
         Le chemin absolu vers le binaire Ollama, ou ``None`` s'il est introuvable.
     """
-    name = "ollama.exe" if SYSTEM == "windows" else " each"
-    # Correction : "ollama" au lieu de "each" (typo mentale, corrigé ci-dessous)
+    # CORRECTION : Nettoyage de la typo "each"
     name = "ollama.exe" if SYSTEM == "windows" else "ollama"
     
     candidates = [

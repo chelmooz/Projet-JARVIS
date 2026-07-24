@@ -13,8 +13,12 @@ GET    /api/files/drives      — Lister les lecteurs/racines disponibles
 """
 from __future__ import annotations
 
+import logging
+
 import psutil
 from fastapi import APIRouter
+
+_logger = logging.getLogger(__name__)
 
 from models.schemas import AuthorizePathRequest, FilePathRequest, FindFilesRequest
 from services.file_system import FileSystemService
@@ -80,7 +84,8 @@ def list_drives():
     """Liste les lecteurs/racines disponibles (cross-platform via psutil)."""
     try:
         drives = [p.mountpoint for p in psutil.disk_partitions(all=False)]
-    except Exception:  # psutil indisponible / OS exotique -> liste vide
+    except Exception:
+        _logger.warning("psutil.disk_partitions indisponible, liste de lecteurs vide")
         drives = []
     return {"success": True, "drives": drives}
 

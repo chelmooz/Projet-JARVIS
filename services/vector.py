@@ -69,21 +69,19 @@ class VectorService(VectorPort):
     et les fichiers corrompus sont automatiquement sauvegardés avant réinitialisation.
     """
 
-    def __init__(self, inference_service: Any) -> None:
-        """Initialise l'index vectoriel avec injection de dépendance stricte.
-        
+    def __init__(self, inference_service: Any = None) -> None:
+        """Initialise l'index vectoriel.
+
         Args:
-            inference_service: Service d'inférence pour le calcul d'embeddings (requis).
-            
-        Raises:
-            ValueError: Si inference_service est None.
+            inference_service: Service d'inférence pour le calcul d'embeddings.
+                Optionnel : si omis, une instance réelle de ``InferenceService``
+                est créée par défaut (compat DI historique + usages sans
+                embedding explicite, ex. inspection de ``_data``/``stats()``).
         """
         if inference_service is None:
-            raise ValueError(
-                "VectorService nécessite un service d'inférence valide. "
-                "Injection de dépendance requise (DIP)."
-            )
-        
+            from services.inference import InferenceService
+            inference_service = InferenceService()
+
         os.makedirs(os.path.dirname(VECTOR_PATH), exist_ok=True)
         
         self._lock = threading.RLock()

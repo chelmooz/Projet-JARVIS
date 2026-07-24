@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, Query
 
 from controllers.responses import fail, ok
 from services.analysis import Analyzer as KillCodingAnalyzer
+from services.file_system import FileSystemService
 
 router = APIRouter()
+_fs = FileSystemService()
 
 
 def get_analyzer() -> KillCodingAnalyzer:
@@ -20,10 +22,9 @@ def analyze_file(
     path: str = Query(..., description="Chemin absolu du fichier Python"),
     analyzer: KillCodingAnalyzer = Depends(get_analyzer),
 ):
-    """Analyse un fichier Python selon les règles SOLID/TDD/Clean Code/KISS.
-
-    Laisse sync : analyse disque/CPU bloquant (lecture + parse du fichier).
-    """
+    """Analyse un fichier Python selon les règles SOLID/TDD/Clean Code/KISS."""
+    if not _fs.authorize_path(path):
+        return fail("Chemin non autorisé (hors sandbox)", status_code=403)
     report = analyzer.analyze_file(path)
     return ok(report)
 
@@ -33,10 +34,9 @@ def analyze_project(
     path: str = Query(".", description="Chemin du répertoire racine"),
     analyzer: KillCodingAnalyzer = Depends(get_analyzer),
 ):
-    """Audit complet d'un projet Python.
-
-    Laisse sync : audit complet (lecture/parse de tous les fichiers, CPU/IO).
-    """
+    """Audit complet d'un projet Python."""
+    if not _fs.authorize_path(path):
+        return fail("Chemin non autorisé (hors sandbox)", status_code=403)
     report = analyzer.generate_global_report(root=path)
     return ok(report)
 
@@ -46,10 +46,9 @@ def check_test(
     path: str = Query(..., description="Chemin absolu du fichier source"),
     analyzer: KillCodingAnalyzer = Depends(get_analyzer),
 ):
-    """Vérifie si un fichier source a des tests associés (TDD).
-
-    Laisse sync : parcours disque bloquant (recherche de fichiers de test).
-    """
+    """Vérifie si un fichier source a des tests associés (TDD)."""
+    if not _fs.authorize_path(path):
+        return fail("Chemin non autorisé (hors sandbox)", status_code=403)
     result = analyzer.check_test_exists(path)
     if result.get("test_found"):
         return ok({

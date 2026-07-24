@@ -32,7 +32,7 @@ def gray(text):    return color(text, "90")
 
 def header():
     """Header."""
-    os.system("cls" if SYSTEM == "windows" else "clear")
+    subprocess.run("cls" if SYSTEM == "windows" else "clear", shell=True)
     print(cyan("====================================================="))
     print(cyan("  JARVIS Portable Edition v5.4"))
     print(cyan("  Installateur multi-OS"))

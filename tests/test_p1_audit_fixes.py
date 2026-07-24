@@ -23,19 +23,15 @@ sys.path.insert(0, _PROJECT_DIR)
 # ---------------------------------------------------------------------------
 class TestReadPreferencesCache:
 
-    def _reload_selector(self, monkeypatch, prefs_path):
-        """Recharge services.selector avec PREFERENCES_PATH pointant sur un fichier temporaire."""
-        import importlib
-
-        import services.selector as selector
-        importlib.reload(selector)
-        monkeypatch.setattr(selector, "PREFERENCES_PATH", str(prefs_path))
-        return selector
+    def _make_cache(self, prefs_path):
+        """Crée un _PreferencesCache pointant sur un fichier temporaire."""
+        from services.selector import _PreferencesCache
+        return _PreferencesCache(str(prefs_path))
 
     def test_second_call_does_not_reread_file_when_mtime_unchanged(self, tmp_path, monkeypatch):
         prefs_path = tmp_path / "model_preferences.json"
         prefs_path.write_text(json.dumps({"offline": False}), encoding="utf-8")
-        selector = self._reload_selector(monkeypatch, prefs_path)
+        cache = self._make_cache(prefs_path)
 
         real_open = open
         call_count = {"n": 0}
@@ -47,9 +43,9 @@ class TestReadPreferencesCache:
 
         monkeypatch.setattr("builtins.open", _counting_open)
 
-        selector.read_preferences()
-        selector.read_preferences()
-        selector.read_preferences()
+        cache.get()
+        cache.get()
+        cache.get()
 
         assert call_count["n"] == 1, (
             f"read_preferences() a rouvert le fichier {call_count['n']} fois "
@@ -59,9 +55,9 @@ class TestReadPreferencesCache:
     def test_cache_invalidates_when_file_changes(self, tmp_path, monkeypatch):
         prefs_path = tmp_path / "model_preferences.json"
         prefs_path.write_text(json.dumps({"offline": False}), encoding="utf-8")
-        selector = self._reload_selector(monkeypatch, prefs_path)
+        cache = self._make_cache(prefs_path)
 
-        first = selector.read_preferences()
+        first = cache.get()
         assert first == {"offline": False}
 
         # mtime distinct garanti (certains FS ont une resolution de 1s)
@@ -70,7 +66,7 @@ class TestReadPreferencesCache:
         prefs_path.write_text(json.dumps({"offline": True}), encoding="utf-8")
         os.utime(prefs_path, (new_mtime, new_mtime))
 
-        second = selector.read_preferences()
+        second = cache.get()
         assert second == {"offline": True}, "le cache n'a pas ete invalide apres modification du fichier"
 
 

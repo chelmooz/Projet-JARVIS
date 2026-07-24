@@ -6,6 +6,7 @@ import sys
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _PROJECT_DIR)
 
+import config.constants as constants
 import services.log as log_module
 from services.log import LogService
 
@@ -47,11 +48,11 @@ class TestLogService:
         try:
             log_module.LOG_PATH = log_path
             svc = LogService()
-            for i in range(510):
+            for i in range(constants.MAX_LOG_ENTRIES + 10):
                 svc.log("INFO", f"msg{i}")
             with open(log_path) as f:
                 data = json.load(f)
-            assert len(data) == 500
+            assert len(data) == constants.MAX_LOG_ENTRIES
             assert data[0]["message"] == "msg10"
         finally:
             log_module.LOG_PATH = _orig

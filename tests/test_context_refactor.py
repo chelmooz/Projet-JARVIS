@@ -28,7 +28,7 @@ class TestAppContextInitialization:
         assert ctx.analytics is None
         assert ctx.conversations is None
         assert ctx.metrics is None
-        assert ctx.agents is None
+        assert ctx.agents == {}
         assert ctx.router_svc is None
         assert ctx.toolbox is None
         assert ctx.orchestrator is None

@@ -13,6 +13,7 @@ from typing import Any
 from agents.factory import create_agents
 from agents.supervisor import AgentSupervisor
 from config.constants import DEFAULT_MODEL
+from config.paths import CONFIG_DIR, OLLAMA_PORT
 from controllers.responses import ok, fail
 from graph.agent_graph import AgentGraph
 from ports import (
@@ -77,7 +78,9 @@ class AppContext:
         self.inference: InferenceService | None = None
         self.memory: MemoryService | None = None
         self.vector: VectorService | None = None
-        self.agents: dict[str, Any] = {}
+        self.agents = {}
+        self.status_cache = {"ts": 0.0, "data": {}}
+        self.profiles_path = str(CONFIG_DIR / "agent_profiles.json")
         self.orchestrator: OrchestratorService | None = None
         self.toolbox: _Toolbox | None = None
         self.router_svc: _RouterService | None = None
@@ -87,15 +90,15 @@ class AppContext:
         self.log: LogService | None = None
         self.analytics: AnalyticsService | None = None
         self.agent_supervisor: AgentSupervisor | None = None
-        self._is_initialized = False
+        self._initialized = False
     
     def initialize(self) -> None:
         """Initialise tous les services (idempotent)."""
-        if self._is_initialized:
+        if self._initialized:
             return
         
         self._do_initialize()
-        self._is_initialized = True
+        self._initialized = True
         _logger.info("AppContext initialisé avec succès.")
     
     def _do_initialize(self) -> None:

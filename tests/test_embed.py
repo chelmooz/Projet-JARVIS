@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+import config.constants as constants
 from services.adapters.ollama_adapter import OllamaAdapter
 from services.vector import EXPECTED_DIM, EXPECTED_MODEL, VectorService
 
@@ -19,7 +20,7 @@ class TestOllamaAdapterEmbed:
         mock_response.raise_for_status = lambda: None
         with patch.object(adapter._http, "post", return_value=mock_response):
             vec = adapter.embed("hello world")
-        assert len(vec) == 768
+        assert len(vec) == constants.EMBEDDING_DIM
         assert all(isinstance(v, float) for v in vec)
 
     def test_embed_default_model(self):

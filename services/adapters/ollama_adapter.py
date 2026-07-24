@@ -55,6 +55,7 @@ class OllamaAdapter(LLMAdapter):
         try:
             return httpx.get(f"{url}/api/tags", timeout=0.5).status_code == 200
         except Exception:
+            _logger.warning("Ollama endpoint %s injoignable", url)
             return False
 
     def _get_http(self) -> "httpx.Client":
@@ -89,6 +90,7 @@ class OllamaAdapter(LLMAdapter):
             with open(path) as f:
                 self._timeout = json.load(f).get("timeout", 120)
         except Exception:
+            _logger.warning("Impossible de charger le timeout depuis model_preferences.json, fallback 120")
             self._timeout = 120
         return self._timeout
 

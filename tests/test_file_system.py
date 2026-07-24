@@ -27,12 +27,12 @@ class TestFileSystemAuth:
     def test_list_dir_refuse_sans_auth(self):
         result = self.svc.list_dir(self.tmpdir)
         assert not result.get("success")
-        assert "non authorise" in result.get("error", "").lower()
+        assert "non autoris" in result.get("error", "").lower()
 
     def test_read_file_refuse_sans_auth(self):
         result = self.svc.read_file(__file__)
         assert not result.get("success")
-        assert "non authorise" in result.get("error", "").lower()
+        assert "non autoris" in result.get("error", "").lower()
 
     # --- 1.2 GREEN tests after implementation ---
 

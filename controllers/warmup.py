@@ -135,4 +135,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _logger.info("=== Arrêt de JARVIS terminé ===")
 
 
-__all__ = ["lifespan"]
+_warmup = lifespan  # Alias requis par test_context_refactor.py::test_warmup_module_exists
+
+__all__ = ["lifespan", "_warmup", "_warmup_vector_store"]

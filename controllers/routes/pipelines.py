@@ -16,7 +16,10 @@ router = APIRouter()
 @router.get("/api/pipelines")
 async def list_pipelines(context: AppContext = Depends(get_app_context)):
     """Liste les pipelines enregistrés (en mémoire, safe en async)."""
-    return ok({"pipelines": context.pipeline.list()})
+    pipeline = context.pipeline
+    if pipeline is None:
+        return ok({"pipelines": []})
+    return ok({"pipelines": pipeline.list()})
 
 
 @router.post("/api/pipelines/run")
@@ -25,9 +28,14 @@ def run_pipeline(
     context: AppContext = Depends(get_app_context),
 ):
     """Exécute un pipeline par son ID."""
-    context.metrics.incr_pipeline_run()
+    pipeline = context.pipeline
+    if pipeline is None:
+        return fail("Pipeline service non initialisé", status_code=503)
+    metrics = context.metrics
+    if metrics is not None:
+        metrics.incr_pipeline_run()
     try:
-        result = context.pipeline.run(body.pipeline_id, body.task, body.context)
+        result = pipeline.run(body.pipeline_id, body.task, body.context)
     except PipelineError as e:
         return fail(str(e), status_code=404)
     return ok(result)

@@ -154,11 +154,11 @@ async def handle_request(
 
         return result
 
-    except Exception as e:
-        _logger.error("handle_request crashed: %s", e, exc_info=True)
+    except Exception:
+        _logger.error("handle_request crashed", exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"error": f"Erreur interne: {e}", "agent": "system", "model": "unknown"},
+            content={"error": "Erreur interne du service", "agent": "system", "model": "unknown"},
         )
 
 

@@ -9,41 +9,43 @@ build_app()
 import controllers.router  # noqa: E402,F401
 
 
+def _mock_context():
+    """Crée un AppContext factice pour les appels directs aux routes."""
+    from controllers.di import AppContext
+    ctx = AppContext()
+    ctx.vector = MagicMock()
+    ctx.vector.index_batch = MagicMock()
+    ctx.vector.vectorize_pending.return_value = 0
+    ctx.vector.stats.return_value = {"total": 0}
+    ctx.log = MagicMock()
+    return ctx
+
+
 class TestDocumentsNoDeadLog:
 
-    @patch("controllers.context.vector")
-    def test_ingest_no_log_dot_log_crash(self, mock_vector):
+    def test_ingest_no_log_dot_log_crash(self):
         """Vérifie que ingest_documents ne lève pas AttributeError sur log.log()."""
-        mock_vector.index_batch = MagicMock()
         from controllers.routes.documents import ingest_documents
         from models.schemas import IngestDocument, IngestRequest
 
+        ctx = _mock_context()
         body = IngestRequest(
             documents=[IngestDocument(text="hello", metadata={"type": "test"})],
             source="test",
         )
-        result = ingest_documents(body)
-        assert result["status"] == "ok"
-        assert result["ingested"] == 1
+        result = ingest_documents(body, ctx)
+        assert result["data"]["ingested"] == 1
 
-    @patch("controllers.context.vector")
-    def test_vectorize_no_log_dot_log_crash(self, mock_vector):
+    def test_vectorize_no_log_dot_log_crash(self):
         """Vérifie que vectorize_pending ne lève pas AttributeError sur log.log()."""
-        mock_vector.vectorize_pending.return_value = 0
-        mock_vector.stats.return_value = {"total": 0}
         from controllers.routes.documents import vectorize_pending
 
-        result = vectorize_pending()
-        assert result["status"] == "ok"
+        ctx = _mock_context()
+        result = vectorize_pending(ctx)
+        assert "vectorized" in result.get("data", {})
 
-    @patch("controllers.routes.agents.inference")
-    @patch("controllers.routes.agents.memory")
-    @patch("controllers.routes.agents.analytics")
-    def test_assign_profile_no_log_dot_log_crash(
-        self, mock_analytics, mock_memory, mock_inference
-    ):
+    def test_assign_profile_no_log_dot_log_crash(self):
         """Vérifie que assign_profile ne lève pas AttributeError sur log.log()."""
-        mock_inference.select_backend = MagicMock()
         from controllers.routes.agents import assign_profile
         from models.schemas import AssignRequest
 
@@ -58,4 +60,4 @@ class TestDocumentsNoDeadLog:
             mock_open().__enter__.return_value = mock_file.__enter__.return_value
             body = AssignRequest(profile="techlead", model="phi4-mini:latest")
             result = assign_profile(body)
-            assert result["status"] == "ok"
+            assert result.get("data", {}).get("profile") == "techlead"

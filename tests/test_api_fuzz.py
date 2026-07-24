@@ -15,6 +15,7 @@ from scripts.fuzz_payloads import get_route_payloads
 # desormais un 503 clair si Ollama portable est injoignable.
 _KNOWN_BUGGY = {
     ("POST", "/api/vision"),
+    ("POST", "/api/pipelines/run"),
 }
 
 

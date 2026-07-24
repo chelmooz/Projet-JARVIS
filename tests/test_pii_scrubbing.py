@@ -43,6 +43,7 @@ class TestPiiScrubbing:
     def test_search_scrubs_results(self):
         """Les résultats de recherche doivent être scrubés (PII masquées)."""
         from controllers.routes.documents import search_documents
+        from controllers.di import AppContext
         from services.sanitize import scrub
 
         class FakeVector:
@@ -52,9 +53,11 @@ class TestPiiScrubbing:
                     {"text": "IP: 10.0.0.1", "score": 0.85},
                 ]
 
-        with patch("controllers.routes.documents._ctx", return_value=(None, None, FakeVector(), None)), \
-             patch("controllers.routes.documents.scrub", wraps=scrub) as mock_scrub:
-            result = search_documents(q="test", top_k=2)
+        ctx = AppContext()
+        ctx.vector = FakeVector()
+
+        with patch("controllers.routes.documents.scrub", wraps=scrub) as mock_scrub:
+            result = search_documents(q="test", top_k=2, context=ctx)
             assert mock_scrub.call_count >= 2
-            for r in result["results"]:
+            for r in result["data"]["results"]:
                 assert "[REDACTED]" in r["text"], f"Champ non scrubé: {r['text']}"

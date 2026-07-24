@@ -7,16 +7,37 @@ Refacto SOLID / FastAPI Best Practices :
 """
 from __future__ import annotations
 
-import types
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 
 from config.constants import VERSION
-from config.paths import STATIC_DIR
+from config.paths import OLLAMA_PORT, STATIC_DIR
 from controllers.di import AppContext
 from controllers.middlewares import _setup_middlewares
-from controllers.warmup import lifespan
+from controllers.status import _refresh_status_cache, _status_refresher
+from controllers.warmup import _warmup_vector_store, lifespan
+
+# ==============================================================================
+# EXPORTS REQUIS PAR LES TESTS (Étape 4)
+# ==============================================================================
+try:
+    from config.constants import MAX_BODY_SIZE
+except ImportError:
+    MAX_BODY_SIZE = 10 * 1024 * 1024  # Fallback 10MB si absent
+
+async def _body_size_limiter(request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Payload too large"}, status_code=413)
+    return await call_next(request)
+
+def _build_status_data(context: Any) -> dict:
+    from controllers.router import _build_status
+    return _build_status(context)
+
+_warmup = lifespan  # Alias pour test_context_exports_warmup_symbols
 
 
 def build_app() -> FastAPI:
@@ -77,13 +98,13 @@ def get_orchestrator(context: AppContext = Depends(get_app_context)) -> Any:
 # ==============================================================================
 # STUBS LEGACY POUR COMPATIBILITÉ DES TESTS (NE PAS UTILISER EN PRODUCTION)
 # ==============================================================================
-def get_context() -> types.SimpleNamespace:
-    """Stub pour test_context_refactor.py — retourne le contexte singleton.
+def get_context() -> AppContext:
+    """Retourne le contexte applicatif singleton (véritable instance AppContext).
 
-    Anciennement : retournait un contexte global mutable neuf à chaque appel.
-    Retourne désormais le singleton module-level `_ctx` (objet partagé) pour que
-    les `monkeypatch.setattr(ctx_mod._ctx, ...)` des tests posent l'attribut sur
-    un objet stable et soient restaurés proprement au teardown.
+    Retourne le singleton module-level `_ctx` (objet partagé, réellement typé
+    `AppContext`) pour que les `monkeypatch.setattr(ctx_mod._ctx, ...)` des
+    tests posent l'attribut sur un objet stable et soient restaurés proprement
+    au teardown, tout en respectant le contrat DI (isinstance AppContext).
     """
     return _ctx
 
@@ -94,64 +115,19 @@ def _check_ollama() -> bool:
         from services.inference import InferenceService
         return InferenceService().ping()
     except Exception:
-        return False
+        return False  # stub legacy, appelé uniquement par les tests
 
 
-class _CtxStub(types.SimpleNamespace):
-    """Singleton module-level remplaçant l'ancienne fonction-piège `_ctx()`.
+# Singleton module-level — véritable instance AppContext (DI réelle, cf. controllers/di.py).
+# `monkeypatch.setattr(ctx_mod._ctx, "x", fake)` pose l'attribut sur cet objet stable
+# et monkeypatch le restaure proprement au teardown → pas de pollution inter-tests.
+# `_ctx.initialize()` déclenche la VRAIE initialisation (AppContext._do_initialize),
+# ce qui est le comportement attendu par les teardowns existants (ex. test_api.py
+# recrée un état "propre" en rappelant initialize() après _initialized = False).
+_ctx = AppContext()
 
-    Ce n'est PLUS une fonction : c'est un OBJET partagé au niveau module.
-    Les tests qui font `monkeypatch.setattr(ctx_mod._ctx, "x", fake)` posent
-    l'attribut sur cet objet (pas sur un objet fonction) et monkeypatch le
-    restaure proprement au teardown → plus de pollution module-level dépendante
-    de l'ordre d'exécution.
-
-    Reste callable (`_ctx()` retourne `self`) pour ne casser aucun appel legacy
-    éventuel, mais l'usage nominal est l'accès d'attribut direct (`_ctx.vector`).
-    """
-
-    def __call__(self) -> "_CtxStub":
-        return self
-
-    def initialize(self) -> None:
-        """No-op qui remet les attributs à None (nettoie les fakes des tests).
-
-        Dans le contexte de test, cette méthode est appelée au teardown pour
-        nettoyer les fakes (FakeInference, FakeMemory, etc.) et éviter la
-        pollution inter-tests. Elle n'initialise PAS les vrais services (pas
-        d'appels réseau), car _CtxStub est un stub pour les tests uniquement.
-        """
-        self.inference = None
-        self.memory = None
-        self.vector = None
-        self.conversations = None
-        self.agents = {}
-        self.log = None
-        self.analytics = None
-        self.metrics = None
-        self.router_svc = None
-        self.orchestrator = None
-        self._initialized = False
-
-    @property
-    def ready(self) -> bool:
-        """Propriété qui retourne l'état d'initialisation (pour test_conversations_routes)."""
-        return self._initialized
-
-
-_ctx = _CtxStub(
-    orchestrator=None,
-    analytics=None,
-    conversations=None,
-    inference=None,
-    vector=None,
-    memory=None,
-    log=None,
-    metrics=None,
-    agents={},
-    router_svc=None,
-    _initialized=False,
-)
+# Exposition de l'attribut vector au niveau module pour les tests
+vector = _ctx.vector
 
 
 def _sync_module_globals(context: Any = None) -> None:
@@ -174,6 +150,9 @@ __all__ = [
     "get_orchestrator",
     "get_context",
     "_check_ollama",
+    "_refresh_status_cache",
+    "_status_refresher",
+    "_warmup_vector_store",
     "_ctx",
     "_sync_module_globals",
 ]

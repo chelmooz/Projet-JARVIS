@@ -29,9 +29,14 @@ def get_settings() -> dict:
 @router.put("/api/settings")
 def update_settings(body: SettingsUpdate) -> dict:
     """Met à jour une clé de préférence (ex: offline)."""
+    from services.selector import _prefs_cache
+
     prefs = read_preferences()
     prefs[body.key] = body.value
     write_json_atomic(PREFERENCES_FILE, prefs, indent=4)
+    # Invalide le cache pour que les lectures suivantes voient la nouvelle valeur
+    _prefs_cache._mtime = 0.0
+    _prefs_cache._cache.clear()
     return {"ok": True, "key": body.key, "value": body.value}
 
 

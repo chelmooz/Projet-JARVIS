@@ -12,6 +12,35 @@ def _get_client():
     import os
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    # Reset prefs file + cache pour éviter les pollutions inter-tests
+    from config.paths import PREFERENCES_FILE
+    from services.file_utils import write_json_atomic
+    write_json_atomic(PREFERENCES_FILE, {"offline": False})
+    from services.selector import _prefs_cache
+    _prefs_cache._mtime = 0.0
+    _prefs_cache._cache.clear()
+
+    class FakeInference:
+        def is_available(self, model): return True
+        def resolve_model(self, model): return model
+        def query(self, prompt, model, **kw): return {"response": "ok", "model": model}
+        def query_multimodal(self, model, task, image): return {"response": "vision ok", "model": model}
+        def embed(self, texts): return [[0.0]*384 for _ in texts]
+        def list_models(self): return ["qwen2.5:latest"]
+        def first_available(self): return "qwen2.5:latest"
+        def select_backend(self, name): return None
+        def get_active_backend(self): return "ollama"
+
+    from unittest.mock import MagicMock
+    import controllers.context as ctx_mod
+    ctx_mod._ctx.inference = FakeInference()
+    ctx_mod._ctx.orchestrator = MagicMock()
+    ctx_mod._ctx.orchestrator.run.return_value = {
+        "response": "ok", "agent": "dev", "model": "qwen2.5:latest"
+    }
+    ctx_mod._ctx.analytics = MagicMock()
+    ctx_mod._ctx.analytics.track_query = MagicMock()
     from controllers.router import app
     return TestClient(app)
 
@@ -50,7 +79,10 @@ class TestOfflineEnforcement:
         """Once set, offline mode should persist until explicitly disabled."""
         client = _get_client()
         client.put('/api/settings', json={'key': 'offline', 'value': True})
-        prefs = read_preferences()
+        from config.paths import PREFERENCES_FILE
+        import json
+        with open(PREFERENCES_FILE, encoding="utf-8") as f:
+            prefs = json.load(f)
         assert prefs.get("offline") is True
         self._reset_offline(client)
 

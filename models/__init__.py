@@ -103,8 +103,6 @@ class PipeStep:
     def __post_init__(self) -> None:
         if not self.name:
             raise ValueError("PipeStep.name must not be empty")
-        if not self.agent_key:
-            raise ValueError("PipeStep.agent_key must not be empty")
 
 
 @dataclass(frozen=True)

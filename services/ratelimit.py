@@ -21,6 +21,23 @@ MAX_REQUESTS = 500
 WINDOW = 60  # Fenêtre glissante en secondes
 
 
+def _purge_stale() -> int:
+    """Nettoie les IPs sans activité depuis plus de WINDOW secondes.
+
+    Retourne le nombre d'IPs purgées. Appel possible depuis un thread
+    d'arrière-plan ou entre deux requêtes.
+    """
+    now = time.time()
+    cutoff = now - WINDOW
+    purged = 0
+    with _lock:
+        stale = [ip for ip, ts in _hits.items() if not any(t > cutoff for t in ts)]
+        for ip in stale:
+            del _hits[ip]
+            purged += 1
+    return purged
+
+
 def check_rate_limit(client_ip: str) -> Tuple[bool, int]:
     """Vérifie si l'IP n'a pas dépassé le quota de MAX_REQUESTS requêtes par WINDOW secondes.
 

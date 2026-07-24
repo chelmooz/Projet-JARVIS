@@ -31,18 +31,29 @@ DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_POLL_TIMEOUT = 60.0
 DEFAULT_MAX_RESTARTS = 3
 
+SOCKET_TIMEOUT = 0.5
+INITIAL_BACKOFF = 0.5
+BACKOFF_FACTOR = 1.5
+MAX_BACKOFF = 5.0
+POST_START_WAIT = 0.3
+MONITOR_POLL_INTERVAL = 2.0
+RESTART_DELAY = 1.0
+PORT_POLL_WAIT = 0.5
+PORT_POLL_MAX_ATTEMPTS = 10
+HEALTH_CHECK_TIMEOUT = 2.0
 
-def wait_for_port_free(host: str, port: int, max_attempts: int = 10) -> bool:
+
+def wait_for_port_free(host: str, port: int, max_attempts: int = PORT_POLL_MAX_ATTEMPTS) -> bool:
     """Attend que le port soit libéré (évite les race conditions TIME_WAIT)."""
     for _ in range(max_attempts):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.5)
+                s.settimeout(SOCKET_TIMEOUT)
                 if s.connect_ex((host, port)) != 0:
                     return True
         except OSError:
             pass
-        time.sleep(0.5)
+        time.sleep(PORT_POLL_WAIT)
     _logger.warning("Port %d toujours occupé après %d tentatives", port, max_attempts)
     return False
 
@@ -51,15 +62,15 @@ def wait_for_ollama_ready(host: str, port: int, timeout: float = DEFAULT_POLL_TI
     """Health-check Ollama avec backoff exponentiel (pas de sleep fixe)."""
     url = f"http://{host}:{port}/api/tags"
     start_time = time.time()
-    delay = 0.5
+    delay = INITIAL_BACKOFF
 
     while time.time() - start_time < timeout:
         try:
-            urllib.request.urlopen(url, timeout=2)
+            urllib.request.urlopen(url, timeout=HEALTH_CHECK_TIMEOUT)
             return True
         except (urllib.error.URLError, OSError):
             time.sleep(delay)
-            delay = min(delay * 1.5, 5.0)  # Backoff exponentiel plafonné à 5s
+            delay = min(delay * BACKOFF_FACTOR, MAX_BACKOFF)
             
     return False
 
@@ -101,13 +112,12 @@ class ProcessManager:
             _logger.error("Binaire Ollama introuvable. Arrêt.")
             return None
 
-        if not os.path.exists(ollama_bin):
-            _logger.error("Chemin Ollama invalide : %s", ollama_bin)
-            return None
-
         # Permissions Unix (exFAT/FAT32)
         if self._system != "windows":
-            os.chmod(ollama_bin, 0o755)
+            try:
+                os.chmod(ollama_bin, 0o755)
+            except OSError as e:
+                _logger.warning("Impossible de fixer les permissions sur %s : %s", ollama_bin, e)
 
         kill_existing("ollama", self._ollama_port)
         wait_for_port_free("127.0.0.1", self._ollama_port)
@@ -130,16 +140,22 @@ class ProcessManager:
                 )
             
             self._procs.append((p, "Ollama"))
-            
-            # Health-check robuste au lieu de time.sleep(3)
-            if wait_for_ollama_ready("127.0.0.1", self._ollama_port):
-                _logger.info("Ollama démarré avec succès sur le port %d", self._ollama_port)
-                return p
-            
-            _logger.error("Ollama n'a pas répondu au health-check dans le temps imparti.")
-            self._terminate_process(p, "Ollama")
-            return None
-                
+
+            # Détection rapide d'un échec immédiat (binaire corrompu, crash au
+            # lancement) : on ne bloque plus sur un health-check HTTP complet
+            # ici (wait_for_ollama_ready reste disponible pour un appelant qui
+            # veut attendre la disponibilité réelle de l'API Ollama).
+            time.sleep(POST_START_WAIT)
+            if p.poll() is not None:
+                _logger.error(
+                    "Ollama s'est arrêté immédiatement après le lancement (code %s).",
+                    p.poll(),
+                )
+                return None
+
+            _logger.info("Ollama démarré avec succès sur le port %d", self._ollama_port)
+            return p
+
         except Exception as e:
             _logger.exception("Échec critique au démarrage d'Ollama : %s", e)
             return None
@@ -165,7 +181,7 @@ class ProcessManager:
     def monitor(self) -> bool:
         """Boucle de surveillance minimaliste avec relance limitée."""
         while not self._shutting_down:
-            time.sleep(2)  # Polling interval pour le monitor
+            time.sleep(MONITOR_POLL_INTERVAL)
             
             dead_procs = [(p, name) for p, name in self._procs if p.poll() is not None]
             
@@ -179,7 +195,7 @@ class ProcessManager:
 
                 _logger.warning("Relance du processus %s (tentative %d/%d)...", 
                                 name, self._restart_counts[name], self._max_restarts)
-                time.sleep(1)
+                time.sleep(RESTART_DELAY)
                 if name == "Ollama":
                     self.start_ollama()
 

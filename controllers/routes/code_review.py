@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from controllers.responses import ok
+from controllers.responses import fail, ok
 from services.analysis import Analyzer as CodeReviewAnalyzer
+from services.file_system import FileSystemService
 
 router = APIRouter()
+_fs = FileSystemService()
 
 
 def get_analyzer() -> CodeReviewAnalyzer:
@@ -20,10 +22,9 @@ def review_file(
     path: str = Query(..., description="Chemin absolu du fichier Python"),
     analyzer: CodeReviewAnalyzer = Depends(get_analyzer),
 ):
-    """Revue complète sécurité + performance + maintenabilité d'un fichier Python.
-
-    Laisse sync : analyse disque/CPU bloquant (lecture + parse du fichier).
-    """
+    """Revue complète sécurité + performance + maintenabilité d'un fichier Python."""
+    if not _fs.authorize_path(path):
+        return fail("Chemin non autorisé (hors sandbox)", status_code=403)
     report = analyzer.review_file(path)
     return ok(report)
 
@@ -33,10 +34,9 @@ def review_project(
     path: str = Query(".", description="Chemin du répertoire racine"),
     analyzer: CodeReviewAnalyzer = Depends(get_analyzer),
 ):
-    """Revue de tous les fichiers Python d'un projet.
-
-    Laisse sync : analyse complète (lecture/parse de tous les fichiers, CPU/IO).
-    """
+    """Revue de tous les fichiers Python d'un projet."""
+    if not _fs.authorize_path(path):
+        return fail("Chemin non autorisé (hors sandbox)", status_code=403)
     results = analyzer.analyze_project(path)
     if not results:
         return ok({"files": 0, "total_findings": 0, "average_score": 100.0, "reports": []})

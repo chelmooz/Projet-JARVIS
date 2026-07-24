@@ -65,9 +65,9 @@ def add_message(
     try:
         context.conversations.add_message(conv_id, body.role, body.content)
         return ok({"status": "ok"})
-    except Exception as e:  # noqa: BLE001 - défensif
-        _logger.warning("Échec ajout message conv %s: %s", conv_id, e)
-        return fail(str(e), status_code=500)
+    except Exception:
+        _logger.warning("Échec ajout message conv %s", conv_id, exc_info=True)
+        return fail("Erreur interne lors de l'ajout du message", status_code=500)
 
 
 @router.get("/api/conversations")

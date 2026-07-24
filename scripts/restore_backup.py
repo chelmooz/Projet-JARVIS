@@ -12,6 +12,7 @@ Usage:
 import argparse
 import datetime
 import json
+import logging
 import os
 import shutil
 import sys
@@ -21,6 +22,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import config.paths as paths
 from services.file_utils import read_json, write_json_atomic
+
+_logger = logging.getLogger(__name__)
 
 # Sous-dossiers restaures vers la racine du projet
 SOURCE_SUBDIRS = ["memory", "logs", "config"]
@@ -40,6 +43,7 @@ def get_backup_dir(arg: str | None = None) -> str:
         from scripts.schedule_backup import BACKUP_DIR
         return BACKUP_DIR
     except Exception:
+        _logger.warning("Impossible d'importer BACKUP_DIR depuis schedule_backup, fallback backups/")
         return os.path.join(paths.ROOT, "backups")
 
 

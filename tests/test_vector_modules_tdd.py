@@ -4,6 +4,7 @@ Chaque responsabilite devient un module independant ; VectorService reste une
 façade fine qui delegate. Le contrat public + l'acces a v._data sont preserves
 (tests existants y accedent).
 """
+import config.constants as constants
 from services import vector as vector_mod
 
 import numpy as _np
@@ -52,7 +53,7 @@ class TestVectorEmbedderExtraction:
         from services.vector_embedder import Embedder
         emb = Embedder(inference_service=_FakeInference())
         out = emb.embed("texte de test")
-        assert len(out) == 768
+        assert len(out) == constants.EMBEDDING_DIM
         assert isinstance(out, list)
         assert all(isinstance(v, float) for v in out)
 

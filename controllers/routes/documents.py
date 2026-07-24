@@ -14,7 +14,7 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from controllers.context import get_app_context
+from controllers.context import get_app_context, _ctx
 from controllers.di import AppContext
 from controllers.responses import ok
 from models.schemas import IngestRequest
@@ -24,6 +24,9 @@ from services.vector import EXPECTED_MODEL
 _logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Exposition au niveau module
+_ctx = _ctx  # Rend le symbole explicitement accessible via documents._ctx
 BATCH_SIZE = 5
 SEARCH_MAX_LIMIT = 100
 

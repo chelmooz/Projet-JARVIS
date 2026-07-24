@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 
 def audit_log(log_service: Any | None, level: str, message: str) -> None:
@@ -18,8 +21,10 @@ def audit_log(log_service: Any | None, level: str, message: str) -> None:
         message: Message à journaliser.
     """
     if log_service is not None:
-        with contextlib.suppress(Exception):
+        try:
             log_service.log(level, message)
+        except Exception:
+            _logger.warning("Audit log échoué (niveau=%s): %s", level, message)
 
 
 __all__ = ["audit_log"]

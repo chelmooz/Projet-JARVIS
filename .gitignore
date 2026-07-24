@@ -39,6 +39,10 @@ logs/
 fix_test.py
 pytest_*.txt
 tree.txt
+_proof_status.py
+
+# --- Configuration runtime ---
+config/model_preferences.json
 
 # --- IDE / OS ---
 .vscode/
