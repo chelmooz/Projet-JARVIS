@@ -39,7 +39,6 @@ def test_requirements_runtime_has_no_dev_tools():
         assert pkg not in text, f"{pkg} ne doit pas etre dans requirements.txt"
 
 
-def test_requirements_dev_contains_dev_tools():
-    text = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8", errors="replace")
-    for pkg in ("pytest", "pytest-cov", "coverage", "ruff"):
-        assert pkg in text, f"{pkg} doit etre dans requirements-dev.txt"
+# requirements-dev.txt a été supprimé (chore: doublons/contradictions ADR-003) :
+# les dépendances de dev vivent désormais uniquement dans pyproject.toml,
+# sous [project.optional-dependencies].dev (pytest, pytest-cov, ruff).

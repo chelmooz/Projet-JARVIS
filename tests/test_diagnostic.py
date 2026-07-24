@@ -1,7 +1,7 @@
 """Tests DiagnosticService — 8 checks + rapport + recommandations."""
 import pytest
 
-from services.diagnostic import DiagnosticService
+from services.diagnostics import DiagnosticService
 
 
 def _mock_full_results():

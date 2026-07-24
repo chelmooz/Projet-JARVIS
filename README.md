@@ -571,6 +571,16 @@ python scripts/restore_backup.py --check backups/jarvis-backup-XXXXXXXX_XXXXXX.z
 
 > Les dossiers sources absents (ex. `logs/` pas encore créé) sont ignorés proprement, sans faire échouer la sauvegarde.
 
+Pour automatiser : `python scripts/schedule_backup.py --interval daily` (tâche planifiée
+Windows / cron selon l'OS). Pour un instantané complet de l'environnement (portable_python
++ bin + venv + config + modèles), avec rollback possible sur clef USB :
+
+```bash
+python scripts/build_snapshot.py create --archive
+```
+
+Détails complets : [docs/restauration.md](docs/restauration.md).
+
 ---
 
 ## 💻 Développement avec OpenCode

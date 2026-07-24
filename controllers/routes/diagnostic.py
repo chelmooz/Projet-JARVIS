@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from services.diagnostic import DiagnosticService
+from services.diagnostics import DiagnosticService
 
 router = APIRouter()
 

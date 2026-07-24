@@ -1,8 +1,6 @@
-"""Compatibilité ascendante : réexport de DiagnosticService.
+"""Réexport de DiagnosticService.
 
-Permet les deux formes d'import :
-  - ``from services.diagnostics import DiagnosticService``
-  - ``from services.diagnostic import DiagnosticService`` (via façade)
+Import : ``from services.diagnostics import DiagnosticService``
 """
 
 from __future__ import annotations
