@@ -18,8 +18,10 @@ from controllers.context import get_app_context, _ctx
 from controllers.di import AppContext
 from controllers.responses import ok
 from models.schemas import IngestRequest
+from services.chunker import chunk_text
 from services.sanitize import scrub
 from services.vector import EXPECTED_MODEL
+from config.constants import CHUNK_SIZE, CHUNK_OVERLAP
 
 _logger = logging.getLogger(__name__)
 
@@ -100,17 +102,22 @@ def vectorize_conversations(context: AppContext = Depends(get_app_context)):
 
 @router.post("/api/ingest")
 def ingest_documents(body: IngestRequest, context: AppContext = Depends(get_app_context)):
-    """Ingeste des documents bruts dans le store vectoriel."""
+    """Ingeste des documents bruts dans le store vectoriel (chunking sémantique)."""
     if not body.documents:
         return JSONResponse({"error": "Liste 'documents' vide", "ingested": 0}, status_code=400)
     pairs = []
     for doc in body.documents:
         if doc.text:
-            metadata = doc.metadata or {}
-            metadata["source"] = body.source
-            pairs.append((doc.text, metadata))
+            base_meta = doc.metadata.copy()
+            base_meta["source"] = body.source
+            doc_id = base_meta.get("doc_id", "")
+            chunks = chunk_text(doc.text, CHUNK_SIZE, CHUNK_OVERLAP, doc_id=doc_id)
+            for c in chunks:
+                meta = base_meta.copy()
+                meta.update(c["metadata"])
+                pairs.append((c["text"], meta))
     context.vector.index_batch(pairs)
-    context.log.log("INFO", "Ingested %d documents from '%s'", len(pairs), body.source)
+    context.log.log("INFO", "Ingested %d chunks from %d documents ('%s')", len(pairs), len(body.documents), body.source)
     return ok({"ingested": len(pairs)})
 
 

@@ -92,6 +92,13 @@ BAD_COUNT_PRUNING_THRESHOLD: Final[int] = 3
 
 MAX_ADAPTIVE_ATTEMPTS: Final[int] = 3
 
+# ---------------------------------------------------------------------------
+# Chunking sémantique (D8)
+# ---------------------------------------------------------------------------
+
+CHUNK_SIZE: Final[int] = 500
+CHUNK_OVERLAP: Final[int] = 50
+
 if not (WEIGHT_MIN < WEIGHT_MAX):
     raise ValueError(f"WEIGHT_MIN ({WEIGHT_MIN}) must be < WEIGHT_MAX ({WEIGHT_MAX})")
 

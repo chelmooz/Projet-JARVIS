@@ -1,5 +1,5 @@
 # Micro-tâches Projet JARVIS — TDD + Audit
-Dernière mise à jour : 24/07/2026 (session #11 — Phase S + Phase 7 ADR-008)
+Dernière mise à jour : 24/07/2026 (session #12 — D8 chunking sémantique)
 
 ## Légende
 - ✅ = Terminé
@@ -531,3 +531,17 @@ Dernière mise à jour : 24/07/2026 (session #11 — Phase S + Phase 7 ADR-008)
 - ✅ `node -c static/assets/js/app.js` : Syntaxe JS valide
 - ✅ Tests backend : 57 passed, 0 failed
 - Commit : `feat(frontend): branche upload document dans l'onglet Analytics (D6)`
+
+---
+## Session #12 — D8 Chunking sémantique + overlap
+### Date : 24/07/2026
+
+### D8 — Découpage sémantique des documents avant ingestion
+- ✅ `services/chunker.py` : `chunk_text()` pure function (paragraphes → phrases → overlap 50)
+- ✅ `config/constants.py` : ajout `CHUNK_SIZE=500`, `CHUNK_OVERLAP=50`
+- ✅ `controllers/routes/documents.py` : `ingest_documents()` applique chunking avant `index_batch()`
+- ✅ `tests/test_chunker.py` : 7 tests (court, long, overlap, metadata doc_id, metadata index, vide, whitespace)
+- ✅ `pytest tests/test_chunker.py -q` : **7 passed**
+- ✅ `pytest tests/test_api.py::TestDocuments tests/test_documents_no_dead_log.py -q` : **12 passed** (régression zéro)
+- ✅ `pytest tests/test_chunker.py tests/test_api.py::TestDocuments tests/test_documents_no_dead_log.py tests/test_vector.py tests/test_vector_feedback.py tests/test_endpoints_async.py -q --tb=short` : **84 passed, 0 failed**
+- Commit : `feat(ingestion): chunking sémantique avec overlap avant indexation (D8)`
