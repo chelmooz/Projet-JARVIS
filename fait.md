@@ -409,4 +409,36 @@ Dernière mise à jour : 24/07/2026 (session #4 — pré-déploiement)
 - `services/ollama_installer.py` (Phase 6 : 1 modification)
 - `services/system.py` (Phase 6 : 1 modification)
 - `launchers/JARVIS.sh` (Phase 6 : 1 modification)
+- `scripts/backup.ps1` (créé)
+- `scripts/backup.sh` (créé)
 - `fait.md` (mise à jour)
+
+---
+## Session #10 — Backup (25/07/2026)
+
+### MT-B1 : Créer `scripts/backup.ps1` (Windows PowerShell)
+- ✅ `Compress-Archive` de `memory/`, `logs/`, `config/` → `backups/jarvis-backup-YYYYMMDD_HHMMSS.zip`
+- ✅ Paramètre `-WhatIf` pour dry-run
+- ✅ Paramètre `-Destination` pour surcharger le répertoire de sortie
+- ✅ Gestion des dossiers sources absents (graceful exit)
+- ✅ Test : dry-run OK + backup réel OK (44 KB)
+
+### MT-B2 : Créer `scripts/backup.sh` (Linux/Mac)
+- ✅ `tar -czf` de `memory/`, `logs/`, `config/` → `backups/jarvis-backup-YYYYMMDD_HHMMSS.tar.gz`
+- ✅ Paramètre `--dry-run` pour simulation
+- ✅ Paramètre positionnel pour le répertoire de destination
+- ✅ Gestion des dossiers sources absents (graceful exit)
+
+### Validation end-to-end
+- ✅ `backup.ps1` → archive ZIP
+- ✅ `Expand-Archive` → restauration dans `.temp-restore/`
+- ✅ `python scripts/restore_backup.py --check` → "Integrite du backup validee (36 fichier(s))"
+- ✅ Nettoyage : `.temp-restore/` et archive supprimés
+- ✅ Suite complète : **724 passed, 0 failed, 43 skipped, 1 xfailed** — 0 régression
+
+### Impact audit
+| Couche | Avant | Après |
+|--------|-------|-------|
+| Stockage | 10/12 → **11/12** (+ backup scripté) |
+| Stabilité | 9/12 → **10/12** (+ restauration documentée) |
+| **Score estimé** | 72/100 → **~79/100** |

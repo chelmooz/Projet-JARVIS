@@ -1,122 +1,165 @@
-# ADR-008 : RAG d'amélioration continue pour les pipelines de diagnostic
 
-**Statut :** Proposé (non implémenté — descriptif pour amélioration future)
-**Date :** 24/07/2026
-**Décideur :** Michel
+---
 
-## Contexte
+## 2️⃣ Design System "ctOS par rubrique" — Maquette CSS
 
-JARVIS possède déjà une famille de pipelines de diagnostic métier, définis en
-YAML et exécutés par `services/pipeline.py` :
+Voici le CSS pour le thème "ctOS" appliqué **uniquement** à l'onglet Outils (🔧) :
 
-| Pipeline | Fichier | Fonction |
-|---|---|---|
-| `network_triage` | `config/pipelines/network_triage.yaml` | Analyse problème réseau → cause racine → script de correction |
-| `diagnostic_drone_vision` | `config/pipelines/diagnostic_drone_vision.yaml` | Image drone → diagnostic matériel → rapport |
-| `incident_response` | `config/pipelines/incident_response.yaml` | Incident sécu → analyse → remédiation → post-mortem |
-| `full_audit` | `config/pipelines/full_audit.yaml` | Audit système + réseau + sécurité |
-| `code_review` | `config/pipelines/code_review.yaml` | Script → revue de code → audit sécu |
-| `security_audit` | `config/pipelines/security_audit.yaml` | Audit sécurité dédié |
+```css
+/* ============================================================================
+   Thème ctOS — Onglet Outils uniquement (scope #tab-tools)
+   Inspiration Watch Dogs : scan de nœuds, terminal vert, topologie réseau
+   ========================================================================= */
 
-Ces pipelines existent et sont câblés (chargés et exécutés par
-`PipelineService`), mais fonctionnent en **enchaînement séquentiel de prompts
-LLM sans aucune mémoire des cas passés** : `services/pipeline.py` ne fait
-aucun appel à `services/vector.py`. Chaque diagnostic repart de zéro, même si
-un cas quasi identique a déjà été traité et corrigé la veille.
+/* Variables locales au thème ctOS */
+#tab-tools {
+  --ctos-cyan: #00f0ff;
+  --ctos-green: #00ff41;
+  --ctos-dark: #0a0f14;
+  --ctos-panel: rgba(10, 15, 20, 0.95);
+  --ctos-border: rgba(0, 240, 255, 0.3);
+  --ctos-scanline: rgba(0, 240, 255, 0.03);
+}
 
-En parallèle, une brique de recherche sémantique existe déjà
-(`services/vector.py`, `context["similar_cases"]`, consommée par
-`agents/base.py::_similar_cases_block`) mais n'est reliée à aucun de ces
-pipelines de diagnostic, et est aujourd'hui **cassée** (mismatch de clé
-`vector_results`/`similar_cases` dans `services/pipeline_steps.py`, cf. audit
-du 22/07/2026, chantier distinct déjà tracé dans `ROADMAP.md` Phase 3).
+/* Fond avec grille hexagonale subtile */
+#tab-tools .tools-area {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.05) 0%, transparent 50%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--ctos-scanline) 2px,
+      var(--ctos-scanline) 4px
+    ),
+    var(--ctos-dark);
+  position: relative;
+  overflow: hidden;
+}
 
-### Objectif initial (retracé de mémoire, ~4 mois de travail)
+/* Effet de scanline animé */
+#tab-tools .tools-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.1) 50%,
+    transparent 100%
+  );
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+}
 
-L'intention de départ était de s'inspirer du principe de
-[`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) : une
-boucle qui **mesure, garde ce qui améliore, jette ce qui n'améliore pas, et
-recommence**. Dans ce repo, la boucle porte sur des poids de modèle
-(fine-tuning). Le choix pour JARVIS était d'appliquer le même principe de
-boucle à la **récupération** (RAG) plutôt qu'au **fine-tuning** (QLoRA/PEFT
-Hugging Face), le corpus de documents disponible étant insuffisant pour un
-fine-tuning pertinent. Cette intention n'a jamais été implémentée sous cette
-forme : au fil des sessions de debug de l'existant, seule la brique de
-récupération passive (`similar_cases`) a été posée, sans la boucle de mesure
-qui en faisait l'intérêt — et cette brique elle-même s'est cassée en route.
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
 
-## Décision proposée
+/* Cartes de diagnostic — style "panneau de contrôle" */
+#tab-tools .tools-section {
+  background: var(--ctos-panel);
+  border: 1px solid var(--ctos-border);
+  border-left: 3px solid var(--ctos-cyan);
+  border-radius: 4px;
+  padding: 16px;
+  position: relative;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+  transition: all 0.3s ease;
+}
 
-Construire une boucle d'amélioration continue **au-dessus** des pipelines de
-diagnostic existants, sans toucher aux poids du modèle :
+#tab-tools .tools-section:hover {
+  border-left-color: var(--ctos-green);
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+  transform: translateX(4px);
+}
 
-### 1. Capitalisation (après chaque exécution de pipeline diagnostic)
-- À la fin d'un pipeline (`network_triage`, `incident_response`, etc.),
-  vectoriser le couple `(problème initial, diagnostic produit, correction
-  proposée)` dans l'index vectoriel existant (`services/vector.py`), avec les
-  métadonnées : pipeline_id, horodatage, feedback utilisateur (👍/👎 déjà
-  existant via `sendFeedback`/`sendImplicit`).
-- Réutilise l'infrastructure de vectorisation déjà présente
-  (`index_message`/`ingest_message`), pas de nouveau service à créer.
+/* Titres de section — style terminal */
+#tab-tools .tools-section h4 {
+  color: var(--ctos-cyan);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+  position: relative;
+}
 
-### 2. Récupération (au début d'un nouveau diagnostic)
-- Avant de lancer un pipeline, interroger `VectorService.search()` pour
-  retrouver les cas similaires déjà traités.
-- Injecter ces cas dans le prompt de la première étape du pipeline (déjà le
-  rôle prévu de `context["similar_cases"]` / `_similar_cases_block` — il
-  suffit de le câbler dans `services/pipeline.py`, qui ne l'appelle
-  actuellement pas).
-- **Pré-requis bloquant :** corriger d'abord le mismatch de clé
-  `vector_results`/`similar_cases` (chantier déjà identifié, Phase 3 du
-  ROADMAP existant) — cette étape ne peut pas être sautée.
+#tab-tools .tools-section h4::before {
+  content: '>';
+  color: var(--ctos-green);
+  margin-right: 8px;
+  animation: blink 1s infinite;
+}
 
-### 3. Mesure (le "val_bpb" de JARVIS)
-- Définir une métrique de qualité de diagnostic mesurable automatiquement,
-  par exemple : le feedback 👍/👎 déjà collecté, ou si un même problème
-  revient (`msg_count`/similarité élevée avec un cas récent marqué 👎 = signe
-  que la correction précédente n'a pas tenu).
-- Sans cette métrique, il n'y a pas de "garder/jeter" possible — c'est la
-  pièce manquante la plus critique, à spécifier avant tout code.
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
 
-### 4. Garder / jeter (consolidation orientée qualité)
-- `VectorService.consolidate()` existe déjà mais ne fait que du
-  dédoublonnage/élagage générique par poids et ancienneté — **pas** une
-  évaluation de pertinence diagnostic.
-- Étendre cette consolidation (ou créer une passe dédiée) pour repondérer les
-  cas vectorisés en fonction de la métrique du point 3 : renforcer les cas
-  qui ont mené à un 👍 durable, faire décroître ceux qui ont mené à un 👎 ou
-  une récidive.
+/* Items de diagnostic — style "ligne de log" */
+#tab-tools .tools-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+}
 
-## Conséquences
+#tab-tools .tools-item:last-child {
+  border-bottom: none;
+}
 
-- ✅ Répond à la contrainte initiale (corpus trop petit pour QLoRA/PEFT) sans
-  changer d'approche technique.
-- ✅ Réutilise à 100% l'infrastructure déjà posée (vector.py, feedback,
-  pipelines YAML) — pas de nouveau service lourd.
-- ⚠️ Dépend strictement de la correction préalable du bug RAG existant
-  (Phase 3 du ROADMAP) — à faire avant, pas en parallèle.
-- ⚠️ Le point le plus flou à trancher avant tout code : la métrique de
-  qualité du point 3. Sans elle, cette ADR reste une intention, pas un plan
-  exécutable.
-- ❌ Ne pas confondre avec le fine-tuning : cette boucle n'améliore jamais le
-  modèle lui-même, seulement ce qu'on lui donne à lire.
+#tab-tools .tools-key {
+  color: var(--ctos-cyan);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
 
-## Modules impactés (si acceptée)
+#tab-tools .tools-val {
+  color: var(--ctos-green);
+  font-weight: 600;
+}
 
-- `services/pipeline.py` — brancher un appel `VectorService.search()` avant
-  la première étape, et un appel de vectorisation après la dernière.
-- `services/vector.py` — étendre `consolidate()` avec repondération par
-  feedback (ou nouvelle méthode dédiée).
-- `services/pipeline_steps.py` — corriger d'abord le mismatch de clé
-  (pré-requis, hors périmètre de cette ADR).
-- `config/pipelines/*.yaml` — pas de changement de structure a priori, la
-  récupération s'insère en amont sans modifier le format des steps.
+/* Statuts OK/HS — style "LED" */
+#tab-tools .tools-val::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  box-shadow: 0 0 10px currentColor;
+  animation: pulse-led 2s infinite;
+}
 
-## Voir aussi
+#tab-tools .tools-val:not(:contains('HS'))::before {
+  background: var(--ctos-green);
+  color: var(--ctos-green);
+}
 
-- ROADMAP.md, Phase 3 (bug RAG à corriger en premier).
-- ADR-005 (pipeline RAG runbooks — à réviser/remplacer, décrit un design
-  différent et un fallback histogramme aujourd'hui supprimé).
-- [karpathy/autoresearch](https://github.com/karpathy/autoresearch) — source
-  d'inspiration du principe mesurer/garder/jeter, appliqué ici à la
-  récupération plutôt qu'au fine-tuning.
+#tab-tools .tools-val:contains('HS')::before {
+  background: #ff0040;
+  color: #ff0040;
+}
+
+@keyframes pulse-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #tab-tools .tools-section {
+    margin-bottom: 12px;
+  }
+}
