@@ -7,6 +7,7 @@ Refacto SOLID / FastAPI Best Practices :
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
@@ -17,6 +18,8 @@ from controllers.di import AppContext
 from controllers.middlewares import _setup_middlewares
 from controllers.status import _refresh_status_cache, _status_refresher
 from controllers.warmup import _warmup_vector_store, lifespan
+
+_logger = logging.getLogger(__name__)
 
 # ==============================================================================
 # EXPORTS REQUIS PAR LES TESTS (Étape 4)
