@@ -1,5 +1,4 @@
 """Tests TDD extraction _run_tool -> CommandExecutor (SRP/KISS).
-
 Le contrat DiagnosticExtService._run_tool reste identique (tests existants
 l'appellent). On verifie que la logique est deleguee a un CommandExecutor
 aux responsabilites separees (resolution, args, subprocess, format, erreurs).
@@ -7,9 +6,7 @@ aux responsabilites separees (resolution, args, subprocess, format, erreurs).
 import os
 import sys
 import tempfile
-
 import yaml
-
 from services.diagnostic_ext import DiagnosticExtService
 from services.diagnostic_ext.executor import CommandExecutor
 
@@ -22,6 +19,7 @@ SAMPLE_CONFIG = {
             "platforms": ["win32", "linux"],
             "args": ["-a", "{device}"],
             "sha256": "",
+            "allowed_params": ["device"],  # ← AJOUT CRUCIAL : autorise la clé "device"
         },
     },
 }
@@ -30,12 +28,12 @@ SAMPLE_CONFIG = {
 class FakeLog:
     def __init__(self):
         self.entries = []
+
     def log(self, level, message):
         self.entries.append({"level": level, "message": message})
 
 
 class TestCommandExecutor:
-
     def setup_method(self):
         self.tmpdir = tempfile.mkdtemp()
         self.config_path = os.path.join(self.tmpdir, "tools.yaml")
