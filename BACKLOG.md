@@ -1,208 +1,146 @@
-# 📋 BACKLOG.md — Plan de Micro-Tâches TDD (mise à jour)
+# 📋 BACKLOG.md — Plan de Micro-Tâches TDD (audit du 25/07/2026)
 
 **Projet** : JARVIS Portable Edition v5.4
-**État** : Phases 1-7.3 + 7.5 + 7.6 complétées ✅ · 803 tests verts sur Linux ET Windows (0 failed, confirmé réel) · Score audit en progression
-**Objectif** : Passer à 90+/100 en corrigeant les HIGH restants (dont 7.4) + perf + polish
-**Règle d'or** : 1 micro-tâche = 1 fichier = 1 cycle RED/GREEN = 1 commit
+**État réel vérifié** : 805 tests passed / 0 failed / 40 skipped / 1 xfailed (803 initialement + 2 nouveaux tests ajoutés pour la tâche 7.4 ; 10.5 n'ajoute ni ne retire de tests, juste une réécriture)
+**Méthode d'audit** : relecture du BACKLOG.md précédent + grep/lecture du code réel derrière chaque item + relance de la suite de tests + `git log`/`git status`
+**Verdict global** : le projet est plus avancé que ce que disait le backlog sur la Perf (Phase 8), mais deux tâches "closes" cachent un résidu. Le reste (Phase 9 UX, Phase 10 Docs) est correctement décrit.
 
 ---
 
-## ✅ Phase 7 — Sécurité (partiellement close)
+## 🚨 0. Actions immédiates
 
-### 7.1 ✅ Path traversal — `code_review` (CLOSED)
-- Commit : `fix(security): sandbox path traversal dans code_review`
-- Fichiers modifiés : `controllers/routes/code_review.py`, `services/file_system.py`, `tests/conftest.py`
-- Durcissement cross-platform de `FileSystemService.authorize_path()`
-
-### 7.1.1 ✅ Fix TypeError `authorize_path` (Path vs str) (CLOSED)
-- **RED** : `pytest tests/test_file_system.py` → `test_secure_by_default_en_production` : `TypeError: Path.replace() takes 2 positional arguments but 3 were given` (`PROJECT_DIR` est un `Path`, passé tel quel à `authorize_path()` qui appelait `.replace("\\","/")` — collision avec `Path.replace()`, l'API de renommage de fichier)
-- **GREEN** : ajout de `path = str(path)` en tête de `authorize_path()` (`services/file_system.py`)
-- **Preuve** : `tests/test_file_system.py` 23/23 passed ; suite complète 802 passed / 0 failed / 40 skipped / 1 xfailed (vs 801/1 failed avant)
-- **Commit** : `fix(security): caste path en str dans authorize_path (TypeError Path.replace)`
-- Fichier modifié : `services/file_system.py`
-
-### 7.2 ✅ Path traversal — `kill_coding` (CLOSED)
-- Commit : `fix(security): confirme et teste la sandbox path traversal dans kill_coding`
-- Fichier modifié : `tests/test_security_path_traversal.py`
-- Les 3 endpoints étaient déjà sécurisés — 15 tests TDD ajoutés comme preuve
-
-### 7.3 ✅ Format string injection — `diagnostic_ext` (CLOSED)
-- Commit : `fix(security): élimine format string injection dans executor`
-- Fichiers modifiés : `services/diagnostic_ext/executor.py`, `tests/test_security_format_string.py`, `tests/test_diagnostic_ext_executor_tdd.py`
-- Substitution en passe unique via `re.sub` + whitelist `allowed_params` + regex stricte
-
-### 7.4 🔴 Error leakage vers le client (À FAIRE)
-- **Fichiers** : `controllers/routes/jarvis.py`, `agents.py`, `conversations.py`
-- **Problème** : Stack traces exposées au client
-- **RED** : `pytest tests/test_security_error_leakage.py` (à créer)
-- **GREEN** : Logger avec `exc_info=True`, retourner message générique
-- **Commit** : `fix(security): masque les stack traces côté client`
-
-### 7.5 ✅ Logging des bare excepts (CLOSED)
-- **Constat** : les 15 excepts listés en AUDIT_REPORT §8 étaient déjà loggés (fix antérieur non reflété dans ce backlog)
-- **RED réel** : garde-fou AST (`tests/test_no_silent_except.py::TestNoBareExceptPass`) a détecté 5 `except: pass` silencieux supplémentaires, hors de la liste §8 : `services/analysis_audit.py:327`, `services/launcher.py:54`, `services/vector.py:166`, `services/diagnostics/checks.py:54`, `services/diagnostics/checks.py:155`
-- **GREEN** : `_logger.debug(...)` ajouté sur les 5 (logger créé dans `analysis_audit.py`, absent avant) ; le garde-fou AST scanne désormais tout le code de prod en continu (anti-régression)
-- **Preuve** : suite complète 803 passed / 0 failed / 40 skipped / 1 xfailed (vs 802 avant, +1 = le nouveau test de garde-fou)
-- **Commit** : `fix(security): log les 5 except:pass silencieux restants + garde-fou AST anti-régression`
-- Fichiers modifiés : `services/analysis_audit.py`, `services/launcher.py`, `services/vector.py`, `services/diagnostics/checks.py`, `tests/test_no_silent_except.py`
-
-### 7.6 ✅ Régression Windows — `authorize_path` rejetait `PROJECT_DIR` lui-même (CLOSED)
-- **Cause racine** : Cas A (`re.match(r'^[A-Za-z]:', ...)`) s'appliquait sans condition d'OS. Sur Windows natif, tout chemin absolu légitime commence par une lettre de lecteur → rejet systématique, y compris `PROJECT_DIR`
-- **Fix** : garde `not IS_WINDOWS` (constante réutilisée depuis `config/paths.py`) — Cas A ne s'applique plus que sur Linux/macOS, seul OS où l'artefact décrit dans le commentaire d'origine existe
-- **Validation** : émulation `ntpath`/`PureWindowsPath` (pas de host Windows disponible ici) — `PROJECT_DIR` autorisé, `C:\Windows\System32` et temp externe correctement refusés hors sandbox
-- **Preuve** : suite complète Linux 803 passed / 0 failed (comportement inchangé sur Linux/macOS, `IS_WINDOWS=False`)
-- **Commit** : `fix(security): corrige le faux positif path-traversal sur lecteur Windows dans authorize_path`
-- Fichier modifié : `services/file_system.py`
-- **Confirmé en réel sur Windows** (commit `addb18e`) : 803 passed / 0 failed, les 23 échecs ont disparu
+### 0.1 ✅ Commit en attente — CLOSED (25/07/2026)
+- **Commit** : `docs: aligne README suite au retrait de .opencode/` (`2283b6b`)
 
 ---
 
-## 🪟 Historique — Régression Windows 7.6 (résolue)
+## ✅ Phase 7 — Sécurité
 
-- **25/07, commit `6a2e4fd`** : run réel Windows → 23 failed / 779 passed (vs 803/0 sur Linux, même commit) — cause racine : `authorize_path()` bloquait toute autorisation de dossier sous Windows, y compris légitime
-- **25/07, commit `addb18e`** : fix `services/file_system.py` appliqué + confirmé en réel Windows → 803 passed / 0 failed, identique à Linux
+### 7.1 → 7.6 : confirmés CLOSED, comportement inchangé en code (RAS)
 
-## ⚡ Phase 8 — Performance (RTOC+CoT)
+### 7.4 ✅ Error leakage — CLOSED (25/07/2026)
+`jarvis.py`, `agents.py`, `conversations.py` : déjà propres (vérifié, rien à faire).
 
-### 8.0 🔴 Outillage & Baseline
-- **Fichiers** : `scripts/profile_app.py` + `scripts/bench_runner.py`
-- **RED** : Profiler l'app mockée → identifier top 3 goulots
-- **GREEN** : Scripts de benchmark fonctionnels
-- **Commit** : `chore(perf): outillage de profilage`
+Fuite réelle trouvée et corrigée : **`controllers/routes/documents.py:83`** (`vectorize_conversations`) renvoyait `str(e)` brut au client dans `errors[]`.
+- **RED** : `tests/test_security_error_leakage.py` (créé) — 2 tests : pas de fuite du message brut + log serveur avec `exc_info=True`
+- **GREEN** : message générique côté client (`"Erreur interne lors de la vectorisation"`) + `_logger.error(..., exc_info=True)` côté serveur
+- **Preuve** : suite complète 805 passed / 0 failed / 40 skipped / 1 xfailed (vs 803 avant, +2 = les nouveaux tests)
+- **Commit** : `fix(security): masque le détail d'exception brut dans vectorize_conversations (documents.py)` (`7747ad2`)
 
-### 8.1 🔴 Inférence Ollama — connection pooling
-- **Fichier** : `services/adapters/ollama_adapter.py`
-- **Problème** : Client HTTP recréé à chaque appel
-- **RED** : `pytest tests/test_inference_perf.py` → P95 > 50ms
-- **GREEN** : `httpx.Client` singleton + timeout adaptatif
-- **Commit** : `perf(inference): connection pooling + timeout adaptatif`
+**`controllers/routes/pipelines.py:40`** : revu, non retenu comme fuite — `PipelineError` ne contient que des messages métier contrôlés (ex. `"Pipeline 'xyz' introuvable"`), aucun détail interne (chemin, stack, requête). Rien à faire.
 
-### 8.2 🔴 Vector Search — numpy vectorisé
-- **Fichier** : `services/vector_search.py`
-- **Problème** : Recherche O(N) naïve en Python
-- **RED** : `pytest tests/test_vector_perf.py` → P95 > 50ms sur 5k docs
-- **GREEN** : `numpy.dot` + `argsort` vectorisé
-- **Commit** : `perf(vector): recherche numpy vectorisée`
+---
 
-### 8.3 🔴 Vector Cache — LRU borné
-- **Fichier** : `services/vector_cache.py`
-- **Problème** : Pas de cache pour les embeddings fréquents
-- **RED** : `pytest tests/test_vector_cache.py` → hit rate < 70%
-- **GREEN** : Cache LRU avec `MAX_VECTOR_CACHE=32` + TTL
-- **Commit** : `perf(vector): cache LRU borné`
+## ⚡ Phase 8 — Performance (RTOC+CoT) — largement plus avancée que déclaré
 
-### 8.4 🔴 I/O Fichiers — `orjson` + batch writes
-- **Fichiers** : `services/file_utils.py`, `services/memory.py`
-- **Problème** : `json` stdlib lent, writes non batchés
-- **RED** : `pytest tests/test_io_perf.py` → P95 > 20ms
-- **GREEN** : `orjson` + batch writes + cache mémoire
+### 8.0 🔴 Outillage & Baseline — toujours à faire
+`scripts/profile_app.py` et `scripts/bench_runner.py` n'existent pas. Inchangé.
+
+### 8.1 ✅ Inférence Ollama — connection pooling — DÉJÀ FAIT (backlog disait 🔴)
+`services/adapters/ollama_adapter.py` a déjà un `httpx.Client(timeout=...)` en singleton (`self._http`, méthode `_get_http()`). Rien à coder.
+- Reste seulement à ajouter une preuve de perf : `tests/test_inference_perf.py` n'existe pas → si vous voulez la métrique P95, il faut créer le test, mais l'implémentation est bonne.
+
+### 8.2 ✅ Vector Search — numpy vectorisé — DÉJÀ FAIT (backlog disait 🔴)
+`services/vector_search.py` utilise déjà `np.argpartition` (O(N)) + `np.argsort` sur le top-k. Rien à coder.
+
+### 8.3 ✅ Vector Cache — LRU borné — DÉJÀ FAIT (backlog disait 🔴)
+`services/vector_cache.py` implémente déjà un `OrderedDict` avec `move_to_end` (LRU) + TTL (`VECTOR_CACHE_TTL_SECONDS = 300`). Rien à coder.
+
+### 8.4 🔴 I/O Fichiers — `orjson` + batch writes — TOUJOURS À FAIRE (confirmé)
+`services/file_utils.py` et `services/memory.py` utilisent encore `import json` (stdlib). Aucune trace d'`orjson`.
+- **RED** : `pytest tests/test_io_perf.py` (à créer)
+- **GREEN** : migrer vers `orjson` + batcher les écritures
 - **Commit** : `perf(io): orjson + batch writes + cache LRU`
 
-### 8.5 🔴 Validation E2E & Rapport
-- **Fichier** : `rapport_perf.md`
-- **RED** : Benchmark E2E sur 10 conversations complètes
-- **GREEN** : P95 < cible sur tous les endpoints
-- **Commit** : `docs(perf): rapport de performance final`
+### 8.5 🔴 Validation E2E & Rapport — toujours à faire
+`rapport_perf.md` n'existe pas.
+
+**→ Conclusion Phase 8** : 3 des 5 chantiers (8.1, 8.2, 8.3) sont déjà en production. Il ne reste réellement que l'outillage de profiling (8.0), l'I/O (8.4) et le rapport final (8.5). Le score "85 → 90" est probablement déjà acquis en pratique, juste pas mesuré/documenté.
 
 ---
 
-## 🎨 Phase 9 — Polish UX
+## 🎨 Phase 9 — Polish UX (confirmée, avec une nuance importante sur 9.1)
 
-### 9.1 🔴 Focus Trap complet (modals)
-- **Fichier** : `static/assets/js/app.js`
-- **Problème** : La tabulation peut sortir de la modale File Browser
-- **RED** : `pytest tests/test_modal_accessibility.py` → ajouter test focus trap
-- **GREEN** : Implémenter focus trap basique (cycle Tab/Shift+Tab)
-- **Commit** : `feat(ui): focus trap sur modale File Browser`
+### 9.1 🔴 Focus Trap complet (modals) — TOUJOURS À FAIRE, attention au faux positif
+`tests/test_modal_accessibility.py` existe et **passe**, mais son assertion est trop faible (`querySelectorAll` apparaît n'importe où dans `app.js`, donc le test est vert sans que la fonctionnalité existe). Vérification directe : **aucun handler `Tab`/`shiftKey` de cycle de focus n'existe** dans `app.js` — seule la fermeture par `Escape` est implémentée (MT-FE-2).
+- **Action recommandée** : renforcer le test (vérifier un vrai cycle Tab/Shift+Tab dans la modale) avant de le re-valider, puis implémenter le focus trap.
+- **Commit** : `feat(ui): focus trap réel sur modale File Browser + durcit le test`
 
-### 9.2 🔴 Skeleton Loaders — Skills & Analytics
-- **Fichier** : `static/assets/js/app.js`
-- **Problème** : Onglets Skills/Analytics sans feedback visuel
-- **RED** : `pytest tests/test_skeleton_loaders.py` → étendre aux 2 onglets
-- **GREEN** : Appeler `injectSkeletons()` dans `refreshSkills()` et `refreshAnalytics()`
-- **Commit** : `feat(ui): skeleton loaders sur Skills & Analytics`
+### 9.2 🔴 Skeleton Loaders — Skills & Analytics — confirmé toujours à faire
+`injectSkeletons()` est bien appelée dans `refreshAgents()` et `refreshTools()`, mais **pas** dans `refreshSkills()` ni `refreshAnalytics()`. Le test existant vérifie `>= 3` occurrences globales (déjà satisfait par les 2 usages existants), donc il ne détectera pas l'ajout — pensez à monter le seuil à 5 en même temps.
 
-### 9.3 🔴 Toasts animés (feedback mémoire)
-- **Fichiers** : `static/assets/js/app.js` + `static/assets/css/style.css`
-- **Problème** : Feedback 👍/👎 peu visible
-- **RED** : `pytest tests/test_toast_feedback.py`
-- **GREEN** : Toast de confirmation après clic feedback
-- **Commit** : `feat(ui): toast de confirmation feedback mémoire`
+### 9.3 🔴 Toasts animés (feedback mémoire) — confirmé toujours à faire
+Le système `toast()` existe et est utilisé ailleurs (assignation de modèle, erreurs réseau), mais **aucun appel `toast()` après les clics 👍/👎** (`fetch('/api/feedback', ...)` et `/api/feedback/implicit` ne déclenchent rien visuellement).
 
-### 9.4 🔴 Dark mode toggle (optionnel)
-- **Fichiers** : `static/assets/js/app.js` + `static/assets/css/style.css`
-- **Problème** : Pas de mode clair
-- **RED** : `pytest tests/test_theme_toggle.py`
-- **GREEN** : Bouton toggle + variables CSS `--bg`, `--text`
-- **Commit** : `feat(ui): toggle dark/light mode`
+### 9.4 🔴 Dark mode toggle — confirmé toujours à faire
+Les variables CSS (`--bg`, `--text`, etc.) existent mais un seul thème (sombre) est défini. Aucun toggle, aucune variante claire.
 
 ---
 
 ## 📝 Phase 10 — Docs & Maintenance
 
-### 10.1 🔴 Mise à jour ROADMAP.md
-- **Action** : Cocher MT-FE-2, MT-FE-3, MT-6.1, MT-6.2 + Phases 7.1/7.2/7.3
-- **Commit** : `docs: met à jour ROADMAP.md (Phases 6-9)`
+### 10.1 🟡 Mise à jour ROADMAP.md — partiellement fait
+`docs/dev-history/ROADMAP.md` reflète déjà un état "tout ✅" pour son propre périmètre (UI/Portabilité), mais ne mentionne pas les Phases 7-9 de ce backlog. À compléter plutôt qu'à recréer.
 
-### 10.2 🔴 CHANGELOG.md
-- **Action** : Documenter les commits récents (CSP, frontend, portabilité, sécurité sandbox)
-- **Commit** : `docs: CHANGELOG v5.4.1`
+### 10.2 🔴 CHANGELOG.md — à mettre à jour
+Le fichier existe et va jusqu'à la v5.2 (juillet 2026) mais ne documente pas les commits récents (sandbox sécurité 7.1-7.6, nettoyage `.opencode/`). Toujours pertinent.
 
-### 10.3 🔴 Suppression header `X-XSS-Protection` déprécié
-- **Fichier** : `controllers/middlewares.py`
-- **RED** : `pytest tests/test_security_headers.py`
-- **GREEN** : Retirer le header
-- **Commit** : `fix(security): retire header X-XSS-Protection déprécié`
+### 10.3 ✅ Header `X-XSS-Protection` — déjà résolu en pratique, nettoyage doc restant
+Vérification faite dans `controllers/middlewares.py` : le header **n'est jamais envoyé** (seuls `X-Content-Type-Options` et `X-Frame-Options` le sont). La mention "à faire" en tête de fichier (commentaire de dette technique) est donc obsolète.
+- **Reste à faire** : supprimer le commentaire de dette périmé + ajouter `tests/test_security_headers.py` en garde-fou anti-régression (aucun test ne protège ce comportement aujourd'hui)
+- **Commit** : `docs(security): nettoie le commentaire de dette X-XSS-Protection obsolète + garde-fou test`
 
-### 10.4 🔴 Remplacer `os.system("cls")` par `subprocess.run`
-- **Fichier** : `services/launcher.py`
-- **RED** : `pytest tests/test_launcher_subprocess.py`
-- **GREEN** : Utiliser `subprocess.run`
-- **Commit** : `fix(launcher): remplace os.system par subprocess.run`
+### 10.4 ✅ `os.system("cls")` → `subprocess.run` — DÉJÀ FAIT (backlog disait 🔴)
+Aucune occurrence d'`os.system` dans `services/launcher.py`. Rien à coder.
 
-### 10.5 🔴 Suppression stubs legacy
-- **Fichiers** : `controllers/context.py`, `controllers/router.py`
-- **RED** : `pytest tests/test_no_legacy_stubs.py`
-- **GREEN** : Supprimer les fonctions `_check_ollama` + `_sync_module_globals`
-- **Commit** : `refactor: supprime les stubs legacy`
+### 10.5 ✅ Suppression stubs legacy — CLOSED (25/07/2026)
+`_check_ollama` (dupliqué dans `context.py` ET `router.py` via `InferenceService.ping()`) et `_sync_module_globals` (no-op total, corps = `pass`) étaient du code mort : la vraie route `/api/status` utilise `router._build_status` (→ `context.inference.ping()` direct) et `controllers/status.py` a sa propre implémentation réelle (`OllamaAdapter._check_endpoint` sur le port portable), inchangée.
+- **RED/GREEN** : suppression des 2 stubs + réécriture de `tests/test_wave_a.py` (A4) pour tester le vrai `controllers.status._check_ollama()` (mock sur `OllamaAdapter._check_endpoint`) au lieu du stub mort ; mise à jour de `test_context_refactor.py`, `test_api.py`, `test_endpoints_async.py`, `test_profiling.py` (retrait des patches de compatibilité devenus inutiles)
+- **Preuve** : suite complète 805 passed / 0 failed / 40 skipped / 1 xfailed (inchangé, aucune régression)
+- **Commit** : `refactor: supprime les stubs legacy _check_ollama/_sync_module_globals (code mort)` (`4b00bac`)
+- Fichiers modifiés : `controllers/context.py`, `controllers/router.py`, `tests/test_wave_a.py`, `tests/test_context_refactor.py`, `tests/test_api.py`, `tests/test_endpoints_async.py`, `tests/test_profiling.py`
 
 ---
 
-## 📊 Ordre Recommandé (mise à jour)
+## 📊 Ordre Recommandé (mis à jour selon l'état réel)
 
-| Priorité | Phase | Durée estimée | Impact | État |
-|----------|-------|---------------|--------|------|
-| ✅ 1 | Phase 7.1-7.3 (+ fix 7.1.1) (Sécurité sandbox) | 3h | Score audit 72 → 80 | **CLOSED** |
-| 🔴 2 | Phase 7.4-7.5 (Sécurité résiduelle) | 2-3h | Score audit 80 → 85 | À faire |
-| 🟡 3 | Phase 8 (Performance) | 6-8h | UX + score audit 85 → 90 | À faire |
-| 🟢 4 | Phase 9 (Polish UX) | 2-3h | Score audit 90 → 92 | À faire |
-| 🔵 5 | Phase 10 (Docs) | 1-2h | Score audit 92 → 95 | À faire |
+| Priorité | Tâche | Effort estimé | Impact |
+|----------|-------|----------------|--------|
+| 🔴 1 | 9.2 Skeleton loaders Skills/Analytics | 30 min | UX rapide |
+| 🔴 2 | 9.3 Toasts feedback mémoire | 30 min | UX rapide |
+| 🔴 3 | 9.1 Focus trap réel (+ durcir le test existant) | 1-2h | Accessibilité |
+| 🔴 4 | 8.4 I/O `orjson` + batch writes | 2-3h | Perf |
+| 🔴 5 | 8.0 + 8.5 Outillage perf + rapport final | 2h | Mesure/doc |
+| 🟢 6 | 9.4 Dark mode toggle (optionnel) | 2h | UX confort |
+| 🔵 7 | 10.1 / 10.2 / 10.3 Docs (ROADMAP, CHANGELOG, nettoyage commentaire) | 1-2h | Doc |
 
----
-
-## ✅ Règles de Validation (rappel)
-
-1. **UNE micro-tâche = UN fichier = UN cycle RED/GREEN**
-2. **Preuve verte collée AVANT de cocher [x]**
-3. **Commit = point de retour sûr immédiat après le GREEN**
-4. **Ne PAS mélanger chantier Sécurité et chantier Perf**
-5. **Après tout collage de fichier Python : vider `__pycache__`**
-6. **Tests TDD : écrire le test AVANT le code (RED → GREEN → REFACTOR)**
-7. **Tout correctif touchant aux chemins/fichiers : valider sur Windows ET Linux (cross-platform)**
+**Déjà fait, rien à planifier** : 0.1 (commit README), 7.4 (fuite d'erreur documents.py), 8.1 (pooling Ollama), 8.2 (numpy vector search), 8.3 (LRU vector cache), 10.4 (subprocess.run), 10.5 (stubs legacy supprimés).
 
 ---
 
-## 🎯 Prochaine Action au Réveil
+## ✅ Règles de Validation (rappel, inchangées)
 
-Vérification déjà faite cette session : `git status` (RAS, seul bruit CRLF/LF sur fichiers non liés), `git log`, `pytest tests/ -q` → 802 passed / 0 failed / 40 skipped / 1 xfailed après le fix 7.1.1.
+1. UNE micro-tâche = UN fichier = UN cycle RED/GREEN
+2. Preuve verte collée AVANT de cocher [x]
+3. Commit = point de retour sûr immédiat après le GREEN
+4. Ne pas mélanger chantier Sécurité et chantier Perf
+5. Après tout collage de fichier Python : vider `__pycache__`
+6. Tests TDD : écrire le test AVANT le code
+7. Tout correctif touchant aux chemins/fichiers : valider sur Windows ET Linux
+
+---
+
+## 🎯 Prochaine Action
+
+Session du 25/07/2026 : 0.1, 7.4 et 10.5 traitées et committées (`7dd6401`, `05265fb`, `4b00bac`, patches fournis).
 
 ```bash
-# Démarrer Phase 7.4 (error leakage)
-# Ouvrir controllers/routes/jarvis.py
-# Écrire le test RED dans tests/test_security_error_leakage.py
+# Appliquer les 3 commits de cette session (si travail depuis l'archive zip)
+git am 0001-docs-aligne-README-suite-au-retrait-de-.opencode.patch
+git am 0002-fix-security-masque-le-d-tail-d-exception-brut-dans-.patch
+git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
+
+# Puis démarrer la prochaine tâche : 9.2 (skeleton loaders Skills/Analytics)
+# Ouvrir static/assets/js/app.js — ajouter injectSkeletons() dans
+# refreshSkills() et refreshAnalytics(), monter le seuil du test à 5
 ```
-
----
-
-**Bon repos !** 🌙
-Les 3 micro-tâches de sécurité les plus critiques (sandbox path traversal + format string injection) sont closes et testées, plus un bug réel trouvé et corrigé en cours de route (7.1.1). La suite (7.4/7.5) est plus légère — ce sont des nettoyages de stack traces et de bare excepts. Reprends tranquillement à la Phase 7.4. 💪
