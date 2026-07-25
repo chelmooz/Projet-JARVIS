@@ -14,8 +14,8 @@ import numpy as np
 
 
 def cosine_search(
-    query_vector: list[float] | np.ndarray, 
-    documents: list[dict[str, Any]], 
+    query_vector: list[float] | np.ndarray,
+    documents: list[dict[str, Any]],
     top_k: int = 5
 ) -> list[dict[str, Any]]:
     """Retourne les top_k documents les plus similaires à la requête.
@@ -37,14 +37,14 @@ def cosine_search(
     # 1. Préparation du vecteur de requête
     query_vec = np.asarray(query_vector, dtype=np.float32)
     query_dim = len(query_vec)
-    
+
     if query_dim == 0:
         return []
 
     # 2. Filtrage et extraction vectorisée (évite les allocations en boucle)
     valid_docs = []
     valid_embeddings = []
-    
+
     for doc in documents:
         emb = doc.get("embedding")
         # Vérification stricte de la dimension et de la nullité
@@ -58,23 +58,23 @@ def cosine_search(
     # 3. Calcul matriciel (BLAS optimisé)
     # Création d'une seule matrice 2D au lieu de milliers de vecteurs 1D
     embeddings_matrix = np.array(valid_embeddings, dtype=np.float32)
-    
+
     # Calcul des similarités (produit scalaire vectorisé)
-    # Note: Si les embeddings Ollama ne sont pas L2-normalisés, décommentez les 3 lignes suivantes 
+    # Note: Si les embeddings Ollama ne sont pas L2-normalisés, décommentez les 3 lignes suivantes
     # pour forcer une vraie similarité cosinus :
     # query_norm = np.linalg.norm(query_vec)
     # matrix_norms = np.linalg.norm(embeddings_matrix, axis=1)
     # similarities = (embeddings_matrix @ query_vec) / (matrix_norms * query_norm + 1e-8)
-    
+
     similarities = embeddings_matrix @ query_vec
 
     # 4. Extraction du Top-K optimisée (O(N) au lieu de O(N log N))
     k = min(top_k, len(valid_docs))
-    
+
     # argpartition place les k plus grands éléments à la fin (non triés)
     # Nous inversons les scores pour utiliser argpartition sur les plus grands
     top_indices = np.argpartition(-similarities, k - 1)[:k]
-    
+
     # On trie uniquement ces k éléments pour avoir un ordre décroissant parfait
     top_indices = top_indices[np.argsort(-similarities[top_indices])]
 

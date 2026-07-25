@@ -65,7 +65,7 @@ def preflight_check(logger: logging.Logger) -> bool:
 
 def _shutdown(pm, signum, frame) -> None:
     """Gestionnaire de signal pour l'arrêt propre (SIGINT/SIGTERM).
-    
+
     Appelle pm.stop_all(), puis sys.exit(0) quel que soit le résultat.
     """
     logger = logging.getLogger("JARVIS")

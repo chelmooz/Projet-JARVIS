@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ast
-from typing import Iterator
+from collections.abc import Iterator
 
 from services.analysis_core import (
     _MAX_BRANCHES,

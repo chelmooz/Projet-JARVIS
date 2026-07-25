@@ -92,18 +92,18 @@ class LogService(LogPort):
         try:
             with open(LOG_PATH, encoding="utf-8") as f:
                 content = f.read()
-            
+
             decoder = json.JSONDecoder()
             i = 0
             length = len(content)
-            
+
             while i < length:
                 # Sauter les espaces et séparateurs
                 while i < length and content[i] in " \t\n\r,":
                     i += 1
                 if i >= length:
                     break
-                
+
                 if content[i] == "{":
                     try:
                         obj, end = decoder.raw_decode(content, i)
@@ -119,7 +119,7 @@ class LogService(LogPort):
 
         if recovered:
             _logger.info("Log réparé : %d entrées récupérées sur fichier corrompu", len(recovered))
-        
+
         return recovered
 
 

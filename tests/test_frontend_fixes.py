@@ -29,14 +29,14 @@ def test_chartjs_update_or_create_exists():
 def test_no_spaces_in_html_attributes():
     """Vérifie qu'il n'y a pas d'espaces fautifs dans les attributs HTML (ex: class= \")."""
     app_js = Path("static/assets/js/app.js").read_text(encoding="utf-8")
-    
+
     # \s+ capture 1 ou plusieurs espaces (cible spécifiquement les erreurs comme class= ")
     invalid_patterns = [
         r'class=\s+"',      # class= "
         r'data-\w+=\s+"',   # data-xxx= "
         r'id=\s+"',         # id= "
     ]
-    
+
     for pattern in invalid_patterns:
         matches = re.findall(pattern, app_js)
         assert len(matches) == 0, f"Espaces fantômes détectés: {pattern} ({len(matches)} occurrences)"
@@ -49,14 +49,14 @@ def test_eschtml_used_in_rendermarkdown():
 def test_no_syntax_errors():
     """Vérifie qu'il n'y a pas d'erreurs de syntaxe JS dues à des espaces cassés."""
     app_js = Path("static/assets/js/app.js").read_text(encoding="utf-8")
-    
+
     # \s+ capture les espaces fautifs (ex: = > au lieu de =>)
     invalid_patterns = [
         r'=\s+>',            # = > (espace entre = et >)
         r'querySel\s+ectorAll', # querySel ectorAll
         r'a\s+wait\s+\w+',   # a wait
     ]
-    
+
     for pattern in invalid_patterns:
         matches = re.findall(pattern, app_js)
         assert len(matches) == 0, f"Erreur de syntaxe détectée: {pattern} ({len(matches)} occurrences)"

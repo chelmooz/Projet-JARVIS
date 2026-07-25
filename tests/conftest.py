@@ -49,13 +49,13 @@ def pytest_collection_modifyitems(config, items):
 class FakeInferenceService:
     def __init__(self):
         self.models = ["qwen2.5", "llama3.2-vision", "ornith-1.0-9b", "deepseek-coder-v2-lite-instruct"]
-    
+
     def resolve_model(self, model: str) -> str | None:
         return model if model in self.models else None
-    
+
     def list_models(self) -> list[str]:
         return self.models.copy()
-    
+
     def first_available(self) -> str | None:
         return self.models[0] if self.models else None
 
@@ -63,10 +63,10 @@ class FakeInferenceService:
 class FakeMemoryService:
     def __init__(self):
         self.habits = []
-    
+
     def get_habits(self) -> list:
         return self.habits.copy()
-    
+
     def update_habits(self, data: dict):
         self.habits.append(data)
 
@@ -86,7 +86,7 @@ class FakeVectorService:
 class FakeLogService:
     def __init__(self):
         self.logs = []
-    
+
     def log(self, level: str, message: str):
         self.logs.append((level, message))
 
@@ -94,10 +94,10 @@ class FakeLogService:
 class FakeAnalyticsService:
     def __init__(self):
         self.queries = []
-    
+
     def track_query(self, agent: str, model: str, latency_ms: float, success: bool):
         self.queries.append({
-            "agent": agent, "model": model, 
+            "agent": agent, "model": model,
             "latency_ms": latency_ms, "success": success
         })
 
@@ -106,13 +106,13 @@ class FakeConversationService:
     def __init__(self):
         self.messages = []
         self._on_message = None
-    
+
     def add_message(self, conv_id: str, role: str, content: str, **kwargs):
         msg = {"conv_id": conv_id, "role": role, "content": content, **kwargs}
         self.messages.append(msg)
         if self._on_message:
             self._on_message(msg)
-    
+
     def set_on_message(self, callback):
         self._on_message = callback
 
@@ -120,10 +120,10 @@ class FakeConversationService:
 class FakeMetricsService:
     def __init__(self):
         self.requests = 0
-    
+
     def incr_requests(self, endpoint: str):
         self.requests += 1
-    
+
     def get_metrics(self) -> dict:
         return {"requests": self.requests, "uptime": 0}
 
@@ -141,14 +141,14 @@ class FakeAgent:
     def __init__(self, name: str):
         self.name = name
         self.toolbox = None
-    
+
     def inject_toolbox(self, toolbox):
         self.toolbox = toolbox
-    
+
     def run(self, task: str, model: str, context: dict) -> dict:
         return {
-            "response": f"Fake response from {self.name}", 
-            "agent": self.name, 
+            "response": f"Fake response from {self.name}",
+            "agent": self.name,
             "model": model
         }
 
@@ -203,22 +203,22 @@ def fake_toolbox():
 
 
 @pytest.fixture
-def orchestrator(fake_inference, fake_memory, fake_vector, fake_log, 
-                 fake_analytics, fake_conversations, fake_metrics, 
+def orchestrator(fake_inference, fake_memory, fake_vector, fake_log,
+                 fake_analytics, fake_conversations, fake_metrics,
                  fake_agents, fake_router, fake_toolbox):
     """Orchestrateur câblé avec des Fakes (aucune dépendance externe)."""
     from services.orchestrator import OrchestratorService
     from graph import AgentGraph
-    
+
     def fake_graph_factory():
         graph = MagicMock(spec=AgentGraph)
         graph.run.return_value = {
-            "response": "Graph OK", 
-            "agent": "dev", 
+            "response": "Graph OK",
+            "agent": "dev",
             "model": "qwen2.5"
         }
         return graph
-    
+
     return OrchestratorService(
         inference=fake_inference,
         memory=fake_memory,
@@ -236,11 +236,11 @@ def orchestrator(fake_inference, fake_memory, fake_vector, fake_log,
 
 @pytest.fixture
 def app_context(orchestrator, fake_inference, fake_memory, fake_vector, fake_log,
-                fake_analytics, fake_conversations, fake_metrics, fake_agents, 
+                fake_analytics, fake_conversations, fake_metrics, fake_agents,
                 fake_router, fake_toolbox):
     """Contexte applicatif complet prêt pour les tests d'intégration."""
     from controllers.di import AppContext
-    
+
     ctx = AppContext()
     ctx.inference = fake_inference
     ctx.memory = fake_memory

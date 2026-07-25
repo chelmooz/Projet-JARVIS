@@ -106,19 +106,19 @@ class OllamaAdapter(LLMAdapter):
         # CORRECTION : Garde-fou immédiat
         if getattr(self, "_closed", False):
             raise RuntimeError(f"Ollama echec: adapter fermé, requete abandonnee sur {endpoint}")
-            
+
         timeout = timeout or self._load_timeout()
         t = httpx.Timeout(timeout, connect=1.0)
         last_error: Exception | None = None
-        
+
         for attempt in range(self._max_retries):
             # CORRECTION : Garde-fou dans la boucle (au cas où close() est appelé entre 2 tentatives)
             if getattr(self, "_closed", False):
                 break
-                
+
             # CORRECTION : Le client est récupéré À CHAQUE tentative, pas avant la boucle
             client = self._get_http()
-            
+
             try:
                 r = client.post(endpoint, json=payload, timeout=t)
                 r.raise_for_status()

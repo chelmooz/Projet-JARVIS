@@ -43,7 +43,7 @@ def review_project(
     # Robustesse : getattr pour gérer les objets dataclass ou dicts selon l'implémentation
     total_findings = sum(getattr(r, "total", 0) for r in results)
     avg_score = round(sum(getattr(r, "score", 0) for r in results) / len(results), 1)
-    
+
     return ok({
         "files": len(results),
         "total_findings": total_findings,

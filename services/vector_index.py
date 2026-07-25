@@ -34,7 +34,7 @@ class VectorIndex:
         self._data = data
         self._path = path
         self._lock = lock
-        
+
         # Index secondaire pour déduplication O(1) des textes
         # On utilise un hash pour éviter de stocker les textes en double en mémoire
         self._text_hashes: set[str] = set()
@@ -53,16 +53,16 @@ class VectorIndex:
 
     def add_document(self, text: str, metadata: dict[str, Any] | None = None) -> bool:
         """
-        Ajoute un document en mémoire (dedup O(1) par hash). 
+        Ajoute un document en mémoire (dedup O(1) par hash).
         Retourne True si ajouté, False si déjà présent.
         Note : Ne persiste pas automatiquement sur disque (appeler `save()` séparément).
         """
         text_hash = self._get_text_hash(text)
-        
+
         with self._lock:
             if text_hash in self._text_hashes:
                 return False  # Déjà présent
-            
+
             # Ajout sécurisé en mémoire
             self._data["documents"].append({
                 "text": text,
@@ -94,21 +94,21 @@ class VectorIndex:
         """
         if not os.path.exists(self._path):
             return {"documents": [], "embedding_dim": None}
-        
+
         try:
-            with open(self._path, 'r', encoding='utf-8') as f:
+            with open(self._path, encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             # Validation du schéma minimal
             if isinstance(data, dict) and "documents" in data:
                 # S'assurer que la clé embedding_dim existe pour la cohérence
                 data.setdefault("embedding_dim", None)
                 return data
             raise ValueError("Structure de données JSON invalide")
-                
+
         except (json.JSONDecodeError, OSError, ValueError) as e:
             _logger.critical(
-                "Fichier d'index vectoriel corrompu (%s). Sauvegarde et réinitialisation.", 
+                "Fichier d'index vectoriel corrompu (%s). Sauvegarde et réinitialisation.",
                 self._path
             )
             # Sauvegarde du fichier corrompu pour analyse forensique
@@ -119,7 +119,7 @@ class VectorIndex:
                     _logger.info("Fichier corrompu sauvegardé dans %s", backup_path)
             except OSError as backup_error:
                 _logger.error("Échec de la sauvegarde du fichier corrompu : %s", backup_error)
-            
+
             # Retourne un état vide mais schématiquement correct
             return {"documents": [], "embedding_dim": None}
 

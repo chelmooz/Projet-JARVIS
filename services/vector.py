@@ -67,7 +67,7 @@ __all__ = [
 
 class VectorService(VectorPort):
     """Index vectoriel local : orchestre indexation, embedding et recherche cosinus.
-    
+
     Thread-safe et résilient : toutes les mutations d'état sont protégées par un verrou,
     et les fichiers corrompus sont automatiquement sauvegardés avant réinitialisation.
     """
@@ -86,19 +86,19 @@ class VectorService(VectorPort):
             inference_service = InferenceService()
 
         os.makedirs(os.path.dirname(VECTOR_PATH), exist_ok=True)
-        
+
         self._lock = threading.RLock()
         self._inference = inference_service
         self._embedder = Embedder(inference_service)
         self._cache = VectorCache()
-        
+
         # Chargement sécurisé des données
         self._data = self._load_secure()
         self._index = VectorIndex(self._data, VECTOR_PATH, self._lock)
-        
+
         # Index secondaire pour déduplication O(1) des messages de conversation
         self._message_index = self._build_message_index()
-        
+
         # Migration de dimension
         self.last_migration = self._ensure_dimension()
 
@@ -122,20 +122,20 @@ class VectorService(VectorPort):
         """Charge les données avec gestion robuste des fichiers corrompus."""
         if not os.path.exists(VECTOR_PATH):
             return {"documents": [], "embedding_dim": None}
-        
+
         try:
-            with open(VECTOR_PATH, 'r', encoding='utf-8') as f:
+            with open(VECTOR_PATH, encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             if isinstance(data, dict) and "documents" in data:
                 _logger.info("Index vectoriel chargé avec succès (%d documents)", len(data["documents"]))
                 return data
             else:
                 raise ValueError("Structure de données invalide")
-                
+
         except (json.JSONDecodeError, OSError, ValueError) as e:
             _logger.critical(
-                "Fichier vectoriel corrompu (%s). Sauvegarde automatique vers %s", 
+                "Fichier vectoriel corrompu (%s). Sauvegarde automatique vers %s",
                 VECTOR_PATH, VECTOR_BACKUP_PATH
             )
             # Sauvegarde du fichier corrompu
@@ -145,7 +145,7 @@ class VectorService(VectorPort):
                     _logger.info("Fichier corrompu sauvegardé dans %s", VECTOR_BACKUP_PATH)
             except OSError as backup_error:
                 _logger.error("Échec de la sauvegarde du fichier corrompu : %s", backup_error)
-            
+
             # Retourne un état vide mais valide
             return {"documents": [], "embedding_dim": None}
 
@@ -247,39 +247,39 @@ class VectorService(VectorPort):
     # ==============================================================================
 
     def index_message(
-        self, 
-        conv_id: str, 
-        msg_id: str, 
-        role: str, 
-        content: str, 
+        self,
+        conv_id: str,
+        msg_id: str,
+        role: str,
+        content: str,
         ts: float,
         extra: dict[str, Any] | None = None
     ) -> None:
         """Indexe un message (dedup O(1) via index secondaire)."""
         if not content or not content.strip():
             return
-        
+
         with self._lock:
             # Vérification O(1) au lieu de O(N)
             if (conv_id, msg_id) in self._message_index:
                 return  # Déjà indexé
-            
+
             # Ajout du document
             doc = self._build_message_doc(conv_id, msg_id, role, content, ts, extra)
             self._data["documents"].append(doc)
-            
+
             # Mise à jour de l'index secondaire
             self._message_index[(conv_id, msg_id)] = True
-            
+
             self._save_secure()
 
     def _build_message_doc(
-        self, 
-        conv_id: str, 
-        msg_id: str, 
-        role: str, 
-        content: str, 
-        ts: float, 
+        self,
+        conv_id: str,
+        msg_id: str,
+        role: str,
+        content: str,
+        ts: float,
         extra: dict[str, Any] | None
     ) -> dict[str, Any]:
         """Construit un document de message standardisé."""
@@ -287,22 +287,22 @@ class VectorService(VectorPort):
             "text": content,
             "metadata": {
                 "source": "conversation",
-                "conv_id": conv_id, 
-                "msg_id": msg_id, 
+                "conv_id": conv_id,
+                "msg_id": msg_id,
                 "role": role,
-                "created_at": ts, 
-                "weight": 1.0, 
+                "created_at": ts,
+                "weight": 1.0,
                 **(extra or {}),
             },
             "embedding": None,
         }
 
     def ingest_message(
-        self, 
-        conv_id: str, 
-        msg_id: str, 
-        role: str, 
-        content: str, 
+        self,
+        conv_id: str,
+        msg_id: str,
+        role: str,
+        content: str,
         ts: float
     ) -> None:
         """Indexe un message et calcule son embedding (auto-ingest)."""
@@ -314,9 +314,9 @@ class VectorService(VectorPort):
     # ==============================================================================
 
     def adjust_weight(
-        self, 
-        conv_id: str, 
-        msg_id: str, 
+        self,
+        conv_id: str,
+        msg_id: str,
         delta: float,
         conversations: Any | None = None
     ) -> int:
@@ -324,15 +324,15 @@ class VectorService(VectorPort):
         with self._lock:
             wc = WeightConsolidator(self._data["documents"])
             count = wc.apply_weight(conv_id, msg_id, delta, WEIGHT_MIN, WEIGHT_MAX)
-            
+
             prev_id = wc.preceding_user_msg_id(conversations, conv_id, msg_id)
             if prev_id and delta:
                 count += wc.apply_weight(conv_id, prev_id, delta * 0.5, WEIGHT_MIN, WEIGHT_MAX)
-            
+
             if count:
                 self._save_secure()
                 self.clear_cache()
-            
+
             return count
 
     def update_score(self, chunk_id: str, delta: float) -> int:
@@ -364,36 +364,36 @@ class VectorService(VectorPort):
         """Consolidation hors ligne : dedup + prune + élagage des chunks toxiques (thread-safe)."""
         with self._lock:
             docs = self._data["documents"]
-            
+
             # MT 7.4 : Initialiser les métadonnées manquantes (backward compat)
             for d in docs:
                 metadata = d.get("metadata", {})
                 metadata.setdefault("score", 0.0)
                 metadata.setdefault("bad_count", 0)
-            
+
             wc = WeightConsolidator(docs)
-            
+
             to_remove = wc.dedup(CONSOLIDATE_DEDUP_SIMILARITY, CONSOLIDATE_MAX_ITER)
             kept = wc.prune(CONSOLIDATE_PRUNE_WEIGHT, CONSOLIDATE_GRACE_HOURS, self._now())
-            
+
             # MT 7.4 : élagage des chunks toxiques
             toxic_indices = set()
             for idx, d in enumerate(docs):
                 if idx in to_remove or d not in kept:
                     continue
-                
+
                 metadata = d.get("metadata", {})
                 score = float(metadata.get("score", 0.0))
                 bad_count = int(metadata.get("bad_count", 0))
-                
+
                 if bad_count > BAD_COUNT_PRUNING_THRESHOLD or score < SCORE_PRUNING_THRESHOLD:
                     toxic_indices.add(idx)
-            
+
             kept_docs = [
-                d for idx, d in enumerate(docs) 
+                d for idx, d in enumerate(docs)
                 if idx not in to_remove and d in kept and idx not in toxic_indices
             ]
-            
+
             # Limitation de la taille de l'index
             if len(kept_docs) > MAX_VECTOR_DOCS:
                 kept_docs.sort(
@@ -404,17 +404,17 @@ class VectorService(VectorPort):
                     reverse=True,
                 )
                 kept_docs = kept_docs[:MAX_VECTOR_DOCS]
-            
+
             self._data["documents"] = kept_docs
             self._data["last_consolidation"] = time.time()
             self._data.setdefault("consolidation_runs", 0)
             self._data["consolidation_runs"] += 1
-            
+
             self._save_secure()
-            
+
             # Reconstruction de l'index secondaire
             self._message_index = self._build_message_index()
-        
+
         self.clear_cache()
 
     # ==============================================================================
@@ -429,35 +429,35 @@ class VectorService(VectorPort):
         """Recherche sémantique avec cache et scoring pondéré."""
         if not query or not self._data.get("documents"):
             return []
-        
+
         now = self._now()
         cached = self._cache.get(query, top_k, now)
         if cached is not None:
             return cached
-        
+
         # Calcul de l'embedding de la requête
         try:
             query_vec = np.array(self._embed(query), dtype=np.float32)
         except Exception as e:
             _logger.error("Échec calcul embedding requête : %s", e)
             return []
-        
+
         # Vectorisation des documents en attente
         self._embed_pending()
-        
+
         # Recherche par similarité cosinus
         with self._lock:
             all_results = cosine_search(
-                query_vec, 
-                self._data["documents"], 
+                query_vec,
+                self._data["documents"],
                 top_k=len(self._data["documents"])
             )
-            
+
             # Scoring et ranking avec pondération
             results = WeightConsolidator(self._data["documents"]).score_and_rank(
                 all_results, top_k, now
             )
-        
+
         # Mise en cache
         self._cache.put(query, top_k, results, now)
         return results
@@ -510,26 +510,26 @@ class VectorService(VectorPort):
             docs = self._data.get("documents", [])
             total = len(docs)
             embedded = sum(1 for d in docs if d.get("embedding") is not None)
-        
+
         conv_weights = self._conversation_weights()
         wm, lw = self._weight_stats(conv_weights)
-        
+
         return {
-            "total": total, 
-            "embedded": embedded, 
+            "total": total,
+            "embedded": embedded,
             "pending": total - embedded,
-            "cache_hits": self._cache_hits, 
+            "cache_hits": self._cache_hits,
             "cache_misses": self._cache_misses,
             "cache_hit_rate": self._cache_hit_rate(),
             "embedding_backend": "ollama",
-            "embedding_model": EXPECTED_MODEL, 
+            "embedding_model": EXPECTED_MODEL,
             "embedding_dim": EXPECTED_DIM,
             "stored_dim": self._data.get("embedding_dim"),
             "migration_status": self.last_migration,
             "using_fallback": False,  # Embedder refactoré n'a plus de fallback
-            "weight_mean": wm, 
+            "weight_mean": wm,
             "low_weight_ratio": lw,
-            "conversation_docs": len(conv_weights), 
+            "conversation_docs": len(conv_weights),
             "message_indexed": len(conv_weights),
             "dedup_estimated": self._estimate_dedup(),
             "last_consolidation": self._data.get("last_consolidation"),
@@ -540,9 +540,9 @@ class VectorService(VectorPort):
         """Vérifie que l'index est valide et lisible."""
         if not os.path.exists(VECTOR_PATH):
             return True  # Pas encore créé = sain
-        
+
         try:
-            with open(VECTOR_PATH, 'r', encoding='utf-8') as f:
+            with open(VECTOR_PATH, encoding='utf-8') as f:
                 data = json.load(f)
             return isinstance(data, dict) and "documents" in data
         except (json.JSONDecodeError, OSError):

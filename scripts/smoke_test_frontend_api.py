@@ -245,7 +245,7 @@ async def test_agents_assign(client: httpx.AsyncClient) -> bool:
         actual = data.get("data", data)
         assert actual.get("profile") == "techlead", "Profile mismatch"
         assert actual.get("model") == "qwen2.5", "Model mismatch"
-        print(f"  [OK] Assignation techlead -> qwen2.5 confirmée")
+        print("  [OK] Assignation techlead -> qwen2.5 confirmée")
         return True
     except Exception as e:
         print(f"  [FAIL] Assignation modèle: {e}")
@@ -258,7 +258,8 @@ async def test_agents_assign_persist(client: httpx.AsyncClient) -> bool:
         resp = await client.post("/api/agents/assign", json={"profile": "techlead", "model": "qwen2.5"}, timeout=TIMEOUT)
         assert resp.status_code == 200, f"Status {resp.status_code}"
 
-        import os, json
+        import os
+        import json
         pref_path = "config/model_preferences.json"
         assert os.path.exists(pref_path), f"Fichier {pref_path} introuvable"
         with open(pref_path, encoding="utf-8") as f:
@@ -266,7 +267,7 @@ async def test_agents_assign_persist(client: httpx.AsyncClient) -> bool:
         model_map = prefs.get("model_map", {})
         assert "dev" in model_map, f"dev non persisté dans model_map: {model_map}"
         assert model_map["dev"] == "qwen2.5", f"dev model mismatch: {model_map['dev']}"
-        print(f"  [OK] Assignation persistée dans model_preferences.json (dev -> qwen2.5)")
+        print("  [OK] Assignation persistée dans model_preferences.json (dev -> qwen2.5)")
         return True
     except Exception as e:
         print(f"  [FAIL] Persistance assignation: {e}")
@@ -439,7 +440,7 @@ async def test_cyber_workflows(client: httpx.AsyncClient) -> bool:
 
 async def test_cyber_agent_chat(client: httpx.AsyncClient) -> bool:
     """Test: Envoi message à l'agent @cyber.
-    
+
     Note: Le DI utilise actuellement _RouterService.select_agent() qui
     retourne toujours 'dev' (TODO). Le vrai AgentRouter de services/router.py
     n'est pas branché. On vérifie juste que l'endpoint répond."""
@@ -483,7 +484,8 @@ async def test_vision_with_image(client: httpx.AsyncClient) -> bool:
     try:
         import base64
         # Tiny 1x1 red PNG
-        import struct, zlib
+        import struct
+        import zlib
         sig = b'\x89PNG\r\n\x1a\n'
         ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
         ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data) & 0xffffffff
@@ -512,7 +514,7 @@ async def test_vision_with_image(client: httpx.AsyncClient) -> bool:
             print(f"  [FAIL] Vision: statut inattendu {resp.status_code}")
             return False
     except httpx.TimeoutException:
-        print(f"  [SKIP] Vision: timeout (modèle vision non chargé)")
+        print("  [SKIP] Vision: timeout (modèle vision non chargé)")
         return True
     except Exception as e:
         print(f"  [FAIL] Vision image: {e}")
@@ -614,7 +616,7 @@ async def run_scenario2() -> int:
 
         # Test 1: Envoi message simple
         total_tests += 1
-        print(f"\n[TEST] Envoi message simple...")
+        print("\n[TEST] Envoi message simple...")
         if await test_chat_send_simple(client):
             tests_passed += 1
         else:
@@ -622,7 +624,7 @@ async def run_scenario2() -> int:
 
         # Test 2: Historique conversations (list)
         total_tests += 1
-        print(f"\n[TEST] Historique conversations...")
+        print("\n[TEST] Historique conversations...")
         if await test_conv_list(client):
             tests_passed += 1
         else:
@@ -630,14 +632,14 @@ async def run_scenario2() -> int:
 
         # Test 3: Création conversation
         total_tests += 1
-        print(f"\n[TEST] Création conversation...")
+        print("\n[TEST] Création conversation...")
         conv_id = await test_conv_create(client)
         if conv_id:
             tests_passed += 1
 
             # Test 4: Chargement conversation existante
             total_tests += 1
-            print(f"\n[TEST] Chargement conversation...")
+            print("\n[TEST] Chargement conversation...")
             if await test_conv_load(client, conv_id):
                 tests_passed += 1
             else:
@@ -645,7 +647,7 @@ async def run_scenario2() -> int:
 
             # Test 5: Ajout message à conversation
             total_tests += 1
-            print(f"\n[TEST] Ajout message à conversation...")
+            print("\n[TEST] Ajout message à conversation...")
             if await test_conv_add_message(client, conv_id):
                 tests_passed += 1
             else:
@@ -653,7 +655,7 @@ async def run_scenario2() -> int:
 
             # Test 6: Suppression conversation
             total_tests += 1
-            print(f"\n[TEST] Suppression conversation...")
+            print("\n[TEST] Suppression conversation...")
             if await test_conv_delete(client, conv_id):
                 tests_passed += 1
             else:
@@ -662,7 +664,7 @@ async def run_scenario2() -> int:
             print("   ÉCHEC: Création conversation")
 
         # Note: Renommage, Vidage chat (Ctrl+L), Recommencer (Ctrl+Z) sont frontend-only
-        print(f"\n[INFO] Renommage, Vidage chat (Ctrl+L), Recommencer (Ctrl+Z) = frontend only")
+        print("\n[INFO] Renommage, Vidage chat (Ctrl+L), Recommencer (Ctrl+Z) = frontend only")
 
         print(f"\n{'=' * 50}")
         print(f"RÉSULTAT S2: {tests_passed}/{total_tests} tests passés")
@@ -794,7 +796,7 @@ async def run_scenario7() -> int:
 
         print(f"\n{'=' * 50}")
         print(f"RÉSULTAT S7: {passed}/{len(tests)} tests passés")
-        print(f"[INFO] Responsive (mobile/desktop) et raccourcis (Ctrl+Enter, Ctrl+L, Ctrl+Z) = frontend only")
+        print("[INFO] Responsive (mobile/desktop) et raccourcis (Ctrl+Enter, Ctrl+L, Ctrl+Z) = frontend only")
         return 0 if passed == len(tests) else 1
 
 
@@ -812,7 +814,7 @@ async def run_all() -> int:
     s7 = await run_scenario7()
 
     print(f"\n{'=' * 50}")
-    print(f"RÉSUMÉ GLOBAL:")
+    print("RÉSUMÉ GLOBAL:")
     print(f"  Scénario 1 (Smoke):      {'PASS' if s1 == 0 else 'FAIL'}")
     print(f"  Scénario 2 (Chat/Conv):  {'PASS' if s2 == 0 else 'FAIL'}")
     print(f"  Scénario 3 (Agents):     {'PASS' if s3 == 0 else 'FAIL'}")

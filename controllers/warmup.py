@@ -88,13 +88,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # garbage collection prématuré (piège classique asyncio).
     if not hasattr(ctx, "_warmup_tasks"):
         ctx._warmup_tasks = []
-    
+
     task_vector = asyncio.create_task(_warmup_vector_store(ctx))
     ctx._warmup_tasks.append(task_vector)
-    
+
     task_model = asyncio.create_task(_warmup_default_model(ctx, DEFAULT_MODEL))
     ctx._warmup_tasks.append(task_model)
-    
+
     _logger.info("Warmup lancé en arrière-plan. L'application est prête à accepter des requêtes.")
 
     ingest_queue = getattr(ctx, "ingest_queue", None)

@@ -2,9 +2,9 @@
 
 NOTE DevOps / Performance :
 L'implémentation actuelle persiste sur disque à chaque incrémentation (via write_json_atomic).
-Sur un support de type clef USB, les appels répétés à os.fsync() peuvent dégrader les 
-performances et la durée de vie du support. 
-Cible d'évolution : Bufferiser les compteurs en mémoire et persister uniquement 
+Sur un support de type clef USB, les appels répétés à os.fsync() peuvent dégrader les
+performances et la durée de vie du support.
+Cible d'évolution : Bufferiser les compteurs en mémoire et persister uniquement
 périodiquement (ex: toutes les 60s) ou lors du graceful shutdown.
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ def get_resource_usage() -> dict[str, Any]:
             }
         except Exception as e:
             _logger.debug("Échec de la collecte des métriques système : %s", e)
-            
+
     return {
         "memory_rss_mb": None,
         "cpu_percent": None,
@@ -73,7 +73,7 @@ class MetricsService(MetricsPort):
         """Charge les métriques depuis le disque, initialise les compteurs à zéro si nouveau fichier."""
         os.makedirs(os.path.dirname(METRICS_PATH), exist_ok=True)
         self._data = self._load()
-        
+
         # Initialisation défensive des valeurs par défaut
         self._data.setdefault("uptime", time.time())
         self._data.setdefault("requests", 0)
@@ -122,7 +122,7 @@ class MetricsService(MetricsPort):
         with _lock:
             start_time = self._data.get("uptime", time.time())
             uptime = round(time.time() - start_time, 1)
-            
+
             result = {
                 "uptime_seconds": uptime,
                 "uptime_human": self._format_uptime(uptime),
@@ -131,7 +131,7 @@ class MetricsService(MetricsPort):
                 "errors": self._data.get("errors", 0),
                 "by_endpoint": dict(self._data.get("by_endpoint", {})), # Copie défensive
             }
-            
+
         # Métriques système (hors lock car ne modifie pas l'état partagé)
         result.update(get_resource_usage())
         return result

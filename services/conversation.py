@@ -15,7 +15,8 @@ import re
 import threading
 import time
 import uuid
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from config.constants import MAX_CONVERSATION_MESSAGES, PROJECT_DIR
 from ports import ConversationPort
@@ -50,11 +51,11 @@ class ConversationService(ConversationPort):
         self._storage_dir = storage_dir
         self._conv_dir = os.path.join(storage_dir, "conversations")
         os.makedirs(self._conv_dir, exist_ok=True)
-        
+
         self._lock = threading.Lock()
         self._on_message: _MessageCallback | None = None
         self._index_path = os.path.join(storage_dir, "conversations.json")
-        
+
         self._index = self._load_index()
         self._save_index()  # Persiste le nettoyage des orphelins
         self.backfill_message_ids()  # Attribution d'id aux messages existants
@@ -121,14 +122,14 @@ class ConversationService(ConversationPort):
         """Ajoute un message à une conversation. Crée la conversation si elle n'existe pas."""
         if not self._validate_conv_id(conv_id):
             raise ValueError(f"conv_id invalide: {conv_id!r}")
-        
+
         msg = self._build_message(role, content, agent, model, backend)
-        
+
         with self._lock:
             conv = self._load_or_create(conv_id)
             self._append_and_persist(conv_id, conv, msg)
             self._update_index(conv_id, len(conv["messages"]))
-        
+
         # Hook appelé hors lock pour ne pas bloquer le service si le callback est lent
         if self._on_message:
             self._on_message(conv_id, msg["id"], role, content, msg["ts"])
@@ -249,7 +250,7 @@ class ConversationService(ConversationPort):
         """
         if self._index.get("_message_ids_backfilled"):
             return False
-        
+
         changed_any = False
         for entry in self._index.get("conversations", []):
             conv_path = os.path.join(self._conv_dir, f"{entry['id']}.json")
@@ -269,7 +270,7 @@ class ConversationService(ConversationPort):
             except (OSError, json.JSONDecodeError) as e:
                 _logger.debug("backfill ignore conversation %s (illisible/corrompue): %s", entry.get("id"), e)
                 continue
-        
+
         self._index["_message_ids_backfilled"] = True
         self._save_index()
         return changed_any

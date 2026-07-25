@@ -14,7 +14,8 @@ from __future__ import annotations
 import base64
 import re
 import string
-from typing import Callable, Match
+from re import Match
+from collections.abc import Callable
 
 # Caractères ASCII imprimables autorisés dans les entrées textuelles libres
 _PRINTABLE: set[str] = set(string.printable) - {chr(127)}
@@ -154,10 +155,10 @@ def _redact_ip(m: Match[str]) -> str:
     except ValueError:
         # Format IP invalide (ex: "999.999.999.999") — on laisse tel quel
         return ip
-    
+
     if len(parts) != 4:
         return ip
-    
+
     # Loopback
     if parts[0] == 127:
         return "[REDACTED]"
@@ -170,7 +171,7 @@ def _redact_ip(m: Match[str]) -> str:
     # RFC1918 : 192.168.0.0/16
     if parts[0] == 192 and parts[1] == 168:
         return "[REDACTED]"
-    
+
     return ip
 
 

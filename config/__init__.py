@@ -175,7 +175,7 @@ def get_components() -> ComponentsConfig:
         raw = _load_json("components.json")
         if not isinstance(raw, dict):
             raise ConfigError("components.json doit être un dictionnaire")
-        
+
         assets = tuple(
             ComponentAsset(
                 name=a["name"],

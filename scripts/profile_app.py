@@ -70,7 +70,7 @@ def main():
         p = pstats.Stats(profiler)
         p.sort_stats("cumtime").print_stats(10)
 
-    print(f"\nProfils sauvegardés : profile_*.prof")
+    print("\nProfils sauvegardés : profile_*.prof")
     print("Visualiser avec : snakeviz profile_*.prof")
 
 

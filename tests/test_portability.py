@@ -9,7 +9,7 @@ from pathlib import Path
 
 def test_ollama_installer_linux_path():
     """Vérifie que _install_linux_tar retourne bien un chemin dans BIN_LINUX."""
-    
+
     # On mocke toutes les dépendances externes pour isoler la logique de la fonction
     with patch('services.ollama_installer.platform.machine', return_value='x86_64'), \
          patch('services.ollama_installer.os.makedirs'), \
@@ -24,13 +24,13 @@ def test_ollama_installer_linux_path():
          patch('services.ollama_installer.os.remove'), \
          patch('services.ollama_installer.BASE_DIR', '/fake/base'), \
          patch('services.ollama_installer.BIN_LINUX', '/fake/base/bin/linux'):
-        
+
         # On importe la fonction APRÈS le patch pour qu'elle utilise les mocks
         from services.ollama_installer import _install_linux_tar
-        
+
         mock_log = MagicMock()
         result = _install_linux_tar(mock_log)
-        
+
         # Le résultat doit être le chemin dans BIN_LINUX, pas BIN_DIR
         # On utilise os.path.join pour que le séparateur corresponde à l'OS du test (Windows ou Linux)
         expected = os.path.join('/fake/base/bin/linux', 'ollama')
@@ -42,7 +42,7 @@ def test_ollama_installer_source_code_uses_bin_linux():
     """Vérification statique complémentaire : le code source utilise bien BIN_LINUX."""
     installer_path = Path("services/ollama_installer.py")
     content = installer_path.read_text(encoding="utf-8")
-    
+
     assert "BIN_LINUX" in content, "BIN_LINUX doit être importé/utilisé dans le fichier"
     assert 'os.path.join(BIN_LINUX, "ollama")' in content, \
         "Le chemin de destination du binaire doit utiliser BIN_LINUX"

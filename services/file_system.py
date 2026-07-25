@@ -67,13 +67,13 @@ class FileSystemService:
         """Autorise un chemin. Retourne ``False`` si le sandbox le refuse."""
         if not path:
             return False
-            
+
         # Normalisation des séparateurs pour une analyse cohérente
         # (cast str() : PROJECT_DIR et consorts peuvent arriver en Path,
         # or Path.replace() est l'API de renommage de fichier, pas str.replace)
         path = str(path)
         normalized_path = path.replace("\\", "/")
-            
+
         # Cas A : Rejet défensif des chemins absolus Windows (ex: "C:\...")
         # quand on tourne SUR Linux/macOS. Sur ces OS, ':' n'a aucun sens
         # de séparateur pour os.path : "C:\Users\x" est traité comme un nom
@@ -84,7 +84,7 @@ class FileSystemService:
         if not IS_WINDOWS and re.match(r'^[A-Za-z]:', normalized_path):
             _logger.warning("Tentative de path traversal bloquée (lecteur Windows) : %s", path)
             return False
-            
+
         # Cas B : Rejet défensif de TOUTE tentative contenant ".." en substring
         # Neutralise les contournements de filtres naïfs (ex: "....//....//")
         if ".." in normalized_path:

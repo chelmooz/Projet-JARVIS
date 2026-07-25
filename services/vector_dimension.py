@@ -25,14 +25,14 @@ class DimensionManager:
         """Retourne le statut de migration (OK / REINDEXED / RESET)."""
         stored_dim = self._data.get("embedding_dim")
         stored_model = self._data.get("embedding_model")
-        
+
         if stored_dim is None:
             self._init_dimension(expected_dim, expected_model)
             return MIGRATION_OK
-            
+
         if stored_dim == expected_dim and stored_model == expected_model:
             return MIGRATION_OK
-            
+
         return self._migrate(stored_dim, stored_model, expected_dim, expected_model)
 
     def _init_dimension(self, expected_dim: int, expected_model: str) -> None:
@@ -54,7 +54,7 @@ class DimensionManager:
         )
         documents = self._data.get("documents", [])
         textes_disponibles = [d for d in documents if d.get("text")]
-        
+
         if textes_disponibles:
             return self._schedule_reindex(documents, expected_dim, expected_model, len(textes_disponibles))
         return self._reset_index(expected_dim, expected_model)
@@ -69,10 +69,10 @@ class DimensionManager:
         """Re-index paresseux : texte conservé, embeddings invalidés."""
         for doc in documents:
             doc["embedding"] = None
-            
+
         self._data["embedding_dim"] = expected_dim
         self._data["embedding_model"] = expected_model
-        
+
         _logger.info(
             "Re-index planifié (paresseux) de %s document(s) pour la nouvelle dimension %s",
             n_texts, expected_dim,

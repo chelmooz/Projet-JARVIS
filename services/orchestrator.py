@@ -11,7 +11,8 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
+from collections.abc import Callable
 
 from ports import (
     AnalyticsPort,
@@ -58,12 +59,12 @@ class AgentGraphPort(Protocol):
 
 class OrchestratorService:
     """Coordination métier des requêtes JARVIS.
-    
+
     Responsabilités :
     - Orchestrer le flux de traitement d'une requête.
     - Déléguer l'exécution au graphe d'agents ou aux agents vision.
     - Assurer la télémétrie (analytics, metrics, logs).
-    
+
     Ne gère PAS :
     - L'implémentation concrète des agents.
     - La persistance (déléguée aux services injectés).
@@ -94,13 +95,13 @@ class OrchestratorService:
         self.agents = agents
         self.router_service = router_service
         self.toolbox = toolbox
-        
+
         # DIP: Plus d'import concret de AgentGraph ici.
         # La factory doit être injectée par le Composition Root.
         if agent_graph_factory is None:
             raise ValueError("agent_graph_factory doit être injecté (DIP).")
         self.agent_graph_factory = agent_graph_factory
-        
+
         self.vision_model_selector = vision_model_selector or select_vision_model
 
     def handle_request(
@@ -109,7 +110,7 @@ class OrchestratorService:
         """Point d'entrée unique : traite une tâche JARVIS complète."""
         if not conv_id:
             conv_id = str(uuid.uuid4())[:8]
-            
+
         self.metrics.incr_requests("/api/jarvis")
         start = time.time()
 
@@ -131,11 +132,11 @@ class OrchestratorService:
             # Observabilité : On log l'erreur complète via le logger standard.
             _logger.exception("Échec critique du graphe d'agents pour la tâche: %s", task)
             self.log.log("ERROR", f"Graph failed: {e}")
-            
+
             # Fallback métier explicite
             agent_key = self.router_service.select_agent(task)
             return self._build_fallback_response(task, agent_key, str(e), start)
-        
+
         return self._finalize_success(result, task, start)
 
     def _handle_vision(
@@ -144,7 +145,7 @@ class OrchestratorService:
         """Gère les requêtes vision."""
         agent_key = "vision"
         model_name = self.vision_model_selector(self.inference)
-        
+
         if not model_name:
             self.log.log("ERROR", "Aucun modèle vision disponible")
             return {"error": "Aucun modele vision disponible", "agent": agent_key}
@@ -167,10 +168,10 @@ class OrchestratorService:
         self.memory.update_habits({"task": task, "agent": agent_key})
         self.conversations.add_message(conv_id, "user", task)
         self.conversations.add_message(
-            conv_id, "assistant", result.get("response", ""), 
+            conv_id, "assistant", result.get("response", ""),
             agent=agent_key, model=model_name
         )
-        
+
         self._track_metrics(agent_key, model_name, start, success=True)
         self.log.log("INFO", f"agent=vision model={model_name}")
         return result
@@ -181,7 +182,7 @@ class OrchestratorService:
         """Finalise une requête réussie : télémétrie et formatage."""
         agent_key = result.get("agent") or self.router_service.select_agent(task)
         model_name = result.get("model") or "auto"
-        
+
         self._track_metrics(agent_key, model_name, start, success=True)
         self.log.log("INFO", f"graph agent={agent_key} model={model_name}")
         return result

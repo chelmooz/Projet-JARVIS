@@ -15,7 +15,8 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+from collections.abc import Callable
 
 import orjson
 
@@ -96,7 +97,7 @@ def write_json_atomic(path: str, data: Any, **json_kwargs: Any) -> None:
     Garantit que le fichier n'est jamais corrompu : soit l'écriture entière
     réussit, soit le fichier original reste intact. Un verrou par chemin
     évite les écritures concurrentes.
-    
+
     CORRECTION : Conversion explicite de ``path`` en ``str`` pour compatibilité
     avec les objets ``pathlib.Path`` (WindowsPath/PosixPath).
     """

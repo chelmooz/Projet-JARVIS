@@ -42,7 +42,7 @@ def print_report(recommendations: list[str], verdict: str) -> None:
         # Extraction robuste du message après le premier crochet fermant
         msg = rec.split("]", 1)[-1].strip()
         print(f"  [{tag}] {msg}")
-    
+
     print(f"\n  Verdict : {verdict}")
 
 

@@ -38,7 +38,7 @@ def _purge_stale() -> int:
     return purged
 
 
-def check_rate_limit(client_ip: str) -> Tuple[bool, int]:
+def check_rate_limit(client_ip: str) -> tuple[bool, int]:
     """Vérifie si l'IP n'a pas dépassé le quota de MAX_REQUESTS requêtes par WINDOW secondes.
 
     Retourne (allowed, remaining) où remaining est le nombre de requêtes
@@ -46,16 +46,16 @@ def check_rate_limit(client_ip: str) -> Tuple[bool, int]:
     """
     now = time.time()
     cutoff = now - WINDOW
-    
+
     with _lock:
         # Filtrage des timestamps expirés (fenêtre glissante)
         window = [t for t in _hits[client_ip] if t > cutoff]
         window.append(now)
         _hits[client_ip] = window
-        
+
         count = len(window)
         remaining = MAX_REQUESTS - count
-        
+
         return remaining >= 0, max(remaining, 0)
 
 

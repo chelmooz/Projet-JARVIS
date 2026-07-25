@@ -74,7 +74,7 @@ def check_cpu() -> dict[str, Any]:
                     break
     except Exception as e:
         _logger.debug("Impossible de lire /proc/cpuinfo : %s", e)
-    
+
     if not model or model == "?":
         apple = _apple_cpu_brand()
         if apple:
@@ -204,14 +204,14 @@ def check_python() -> dict[str, Any]:
     venv_python = os.path.join(VENV_DIR, "bin", "python")
     if sys.platform == "win32":
         venv_python = os.path.join(VENV_DIR, "Scripts", "python.exe")
-    
+
     venv_ok = os.path.exists(venv_python)
     selected_python = find_python()
     portable_ok = (
         os.path.exists(selected_python)
         and os.path.abspath(selected_python).startswith(os.path.abspath(PORTABLE_DIR))
     )
-    
+
     required = ["fastapi", "uvicorn", "numpy", "psutil", "yaml", "httpx"]
     missing = []
     for mod in required:
@@ -261,14 +261,14 @@ def check_network() -> dict[str, Any]:
             ports_status[str(port)] = (
                 "in_use" if s.connect_ex(("127.0.0.1", port)) == 0 else "free"
             )
-    
+
     internet = False
     try:
         urllib.request.urlopen("http://1.1.1.1", timeout=INTERNET_TIMEOUT)
         internet = True
     except Exception as e:
         _logger.debug("internet check : %s", e)
-    
+
     return {"internet": internet, "ports": ports_status}
 
 
@@ -281,7 +281,7 @@ def check_disk() -> dict[str, Any]:
         if parent == mount:
             break
         mount = parent
-    
+
     return {
         "project_dir": PROJECT_DIR,
         "mount_point": mount or PROJECT_DIR,

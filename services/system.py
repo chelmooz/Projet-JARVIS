@@ -14,7 +14,8 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 _logger = logging.getLogger(__name__)
 
@@ -112,16 +113,16 @@ def _install_deps(python_path: str, requirements: str, log: Callable[..., Any]) 
         _logger.info("pip mis à jour avec succès")
     except Exception as e:
         _logger.debug("pip upgrade skipped: %s", e)
-    
+
     r = subprocess.run(
         [python_path, "-m", "pip", "install", "--quiet", "-r", requirements],
         capture_output=True, text=True, timeout=120,
     )
-    
+
     if r.returncode != 0:
         log("Setup", f"Échec pip install : {r.stderr.strip()}", False)
         return False
-    
+
     log("Setup", "OK", True)
     return True
 
@@ -155,14 +156,14 @@ def ensure_venv(log: Callable[..., Any]) -> str:
                 log("Setup", f"Échec venv : Python incompatible ({exc.strerror})", False)
                 log("Setup", "Solution : installez Python 3.12+ depuis python.org", False)
                 return selected_py
-            
+
             if r.returncode != 0:
                 err = r.stderr.strip()
                 log("Setup", f"Échec venv : {err}", False)
                 if "ensurepip" in err and sys.platform != "win32":
                     log("Setup", "Solution : sudo apt install python3-venv", False)
                 return selected_py
-            
+
             log("Setup", "OK", True)
 
     # Vérification des dépendances critiques
@@ -170,7 +171,7 @@ def ensure_venv(log: Callable[..., Any]) -> str:
         [target_py, "-c", "import fastapi, uvicorn, numpy, httpx, yaml"],
         capture_output=True, text=True, timeout=15,
     )
-    
+
     if import_check.returncode != 0:
         log("Setup", "Installation des dépendances...", None)
         _install_deps(target_py, REQUIREMENTS_FILE, log)
@@ -186,21 +187,21 @@ def get_ollama_path() -> str | None:
     """
     # CORRECTION : Nettoyage de la typo "each"
     name = "ollama.exe" if SYSTEM == "windows" else "ollama"
-    
+
     candidates = [
         OLLAMA_EXE,
         os.path.join(BIN_DIR, name),
     ]
-    
+
     if SYSTEM == "linux":
         candidates.append(os.path.join(BIN_DIR, "ollama-linux-amd64"))
     elif SYSTEM == "darwin":
         candidates.append(os.path.join(BIN_DIR, "ollama-darwin"))
-        
+
     for path in candidates:
         if os.path.exists(path):
             return path
-            
+
     return shutil.which(name)
 
 

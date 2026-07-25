@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Callable
+from collections.abc import Callable
 
 
 def verify_sha256(
@@ -36,7 +36,7 @@ def verify_sha256(
         with open(binary_path, "rb") as f:
             while chunk := f.read(8192):
                 sha256.update(chunk)
-        
+
         actual = sha256.hexdigest().upper()
 
         if actual != expected.upper():

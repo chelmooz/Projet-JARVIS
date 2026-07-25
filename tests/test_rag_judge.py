@@ -32,15 +32,15 @@ def test_judge_returns_structured_score(judge, mock_llm_adapter):
     query = "Problème réseau sur le switch A"
     chunks = ["Le switch A a un port défectueux", "Vérifier le câble Ethernet"]
     response = "Remplacer le câble Ethernet du port 3 du switch A."
-    
+
     # Le LLM retourne un JSON valide
     mock_llm_adapter.query.return_value = {
         "response": '{"score": 0.85, "reason": "La réponse est pertinente et actionnable."}'
     }
-    
+
     # ACT
     result = judge.evaluate(query, chunks, response)
-    
+
     # ASSERT
     assert isinstance(result, dict)
     assert "score" in result
@@ -57,12 +57,12 @@ def test_judge_does_not_see_actor_reasoning(judge, mock_llm_adapter):
     query = "Problème réseau"
     chunks = ["Chunk 1", "Chunk 2"]
     response = "Réponse finale"
-    
+
     mock_llm_adapter.query.return_value = {
         "response": '{"score": 0.7, "reason": "OK"}'
     }
-    
+
     # ACT
     judge.evaluate(query, chunks, response)
-    
+
     # ASSERT — Vérifier que le prompt envoyé au LLM ne contient

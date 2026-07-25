@@ -25,10 +25,10 @@ RAM_HEADROOM_RATIO = 0.8  # 20% de marge de sécurité pour éviter les OOM
 
 class _PreferencesCache:
     """Cache thread-safe pour les préférences utilisateur avec invalidation au mtime.
-    
+
     Remplace les variables globales mutables par un état encapsulé et testable.
     """
-    
+
     def __init__(self, path: str) -> None:
         self._path = path
         self._cache: dict[str, Any] = {}
@@ -85,10 +85,10 @@ def load_model_sizes() -> dict[str, Any]:
 
 def recommend_model(specs: dict[str, Any]) -> dict[str, Any]:
     """Recommande un modèle basé sur les spécifications matérielles.
-    
+
     Args:
         specs: Dictionnaire contenant 'ram_gb', 'vram_gb', 'cpu_only'.
-        
+
     Returns:
         Dictionnaire avec 'model' et 'fallback'.
     """
@@ -108,13 +108,13 @@ def recommend_model(specs: dict[str, Any]) -> dict[str, Any]:
             continue
         if not cpu_only and info.get("cpu_only", False):
             continue
-        
+
         # Garde-fou OOM avec marge de sécurité
         if ram_gb * RAM_HEADROOM_RATIO < info.get("ram_min_gb", 999):
             continue
         if not cpu_only and vram_gb < info.get("vram_min_gb", 0):
             continue
-            
+
         compatible.append((name, info))
 
     if not compatible:
@@ -157,19 +157,19 @@ def select_vision_model(inference: Any) -> str | None:
 
 def select_model(agent_key: str, inference: Any, log_service: Any | None = None) -> str:
     """Sélectionne le meilleur modèle pour un agent donné.
-    
+
     Stratégie :
       1. Court-circuit vision
       2. Préférences utilisateur
       3. Fallback par agent
       4. Premier modèle générique disponible
       5. Chaîne vide si aucun modèle (l'appelant doit gérer l'erreur)
-      
+
     Args:
         agent_key: Clé de l'agent (ex: 'cyber', 'dev', 'vision').
         inference: Service d'inférence (doit implémenter resolve_model/first_available).
         log_service: Service de log optionnel pour les avertissements.
-        
+
     Returns:
         Nom du modèle sélectionné, ou chaîne vide si aucun modèle n'est disponible.
     """
@@ -182,7 +182,7 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
     # Construit la liste des candidats : modèle spécifique à l'agent + modèles génériques
     generic_values = [m for m in model_map.values() if m not in VISION_MODELS]
     candidates = [model_map.get(agent_key)] + generic_values
-    
+
     seen = set()
     for model in candidates:
         if model and model not in seen:

@@ -71,7 +71,7 @@ def wait_for_ollama_ready(host: str, port: int, timeout: float = DEFAULT_POLL_TI
         except (urllib.error.URLError, OSError):
             time.sleep(delay)
             delay = min(delay * BACKOFF_FACTOR, MAX_BACKOFF)
-            
+
     return False
 
 
@@ -84,8 +84,8 @@ def _open_log(name: str) -> io.TextIOWrapper:
 
 class ProcessManager:
     """Gère le cycle de vie du processus Ollama (SPOF critique).
-    
-    KISS : Ne gère plus Uvicorn ni OpenWebUI. 
+
+    KISS : Ne gère plus Uvicorn ni OpenWebUI.
     Uvicorn doit être lancé directement par le processus principal (jarvis.py).
     """
 
@@ -100,7 +100,7 @@ class ProcessManager:
         self._base_dir = base_dir
         self._system = system
         self._max_restarts = max_restarts
-        
+
         self._procs: list[tuple[subprocess.Popen[bytes], str]] = []
         self._restart_counts: dict[str, int] = {}
         self._shutting_down = False
@@ -127,7 +127,7 @@ class ProcessManager:
         env["OLLAMA_HOST"] = OLLAMA_HOST
         env["OLLAMA_MODELS"] = os.path.join(MODELS_DIR, "ollama")
         env["OLLAMA_KEEP_ALIVE"] = "5m"
-        # NOTE : On ne force PLUS OLLAMA_VULKAN=0 ni CUDA_VISIBLE_DEVICES="" 
+        # NOTE : On ne force PLUS OLLAMA_VULKAN=0 ni CUDA_VISIBLE_DEVICES=""
         # pour laisser Ollama utiliser le GPU si disponible.
 
         try:
@@ -138,7 +138,7 @@ class ProcessManager:
                     stdout=log_file,
                     stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 )
-            
+
             self._procs.append((p, "Ollama"))
 
             # Détection rapide d'un échec immédiat (binaire corrompu, crash au
@@ -182,9 +182,9 @@ class ProcessManager:
         """Boucle de surveillance minimaliste avec relance limitée."""
         while not self._shutting_down:
             time.sleep(MONITOR_POLL_INTERVAL)
-            
+
             dead_procs = [(p, name) for p, name in self._procs if p.poll() is not None]
-            
+
             for p, name in dead_procs:
                 self._procs.remove((p, name))
                 self._restart_counts[name] = self._restart_counts.get(name, 0) + 1
@@ -193,7 +193,7 @@ class ProcessManager:
                     _logger.critical("Processus %s crashé %d fois. Abandon.", name, self._max_restarts)
                     return False
 
-                _logger.warning("Relance du processus %s (tentative %d/%d)...", 
+                _logger.warning("Relance du processus %s (tentative %d/%d)...",
                                 name, self._restart_counts[name], self._max_restarts)
                 time.sleep(RESTART_DELAY)
                 if name == "Ollama":

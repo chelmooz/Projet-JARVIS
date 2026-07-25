@@ -31,7 +31,7 @@ class AnalyticsService(AnalyticsPort):
 
     def __init__(self, path: str | None = None) -> None:
         """Charge les stats depuis le disque.
-        
+
         Args:
             path: Chemin personnalisé pour les tests (défaut: ANALYTICS_PATH).
         """
@@ -86,18 +86,18 @@ class AnalyticsService(AnalyticsPort):
                 "success": success,
                 "ts": time.time(),
             })
-            
+
             # Troncature si dépassement de la borne MAX_QUERIES
             if len(queries) > MAX_QUERIES:
                 self._data["queries"] = queries[-MAX_QUERIES:]
-            
+
             # Mise à jour des compteurs agrégés
             agents = self._data.setdefault("agents", {})
             agents[agent] = agents.get(agent, 0) + 1
-            
+
             models = self._data.setdefault("models", {})
             models[model] = models.get(model, 0) + 1
-            
+
             self._save()
 
     def get_stats(self) -> dict[str, Any]:
@@ -112,7 +112,7 @@ class AnalyticsService(AnalyticsPort):
         total = len(q)
         success = sum(1 for x in q if x.get("success"))
         avg_latency = round(sum(x.get("latency_ms", 0) for x in q) / total, 1) if total else 0.0
-        
+
         # Heuristique : l'agent "vectorize" correspond aux conversations ingestées
         total_conversations = sum(1 for x in q if x.get("agent") == "vectorize")
 

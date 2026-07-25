@@ -18,7 +18,7 @@ _logger = logging.getLogger("jarvis.inference")
 
 class InferenceService(ChatPort, MultimodalPort, EmbeddingPort, ModelRegistryPort):
     """Façade unifiée pour l'inférence LLM (backend unique: Ollama).
-    
+
     Implémente les ports granulaires (ISP) :
     - ChatPort : génération de texte (query, chat)
     - MultimodalPort : analyse d'images (query_multimodal)

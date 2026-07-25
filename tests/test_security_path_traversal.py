@@ -33,7 +33,7 @@ class TestPathTraversalCodeReview:
         """
         # Appel robuste avec encodage automatique des query params
         response = client.get("/api/code-review/file", params={"path": bad_path})
-        
+
         # On s'attend à 400 (Bad Request) ou 403 (Forbidden)
         assert response.status_code in [400, 403], \
             f"Faille Path Traversal : la route n'a pas bloqué '{bad_path}' (Status: {response.status_code} | Réponse: {response.text})"

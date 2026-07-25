@@ -180,7 +180,7 @@ def compute_verdict(recommendations: list[str]) -> str:
     """Calcule le verdict global en comptant les FAIL et WARN."""
     fails = sum(1 for r in recommendations if r.startswith("[FAIL]"))
     warns = sum(1 for r in recommendations if r.startswith("[WARN]"))
-    
+
     if fails:
         return f"FAIL ({fails} critique{_plural(fails)})"
     if warns:

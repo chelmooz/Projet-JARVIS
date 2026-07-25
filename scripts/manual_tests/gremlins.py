@@ -40,7 +40,7 @@ log_file = OUT_DIR / f"gremlins_console_{now}.log"
 def main():
     print(f"Starting Gremlins stress test against {url}")
     print(f"Logs will be saved to: {log_file}")
-    
+
     with open(log_file, "w", encoding="utf-8") as logf:
         with sync_playwright() as p:
             try:
@@ -49,7 +49,7 @@ def main():
                 print(f"ERROR: Failed to launch browser: {e}")
                 logf.write(f"ERROR: Failed to launch browser: {e}\n")
                 return 1
-            
+
             context = browser.new_context()
             page = context.new_page()
 

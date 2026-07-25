@@ -43,7 +43,7 @@ def record_slow(route: str, duration: float) -> None:
         else:
             entry["max_dur"] = max(entry["max_dur"], duration)
             entry["count"] += 1
-        
+
         _recent.append({"route": route, "duration": duration, "ts": time.time()})
         if len(_recent) > MAX_RECENT:
             # Troncature efficace de la liste (in-place)

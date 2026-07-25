@@ -21,7 +21,7 @@ class WeightConsolidator:
 
     def apply_weight(self, conv_id: str, msg_id: str, delta: float, wmin: float, wmax: float) -> int:
         """
-        Applique delta (clampe) au document correspondant. 
+        Applique delta (clampe) au document correspondant.
         Retourne 1 si trouvé et modifié, 0 sinon.
         """
         for doc in self._docs:

@@ -16,17 +16,17 @@ def test_jsonl_trace_store_appends_record(tmp_path: Path):
         judge_reason="Diagnostic précis et actionnable",
         feedback="👍"
     )
-    
+
     today = datetime.now().strftime("%Y-%m-%d")
     expected_file = tmp_path / "traces" / "pipelines" / f"{today}.jsonl"
 
     store.append(record)
 
     assert expected_file.exists(), "Le fichier JSONL quotidien n'a pas été créé"
-    
+
     lines = expected_file.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1, "Une seule ligne doit être ajoutée"
-    
+
     data = json.loads(lines[0])
     assert data["trace_id"] == "trace-123"
     assert data["feedback"] == "👍"

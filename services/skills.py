@@ -36,7 +36,7 @@ def get_enabled_skills_text() -> str:
     ]
     if not enabled:
         return ""
-    
+
     sections = "\n\n".join(s["prompt"] for s in enabled)
     return f"[Skills actifs]\n{sections}"
 
