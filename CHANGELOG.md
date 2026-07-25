@@ -25,6 +25,29 @@
 - **Sécurité** : `accept="image/*"` → types MIME explicites (`image/png,jpeg,webp,gif`)
 - **CSS** : style `.noscript-banner` ajouté (erreur JS visible à l'utilisateur)
 
+## [5.5] — 2026-07-26
+
+### Performance — orjson I/O (Phase 8)
+- **orjson** pour toutes les lectures/écritures JSON (`services/file_utils.py`, `services/memory.py`)
+- **Batch writes** `write_json_batch()` dans `file_utils.py` — large writes **4x plus rapides** (P50 : 58.9ms → 14.4ms), lectures **1.8x**
+- **Profiling** : `scripts/profile_app.py` (cProfile endpoints) et `scripts/bench_runner.py` (I/O benchmarks)
+- Connection pooling Ollama, vector search numpy vectorisé, cache LRU TTL 300s (déjà en prod, confirmés)
+
+### UI/UX — Polish (Phase 9)
+- **Focus trap** : cycle Tab/Shift+Tab réel sur la modale File Browser + `getFocusableElements()` utilitaire réutilisable
+- **Skeleton loaders** : injectés dans `refreshSkills()` (7 cartes) et `refreshAnalytics()` (8 KPI cards)
+- **Toasts animés** : retour visuel sur les feedbacks mémoire (👍/👎/📋)
+- **Dark mode toggle** : `localStorage('jarvis_theme')` + thème clair/sombre CSS + transition douce
+
+### Sécurité (Phase 7)
+- **Error leakage** : `vectorize_conversations` masque le détail d'exception brut → message générique + `exc_info=True` serveur
+- **Headers garde-fou** : `X-XSS-Protection` déprécié supprimé, `X-Content-Type-Options` et `X-Frame-Options` protégés par test
+- **Stubs legacy** : `_check_ollama` (dupliqué context.py/router.py) et `_sync_module_globals` (no-op) supprimés
+
+### Documentation
+- **ROADMAP.md** : Phases 7-9 documentées avec micro-tâches TDD et commits
+- **CHANGELOG.md** : cette entrée
+
 ## [5.3] — 2026-07-11
 
 ### Mémoire auto-améliorante (Étapes 0→6)
