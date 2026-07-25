@@ -68,6 +68,9 @@ class FileSystemService:
             return False
             
         # Normalisation des séparateurs pour une analyse cohérente
+        # (cast str() : PROJECT_DIR et consorts peuvent arriver en Path,
+        # or Path.replace() est l'API de renommage de fichier, pas str.replace)
+        path = str(path)
         normalized_path = path.replace("\\", "/")
             
         # Cas A : Rejet défensif des chemins absolus Windows (ex: "C:\...")
