@@ -595,12 +595,7 @@ npm install -g @opencode/cli
 opencode
 ```
 
-Le dossier `.opencode/` à la racine configure :
-- **5 sous-agents** orchestrateurs : orchestrateur, tech-lead, devops, designer, data-secu
-- **Skills intégrés** : clean code, TDD, audit qualité, runbook RAG, vibe coding audit, loop engineering
-- **Protocoles de codage** : SOLID, KISS, conventions du projet
-
-> **Limites :** OpenCode nécessite une **connexion internet** et un **compte** (API tierce). Il n'est pas inclus dans JARVIS portable. Ce n'est **pas requis** pour utiliser JARVIS — c'est un outil facultatif réservé au développement.
+> **Limites :** OpenCode nécessite une **connexion internet** et un **compte** (API tierce). Ce n'est **pas requis** pour utiliser JARVIS — c'est un outil facultatif réservé au développement, dont la configuration (`.opencode/`) reste locale et n'est pas versionnée dans ce dépôt.
 
 ---
 

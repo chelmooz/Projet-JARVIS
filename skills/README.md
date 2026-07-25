@@ -2,8 +2,7 @@
 
 Ce dossier est le **dépôt des skills découverts/générés** de JARVIS, par opposition à :
 
-- `config/skills.json` — skills *built-in* déclaratifs (source de vérité du backend),
-- `.opencode/skills/` — skills de l'assistant de développement (outil tiers, ignoré par JARVIS).
+- `config/skills.json` — skills *built-in* déclaratifs (source de vérité du backend).
 
 ## Rôle futur (vectorisation → skills activables)
 
