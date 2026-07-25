@@ -3,8 +3,6 @@
 Dettes signalées (non corrigées ici) :
 - CSP : ``'unsafe-inline'`` sur script-src/style-src affaiblit la politique
   (nécessaire au JS inline de l'UI locale). Cible : nonce ou hash CSP.
-- ``X-XSS-Protection`` est déprécié (ignoré des navigateurs modernes, peut
-  introduire des bugs d'XSS auditor). Cible : omettre ou forcer à ``0``.
 - ``retry_after: 60`` est hardcodé ; devrait être dérivé de la fenêtre réelle
   de ``services.ratelimit`` (single source of truth).
 - ``_setup_middlewares`` est préfixé ``_`` mais importé par ``controllers/context.py``
