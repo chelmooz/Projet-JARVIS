@@ -8,7 +8,6 @@ class TestPathTraversalCodeReview:
     @pytest.fixture(autouse=True)
     def _force_sandbox(self, monkeypatch):
         """Force le sandbox actif pour ce test.
-
         Sans ceci, services/file_system.py::_is_inside_sandbox désactive
         volontairement la vérification quand 'pytest' est dans sys.modules
         (mode dev/test) : authorize_path() retourne alors True pour
@@ -38,3 +37,41 @@ class TestPathTraversalCodeReview:
         # On s'attend à 400 (Bad Request) ou 403 (Forbidden)
         assert response.status_code in [400, 403], \
             f"Faille Path Traversal : la route n'a pas bloqué '{bad_path}' (Status: {response.status_code} | Réponse: {response.text})"
+
+
+class TestPathTraversalKillCoding:
+    """Teste la protection contre le Path Traversal sur les endpoints kill_coding."""
+
+    @pytest.fixture(autouse=True)
+    def _force_sandbox(self, monkeypatch):
+        """Force le sandbox actif pour ce test."""
+        monkeypatch.setenv("JARVIS_FILES_SANDBOX_ROOT", os.getcwd())
+
+    MALICIOUS_PATHS = [
+        "../../../etc/passwd",
+        "..\\..\\..\\windows\\system32\\config\\sam",
+        "/etc/passwd",
+        "C:\\Windows\\System32\\config\\sam",
+        "....//....//etc/passwd"
+    ]
+
+    @pytest.mark.parametrize("bad_path", MALICIOUS_PATHS)
+    def test_kill_coding_analyze_rejects_path_traversal(self, client, bad_path):
+        """Teste /api/kill-coding/analyze"""
+        response = client.get("/api/kill-coding/analyze", params={"path": bad_path})
+        assert response.status_code in [400, 403], \
+            f"Faille Path Traversal : analyze n'a pas bloqué '{bad_path}' (Status: {response.status_code} | Réponse: {response.text})"
+
+    @pytest.mark.parametrize("bad_path", MALICIOUS_PATHS)
+    def test_kill_coding_project_rejects_path_traversal(self, client, bad_path):
+        """Teste /api/kill-coding/project"""
+        response = client.get("/api/kill-coding/project", params={"path": bad_path})
+        assert response.status_code in [400, 403], \
+            f"Faille Path Traversal : project n'a pas bloqué '{bad_path}' (Status: {response.status_code} | Réponse: {response.text})"
+
+    @pytest.mark.parametrize("bad_path", MALICIOUS_PATHS)
+    def test_kill_coding_check_test_rejects_path_traversal(self, client, bad_path):
+        """Teste /api/kill-coding/check-test"""
+        response = client.get("/api/kill-coding/check-test", params={"path": bad_path})
+        assert response.status_code in [400, 403], \
+            f"Faille Path Traversal : check-test n'a pas bloqué '{bad_path}' (Status: {response.status_code} | Réponse: {response.text})"
