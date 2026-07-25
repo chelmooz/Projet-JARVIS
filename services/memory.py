@@ -6,7 +6,6 @@ Responsabilité unique (SRP) :
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
@@ -14,7 +13,7 @@ from typing import Any
 
 from config.constants import MAX_HABITS, MEMORY_DIR
 from ports import HabitPort
-from services.file_utils import write_json_atomic
+from services.file_utils import read_json, write_json_atomic
 
 _logger = logging.getLogger("jarvis.memory")
 
@@ -33,13 +32,8 @@ class MemoryService(HabitPort):
     @staticmethod
     def _load_from_disk() -> list[dict[str, Any]]:
         """Lit le fichier habits.json et retourne son contenu."""
-        try:
-            with open(HABITS_PATH, encoding="utf-8") as f:
-                data = json.load(f)
-                return data if isinstance(data, list) else []
-        except (OSError, json.JSONDecodeError) as e:
-            _logger.debug("habits.json illisible ou absent, liste vide retournée : %s", e)
-            return []
+        data = read_json(HABITS_PATH, default=[])
+        return data if isinstance(data, list) else []
 
     def _load(self) -> list[dict[str, Any]]:
         """Charge la liste des habitudes en mémoire de manière thread-safe."""

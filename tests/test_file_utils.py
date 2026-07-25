@@ -47,6 +47,22 @@ class TestWriteJsonAtomic:
         assert not (tmp_path / "atomic.json.tmp").exists()
 
 
+class TestWriteJsonBatch:
+    def test_writes_list_of_dicts(self, tmp_path):
+        p = tmp_path / "batch.json"
+        items = [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}]
+        fu.write_json_batch(str(p), items)
+        assert p.exists()
+        import json as stdjson
+        assert stdjson.loads(p.read_text(encoding="utf-8")) == items
+
+    def test_batch_creates_tmp_then_replaces(self, tmp_path):
+        p = tmp_path / "batch_atomic.json"
+        fu.write_json_batch(str(p), [{"x": 1}])
+        assert p.exists()
+        assert not (tmp_path / "batch_atomic.json.tmp").exists()
+
+
 class TestRetry:
     def test_succeeds_first_time(self):
         calls = []

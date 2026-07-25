@@ -11,12 +11,13 @@ la rendre async casserait l'API des fonctions décorées).
 from __future__ import annotations
 
 import functools
-import json
 import logging
 import os
 import threading
 import time
 from typing import Any, Callable, TypeVar
+
+import orjson
 
 _logger = logging.getLogger(__name__)
 
@@ -60,6 +61,16 @@ def _get_lock(path: str) -> threading.Lock:
         return _FILE_LOCKS[path]
 
 
+def _json_kwargs_to_options(**kwargs: Any) -> int:
+    """Convertit les kwargs ``json.dump`` en flags ``orjson``."""
+    options = 0
+    if kwargs.get("indent") in (2, 4):
+        options |= orjson.OPT_INDENT_2
+    if kwargs.get("sort_keys"):
+        options |= orjson.OPT_SORT_KEYS
+    return options
+
+
 @retry()
 def read_json(path: str, default: Any = None) -> Any:
     """Lit un fichier JSON avec fallback silencieux.
@@ -71,9 +82,9 @@ def read_json(path: str, default: Any = None) -> Any:
     lock = _get_lock(path)
     with lock:
         try:
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
+            with open(path, "rb") as f:
+                return orjson.loads(f.read())
+        except (OSError, orjson.JSONDecodeError) as e:
             _logger.debug("Failed to read JSON %s: %s", path, e)
             return default if default is not None else {}
 
@@ -89,17 +100,27 @@ def write_json_atomic(path: str, data: Any, **json_kwargs: Any) -> None:
     CORRECTION : Conversion explicite de ``path`` en ``str`` pour compatibilité
     avec les objets ``pathlib.Path`` (WindowsPath/PosixPath).
     """
-    # CORRECTION : Cast path en str pour compatibilité Path/str
     path = str(path)
-    
     lock = _get_lock(path)
     with lock:
         tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, **json_kwargs)
+        options = _json_kwargs_to_options(**json_kwargs)
+        serialized = orjson.dumps(data, option=options)
+        with open(tmp, "wb") as f:
+            f.write(serialized)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)
 
 
-__all__ = ["retry", "read_json", "write_json_atomic"]
+def write_json_batch(path: str, items: list[dict[str, Any]], **json_kwargs: Any) -> None:
+    """Écrit une liste d'items JSON en une seule opération atomique.
+
+    Alternative à ``write_json_atomic`` pour les écritures groupées
+    (ex. habitudes, logs) : sérialise tout le batch d'un coup, puis
+    écrit en un ``write_json_atomic``.
+    """
+    write_json_atomic(path, items, **json_kwargs)
+
+
+__all__ = ["retry", "read_json", "write_json_atomic", "write_json_batch"]
