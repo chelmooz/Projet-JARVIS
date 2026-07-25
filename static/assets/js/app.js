@@ -1305,3 +1305,33 @@ document.getElementById('fb-select-btn')?.addEventListener('click', browserSelec
 document.getElementById('fb-back')?.addEventListener('click', browserGoUp);
 document.getElementById('fp-browse')?.addEventListener('click', openBrowser);
 document.getElementById('fp-path')?.addEventListener('keydown', e => { if (e.key === 'Enter') authorizePath(); });
+
+// --- Theme toggle (MT-FE-4) ---
+const THEME_KEY = 'jarvis_theme';
+
+function getTheme() {
+    return localStorage.getItem(THEME_KEY) || 'dark';
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, theme);
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', theme === 'light');
+    const icon = btn.querySelector('.icon');
+    if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+    setTheme(getTheme() === 'dark' ? 'light' : 'dark');
+}
+
+function initThemeToggle() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    setTheme(getTheme());
+    btn.addEventListener('click', toggleTheme);
+}
+
+initThemeToggle();

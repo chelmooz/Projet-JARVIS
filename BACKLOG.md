@@ -90,8 +90,8 @@ Le système `toast()` existe et est utilisé ailleurs (assignation de modèle, e
 - **GREEN** : `toast('Merci pour votre retour 👍', 'success')` dans `sendFeedback()` (signal=1), `toast('Noté, on fera mieux 👎', 'info')` (signal=-1), `toast('Réponse copiée 📋', 'success')` dans `sendImplicit()` (type='copy')
 - **Preuve** : 34 tests passés (2 nouveaux + 32 existants), 0 failed
 
-### 9.4 🔴 Dark mode toggle — confirmé toujours à faire
-Les variables CSS (`--bg`, `--text`, etc.) existent mais un seul thème (sombre) est défini. Aucun toggle, aucune variante claire.
+### 9.4 ✅ Dark mode toggle — COMPLÉTÉ (26/07/2026)
+`tests/test_dark_mode.py` créé (3 tests) + `:root[data-theme="light"]` dans `style.css` + `#theme-toggle` dans sidebar + `initThemeToggle()`/`getTheme()`/`setTheme()`/`toggleTheme()` dans `app.js`. Persistance via `localStorage('jarvis_theme')`. Transition CSS douce. Preuve : 819 passed / 0 failed / 40 skipped / 1 xfailed (3 nouveaux tests).
 
 ---
 
@@ -124,10 +124,10 @@ Aucune occurrence d'`os.system` dans `services/launcher.py`. Rien à coder.
 
 | Priorité | Tâche | Effort estimé | Impact |
 |----------|-------|----------------|--------|
-| 🟢 1 | 9.4 Dark mode toggle (optionnel) | 2h | UX confort |
+| 🟢 1 | ✅ **9.4 Dark mode toggle** — FAIT | 2h | UX confort |
 | 🔵 2 | 10.1 / 10.2 / 10.3 Docs (ROADMAP, CHANGELOG, nettoyage commentaire) | 1-2h | Doc |
 
-**Déjà fait, rien à planifier** : tout Phase 8 (orjson + profiling + rapport), Phase 7, Phase 9.1-9.3, 10.4, 10.5.
+**Déjà fait, rien à planifier** : tout Phase 8 (orjson + profiling + rapport), Phase 7, Phase 9.1-9.4, 10.4, 10.5.
 
 ---
 
@@ -182,3 +182,13 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 - **8.5** : `rapport_perf.md` rédigé avec comparaison stdlib/orjson
 - **Vérification** : 186 tests passés (file_utils + memory + io_perf + router + wave_a + log + metrics + analytics + facts + vector + chunker + sanitize + ratelimit + security), 0 failed
 - **Prochaine tâche** : 9.4 Dark mode (ou docs 10.1-10.3)
+
+### Session du 26/07/2026 — 9.4 ✅ Dark mode toggle
+- **Tâche** : 9.4 Dark mode toggle
+- **9.4.1 RED** : `tests/test_dark_mode.py` (créé) — 3 tests : bouton, CSS light, JS persistence
+- **9.4.2 GREEN CSS** : `:root[data-theme="light"]` + variables inversées + transition douce
+- **9.4.3 GREEN HTML** : `#theme-toggle` dans sidebar-header avec `aria-pressed`
+- **9.4.4 GREEN JS** : `initThemeToggle()`, `getTheme()`, `setTheme()`, `toggleTheme()` + localStorage `jarvis_theme`
+- **Preuve** : 819 passed / 0 failed / 40 skipped / 1 xfailed (3 nouveaux)
+- **Fichiers modifiés** : `static/assets/css/style.css`, `static/index.html`, `static/assets/js/app.js`, `tests/test_dark_mode.py`
+- **Prochaine tâche** : 10.1 / 10.2 / 10.3 Docs
