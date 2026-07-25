@@ -27,6 +27,9 @@ python jarvis.py
 
 # Lancer l'API seule
 python -m uvicorn controllers.router:app --reload
+
+# Smoke test manuel API + frontend (serveur déjà lancé requis)
+python scripts/smoke_test_frontend_api.py
 ```
 
 ## Structure

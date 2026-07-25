@@ -40,6 +40,8 @@ fix_test.py
 pytest_*.txt
 tree.txt
 _proof_status.py
+*.prof
+test_payload.json
 
 # --- Configuration runtime ---
 config/model_preferences.json
