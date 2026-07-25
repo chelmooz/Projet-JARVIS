@@ -157,6 +157,8 @@ async function sendFeedback(convId, msgId, signal) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ conv_id: convId, msg_id: msgId, signal })
         });
+        if (signal === 1) toast('Merci pour votre retour 👍', 'success');
+        else toast('Noté, on fera mieux 👎', 'info');
     } catch (e) {}
 }
 
@@ -166,6 +168,7 @@ async function sendImplicit(convId, msgId, type) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ conv_id: convId, msg_id: msgId, type })
         });
+        if (type === 'copy') toast('Réponse copiée 📋', 'success');
     } catch (e) {}
 }
 
@@ -490,6 +493,7 @@ async function refreshSkills() {
     const grid = document.getElementById('skills-grid');
     const status = document.getElementById('skills-status');
     const count = document.getElementById('skill-count');
+    injectSkeletons(grid, 7);
     try {
         const resp = await fetch('/api/skills');
         if (!resp.ok) {
@@ -795,6 +799,7 @@ function updateOrCreateChart(canvasId, type, labels, datasets, options) {
 
 async function refreshAnalytics() {
     if (!document.getElementById('tab-analytics').classList.contains('active')) return;
+    injectSkeletons(document.getElementById('analytics-kpis'), 8);
 
     try {
         const [analyticsResp, metricsResp, vectorResp, agentsResp] = await Promise.all([

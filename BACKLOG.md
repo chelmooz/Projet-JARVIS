@@ -1,7 +1,7 @@
 # 📋 BACKLOG.md — Plan de Micro-Tâches TDD (audit du 25/07/2026)
 
 **Projet** : JARVIS Portable Edition v5.4
-**État réel vérifié** : 805 tests passed / 0 failed / 40 skipped / 1 xfailed (803 initialement + 2 nouveaux tests ajoutés pour la tâche 7.4 ; 10.5 n'ajoute ni ne retire de tests, juste une réécriture)
+**État réel vérifié** : 805 tests passed / 0 failed / 40 skipped / 1 xfailed (803 initialement + 2 nouveaux tests ajoutés pour la tâche 7.4 ; 10.5 n'ajoute ni ne retire de tests, juste une réécriture ; 9.2 modifie le seuil d'un test existant sans en ajouter)
 **Méthode d'audit** : relecture du BACKLOG.md précédent + grep/lecture du code réel derrière chaque item + relance de la suite de tests + `git log`/`git status`
 **Verdict global** : le projet est plus avancé que ce que disait le backlog sur la Perf (Phase 8), mais deux tâches "closes" cachent un résidu. Le reste (Phase 9 UX, Phase 10 Docs) est correctement décrit.
 
@@ -66,11 +66,19 @@ Fuite réelle trouvée et corrigée : **`controllers/routes/documents.py:83`** (
 - **Action recommandée** : renforcer le test (vérifier un vrai cycle Tab/Shift+Tab dans la modale) avant de le re-valider, puis implémenter le focus trap.
 - **Commit** : `feat(ui): focus trap réel sur modale File Browser + durcit le test`
 
-### 9.2 🔴 Skeleton Loaders — Skills & Analytics — confirmé toujours à faire
-`injectSkeletons()` est bien appelée dans `refreshAgents()` et `refreshTools()`, mais **pas** dans `refreshSkills()` ni `refreshAnalytics()`. Le test existant vérifie `>= 3` occurrences globales (déjà satisfait par les 2 usages existants), donc il ne détectera pas l'ajout — pensez à monter le seuil à 5 en même temps.
+### 9.2 ✅ Skeleton Loaders — Skills & Analytics — CLOSED (26/07/2026)
+`injectSkeletons()` appelée dans `refreshAgents()` et `refreshTools()`, mais **pas** dans `refreshSkills()` ni `refreshAnalytics()`. Le test vérifiait `>= 3` — trop faible.
+- **RED** : seuil `>= 3` → `>= 5` dans `tests/test_skeleton_loaders.py` (assertion `assert nb >= 5`)
+- **GREEN** : injection dans `static/assets/js/app.js`
+  - `refreshSkills()` l.493 : `injectSkeletons(grid, 7)` (7 skills dans `config/skills.json`)
+  - `refreshAnalytics()` l.799 : `injectSkeletons(document.getElementById('analytics-kpis'), 8)` (8 KPI cards)
+- **Preuve** : 73 tests passés (skeleton + modal + CSP + security + chunker + file_utils + cache + router + portability + no_silent_except), 0 failed
 
-### 9.3 🔴 Toasts animés (feedback mémoire) — confirmé toujours à faire
+### 9.3 ✅ Toasts animés (feedback mémoire) — CLOSED (25/07/2026)
 Le système `toast()` existe et est utilisé ailleurs (assignation de modèle, erreurs réseau), mais **aucun appel `toast()` après les clics 👍/👎** (`fetch('/api/feedback', ...)` et `/api/feedback/implicit` ne déclenchent rien visuellement).
+- **RED** : `tests/test_feedback_toast.py` (créé) — 2 tests vérifient la présence de `toast(` dans `sendFeedback()` et `sendImplicit()`
+- **GREEN** : `toast('Merci pour votre retour 👍', 'success')` dans `sendFeedback()` (signal=1), `toast('Noté, on fera mieux 👎', 'info')` (signal=-1), `toast('Réponse copiée 📋', 'success')` dans `sendImplicit()` (type='copy')
+- **Preuve** : 34 tests passés (2 nouveaux + 32 existants), 0 failed
 
 ### 9.4 🔴 Dark mode toggle — confirmé toujours à faire
 Les variables CSS (`--bg`, `--text`, etc.) existent mais un seul thème (sombre) est défini. Aucun toggle, aucune variante claire.
@@ -106,15 +114,14 @@ Aucune occurrence d'`os.system` dans `services/launcher.py`. Rien à coder.
 
 | Priorité | Tâche | Effort estimé | Impact |
 |----------|-------|----------------|--------|
-| 🔴 1 | 9.2 Skeleton loaders Skills/Analytics | 30 min | UX rapide |
-| 🔴 2 | 9.3 Toasts feedback mémoire | 30 min | UX rapide |
-| 🔴 3 | 9.1 Focus trap réel (+ durcir le test existant) | 1-2h | Accessibilité |
-| 🔴 4 | 8.4 I/O `orjson` + batch writes | 2-3h | Perf |
-| 🔴 5 | 8.0 + 8.5 Outillage perf + rapport final | 2h | Mesure/doc |
-| 🟢 6 | 9.4 Dark mode toggle (optionnel) | 2h | UX confort |
-| 🔵 7 | 10.1 / 10.2 / 10.3 Docs (ROADMAP, CHANGELOG, nettoyage commentaire) | 1-2h | Doc |
+| 🔴 1 | 9.3 Toasts feedback mémoire | 30 min | UX rapide |
+| 🔴 2 | 9.1 Focus trap réel (+ durcir le test existant) | 1-2h | Accessibilité |
+| 🔴 3 | 8.4 I/O `orjson` + batch writes | 2-3h | Perf |
+| 🔴 4 | 8.0 + 8.5 Outillage perf + rapport final | 2h | Mesure/doc |
+| 🟢 5 | 9.4 Dark mode toggle (optionnel) | 2h | UX confort |
+| 🔵 6 | 10.1 / 10.2 / 10.3 Docs (ROADMAP, CHANGELOG, nettoyage commentaire) | 1-2h | Doc |
 
-**Déjà fait, rien à planifier** : 0.1 (commit README), 7.4 (fuite d'erreur documents.py), 8.1 (pooling Ollama), 8.2 (numpy vector search), 8.3 (LRU vector cache), 10.4 (subprocess.run), 10.5 (stubs legacy supprimés).
+**Déjà fait, rien à planifier** : 0.1 (commit README), 7.4 (fuite d'erreur documents.py), 8.1 (pooling Ollama), 8.2 (numpy vector search), 8.3 (LRU vector cache), 9.2 (skeleton loaders Skills/Analytics), 10.4 (subprocess.run), 10.5 (stubs legacy supprimés).
 
 ---
 
@@ -132,15 +139,27 @@ Aucune occurrence d'`os.system` dans `services/launcher.py`. Rien à coder.
 
 ## 🎯 Prochaine Action
 
-Session du 25/07/2026 : 0.1, 7.4 et 10.5 traitées et committées (`7dd6401`, `05265fb`, `4b00bac`, patches fournis).
-
+### Session du 25/07/2026 — CLOSED
+0.1, 7.4 et 10.5 traitées et committées (`7dd6401`, `05265fb`, `4b00bac`).
 ```bash
-# Appliquer les 3 commits de cette session (si travail depuis l'archive zip)
 git am 0001-docs-aligne-README-suite-au-retrait-de-.opencode.patch
 git am 0002-fix-security-masque-le-d-tail-d-exception-brut-dans-.patch
 git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
+```
 
-# Puis démarrer la prochaine tâche : 9.2 (skeleton loaders Skills/Analytics)
-# Ouvrir static/assets/js/app.js — ajouter injectSkeletons() dans
-# refreshSkills() et refreshAnalytics(), monter le seuil du test à 5
+### Session du 26/07/2026 — 9.2 ✅
+- **Tâche** : 9.2 Skeleton loaders Skills/Analytics
+- **RED** : seuil `>= 3` → `>= 5` dans `tests/test_skeleton_loaders.py`
+- **GREEN** : `injectSkeletons(grid, 7)` dans `refreshSkills()` (app.js:493) + `injectSkeletons(kpisGrid, 8)` dans `refreshAnalytics()` (app.js:799)
+- **Preuve** : 73 tests passés, 0 failed
+
+### Session du 25/07/2026 — 9.3 ✅
+- **Tâche** : 9.3 Toasts animés feedback mémoire
+- **RED** : `tests/test_feedback_toast.py` (créé) — présence de `toast(` dans `sendFeedback()` et `sendImplicit()`
+- **GREEN** : `toast()` après fetch dans `sendFeedback()` (👍/👎) et `sendImplicit()` (📋 copy)
+- **Preuve** : 34 tests passés (2 nouveaux + 32 existants), 0 failed
+```bash
+# Prochaine tâche : 9.1 (focus trap réel)
+# Renforcer test_modal_accessibility.py puis implémenter le cycle Tab/Shift+Tab
+# Voir BACKLOG.md lignes 64-67
 ```

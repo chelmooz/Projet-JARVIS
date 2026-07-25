@@ -19,11 +19,12 @@ def test_skeleton_logic_in_app_js():
     """Vérifie que injectSkeletons() est définie ET appelée dans refreshAgents/refreshTools."""
     app_js = (ROOT / "static" / "assets" / "js" / "app.js").read_text(encoding="utf-8")
     assert "function injectSkeletons" in app_js, "La fonction injectSkeletons() doit être définie"
-    # définition (1) + appel dans refreshAgents (1) + appel dans refreshTools (1) = 3 minimum
+    # définition (1) + appel refreshAgents (1) + refreshTools (1) + refreshSkills (1) + refreshAnalytics (1) = 5 minimum
     nb = app_js.count("injectSkeletons(")
-    assert nb >= 3, (
-        f"injectSkeletons() doit être appelée dans refreshAgents() ET refreshTools() "
-        f"(définition + 2 appels attendus, {nb} occurrence(s) trouvée(s))"
+    assert nb >= 5, (
+        f"injectSkeletons() définie + appelée dans refreshAgents, refreshTools, "
+        f"refreshSkills ET refreshAnalytics "
+        f"(définition + 4 appels attendus, {nb} occurrence(s) trouvée(s))"
     )
 
 
