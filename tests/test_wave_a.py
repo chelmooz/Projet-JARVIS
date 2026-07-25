@@ -84,20 +84,21 @@ def test_embed_empty_embeddings_raises(monkeypatch):
 # A4 — _check_ollama ignore le port système 11434 (design portable)
 # ---------------------------------------------------------------------------
 def test_check_ollama_ignores_system_port(monkeypatch):
-    from controllers import context
-    from services.inference import InferenceService
+    from controllers import status
+    from services.adapters.ollama_adapter import OllamaAdapter
 
-    # InferenceService.ping() ne contacte que le port portable 11436
-    monkeypatch.setattr(InferenceService, "ping", lambda self: False)
-    assert context._check_ollama() is False
+    # Seul le port portable (OLLAMA_PORT) doit être testé ; on simule qu'il
+    # ne répond pas, quel que soit un éventuel Ollama système sur 11434.
+    monkeypatch.setattr(OllamaAdapter, "_check_endpoint", staticmethod(lambda url: False))
+    assert status._check_ollama() is False
 
 
 def test_check_ollama_ok_when_portable_up(monkeypatch):
-    from controllers import context
-    from services.inference import InferenceService
+    from controllers import status
+    from services.adapters.ollama_adapter import OllamaAdapter
 
-    monkeypatch.setattr(InferenceService, "ping", lambda self: True)
-    assert context._check_ollama() is True
+    monkeypatch.setattr(OllamaAdapter, "_check_endpoint", staticmethod(lambda url: True))
+    assert status._check_ollama() is True
 
 
 # ---------------------------------------------------------------------------

@@ -84,7 +84,7 @@ class FakeAgent:
         return {"response": "ok", "agent": "test", "model": model, "backend": "ollama"}
 
 def _apply_mocks():
-    """Injecte les fakes dans AppContext et resynchronise les globals.
+    """Injecte les fakes dans AppContext (via app.state.context, cf. DI FastAPI).
 
     Autouse car un test precedent dans la suite peut restaurer les vrais
     services dans son teardown (initialize()), ce qui ecrase nos mocks.
@@ -103,8 +103,6 @@ def _apply_mocks():
     ctx._ctx.orchestrator = MagicMock()
     ctx._ctx.orchestrator.handle_request.return_value = {"response": "ok"}
     ctx._ctx.metrics = MagicMock()
-    # Sync module-level vars so routes importing them get the mocks
-    ctx._sync_module_globals(ctx._ctx)
 
 
 # Skip real service init — inject mocks into AppContext (avant build_app)
@@ -122,7 +120,6 @@ def _restore_ctx():
     yield
     ctx._ctx._initialized = False
     ctx._ctx.initialize()
-    ctx._sync_module_globals(ctx._ctx)
     from controllers.di import AppContext
     app.state.context = AppContext()
     app.state.context.initialize()

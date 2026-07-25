@@ -147,7 +147,7 @@ class TestConvertedGetEndpointsBehavior:
     def _restore_context(self):
         """Restaure l'état global du contexte apres le test.
 
-        _make_client mute ctx._ctx + les globals module (_sync_module_globals) ;
+        _make_client mute ctx._ctx (les fakes injectés directement) ;
         sans restauration, le fake fuite vers les autres modules de test
         (ex: test_memory_leak -> /api/status -> vector.is_healthy()).
         """
@@ -158,7 +158,6 @@ class TestConvertedGetEndpointsBehavior:
         yield
         for k, v in saved.items():
             setattr(_ctx, k, v)
-        ctx._sync_module_globals(_ctx)
 
     def _make_client(self):
         from unittest.mock import MagicMock
@@ -185,7 +184,6 @@ class TestConvertedGetEndpointsBehavior:
         ctx._ctx.analytics = MagicMock()
         ctx._ctx.analytics.get_stats.return_value = {"total_queries": 0}
         ctx._ctx.analytics.get_most_used.return_value = {"top_agent": None}
-        ctx._sync_module_globals(ctx._ctx)
 
         from fastapi.testclient import TestClient
 

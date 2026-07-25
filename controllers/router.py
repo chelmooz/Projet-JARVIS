@@ -9,8 +9,8 @@ Dettes signalées (non corrigées ici) :
   vers ``controllers/routes/system.py`` (SRP : le router monte les routeurs,
   il ne définit pas d'endpoints).
 - La structure du dict de status (``_build_status``) est une réimplémentation
-  suite à la suppression des globales legacy de ``context.py`` ; à valider
-  contre le contrat attendu par le frontend (static/).
+  suite à la suppression des globales legacy de l'ancien ``context.py`` ; à
+  valider contre le contrat attendu par le frontend (static/).
 """
 
 from __future__ import annotations
@@ -237,24 +237,4 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-# ==============================================================================
-# STUB LEGACY POUR COMPATIBILITÉ DES TESTS (NE PAS UTILISER EN PRODUCTION)
-# ==============================================================================
-def _check_ollama() -> bool:
-    """Stub pour test_profiling.py — vérifie si Ollama répond.
-
-    Anciennement : globale mutable dans context.py, utilisée par le router
-    pour construire le cache de status. Supprimée lors du refacto (injection
-    via app.state + _build_status). Conservée comme stub pour ne pas casser
-    la collection de test_profiling.py qui fait :
-        _ORIG_ROUTER_CHECK = _router_mod._check_ollama
-    """
-    try:
-        from services.inference import InferenceService
-        return InferenceService().ping()
-    except Exception as e:
-        _logger.warning("Legacy _check_ollama failed: %s", e)
-        return False
-
-
-__all__ = ["create_app", "app", "_check_ollama"]
+__all__ = ["create_app", "app"]

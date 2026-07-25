@@ -99,7 +99,7 @@ def get_orchestrator(context: AppContext = Depends(get_app_context)) -> Any:
 
 
 # ==============================================================================
-# STUBS LEGACY POUR COMPATIBILITÉ DES TESTS (NE PAS UTILISER EN PRODUCTION)
+# STUB LEGACY POUR COMPATIBILITÉ DES TESTS (NE PAS UTILISER EN PRODUCTION)
 # ==============================================================================
 def get_context() -> AppContext:
     """Retourne le contexte applicatif singleton (véritable instance AppContext).
@@ -110,16 +110,6 @@ def get_context() -> AppContext:
     au teardown, tout en respectant le contrat DI (isinstance AppContext).
     """
     return _ctx
-
-
-def _check_ollama() -> bool:
-    """Stub pour test_wave_a.py — vérifie si Ollama répond."""
-    try:
-        from services.inference import InferenceService
-        return InferenceService().ping()
-    except Exception as e:
-        _logger.warning("Legacy _check_ollama failed: %s", e)
-        return False  # stub legacy, appelé uniquement par les tests
 
 
 # Singleton module-level — véritable instance AppContext (DI réelle, cf. controllers/di.py).
@@ -134,16 +124,6 @@ _ctx = AppContext()
 vector = _ctx.vector
 
 
-def _sync_module_globals(context: Any = None) -> None:
-    """Stub no-op pour test_api.py / test_response_wrapper.py.
-
-    Anciennement : synchronisait les globales de module (analytics, conversations, etc.)
-    depuis le contexte. Supprimé lors du refacto (injection via app.state).
-    Conservé comme no-op pour ne pas casser la collection des tests legacy.
-    """
-    pass
-
-
 __all__ = [
     "build_app",
     "get_app_context",
@@ -153,10 +133,8 @@ __all__ = [
     "get_agents_registry",
     "get_orchestrator",
     "get_context",
-    "_check_ollama",
     "_refresh_status_cache",
     "_status_refresher",
     "_warmup_vector_store",
     "_ctx",
-    "_sync_module_globals",
 ]

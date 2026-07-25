@@ -2,8 +2,6 @@
 
 Vérifie que le middleware slow_endpoint_profiler détecte les requêtes
 lentes, les log, et les expose dans /api/status (slow_endpoints).
-ATTENTION: les patches globaux de _check_ollama sont nettoyés en fin
-de fichier pour ne pas polluer les autres tests (cf. test_wave_a.py).
 """
 from unittest.mock import MagicMock
 
@@ -11,12 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import controllers.context as ctx
-import controllers.router as _router_mod  # noqa: E402
 from services import profiling
-
-# Sauvegarde pour cleanup en fin de module
-_ORIG_CTX_CHECK = ctx._check_ollama
-_ORIG_ROUTER_CHECK = _router_mod._check_ollama
 
 
 class FakeInference:
@@ -96,12 +89,10 @@ def _apply_mocks():
     ctx._ctx.orchestrator = MagicMock()
     ctx._ctx.orchestrator.handle_request.return_value = {"response": "ok"}
     ctx._ctx.metrics = MagicMock()
-    ctx._sync_module_globals(ctx._ctx)
 
-    # Évite l'appel réseau httpx réel de _check_ollama dans le route /api/status
-    # (qui bloque sous TestClient) ; le profiling n'en dépend pas.
-    ctx._check_ollama = lambda: False
-    _router_mod._check_ollama = lambda: False
+    # Note : /api/status (route _build_status) ignore l'appel réseau réel si
+    # `inference` n'expose pas `ping()` — FakeInference n'en définit pas,
+    # donc aucun appel httpx bloquant n'est déclenché sous TestClient.
 
 
 # Injection initiale des fakes avant la construction de l'app
@@ -173,9 +164,3 @@ class TestSlowProfiler:
         profiling.record_slow("/x", 3.0)
         eps = profiling.get_slow_endpoints()
         assert eps == [{"route": "/x", "max_duration": 3.0, "count": 2}]
-
-
-def teardown_module(module):
-    """Restaure les originaux de _check_ollama pour ne pas polluer les autres tests."""
-    ctx._check_ollama = _ORIG_CTX_CHECK
-    _router_mod._check_ollama = _ORIG_ROUTER_CHECK

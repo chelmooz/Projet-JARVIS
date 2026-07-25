@@ -146,9 +146,14 @@ class TestBackwardCompatibility:
         assert hasattr(context, "_setup_middlewares")
 
     def test_context_exports_status_symbols(self):
-        """context.py doit reexporter les symboles de status."""
+        """context.py doit reexporter les symboles de status utilisés en production.
+
+        `_check_ollama` n'est PAS reexporté : aucun code de prod ne l'utilise
+        via context.py (la route /api/status passe par `router._build_status`,
+        qui appelle `context.inference.ping()` directement). Le reexporter
+        serait de la compatibilité de code mort.
+        """
         from controllers import context
-        assert hasattr(context, "_check_ollama")
         assert hasattr(context, "_build_status_data")
         assert hasattr(context, "_refresh_status_cache")
         assert hasattr(context, "_status_refresher")
