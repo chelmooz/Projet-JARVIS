@@ -1,8 +1,8 @@
 # 📋 BACKLOG.md — Plan de Micro-Tâches TDD (mise à jour)
 
 **Projet** : JARVIS Portable Edition v5.4
-**État** : Phases 1-7.3 complétées ✅ · 802 tests verts (0 failed) · Score audit en progression
-**Objectif** : Passer à 90+/100 en corrigeant les HIGH restants + perf + polish
+**État** : Phases 1-7.3 + 7.5 complétées ✅ · 803 tests verts sur Linux (0 failed) · ⚠️ 23 failed sur Windows (voir 7.6) · Score audit en progression
+**Objectif** : Passer à 90+/100 en corrigeant les HIGH restants (dont 7.4, 7.6) + perf + polish
 **Règle d'or** : 1 micro-tâche = 1 fichier = 1 cycle RED/GREEN = 1 commit
 
 ---
@@ -46,7 +46,23 @@
 - **Commit** : `fix(security): log les 5 except:pass silencieux restants + garde-fou AST anti-régression`
 - Fichiers modifiés : `services/analysis_audit.py`, `services/launcher.py`, `services/vector.py`, `services/diagnostics/checks.py`, `tests/test_no_silent_except.py`
 
+### 7.6 🔴 Régression Windows — `authorize_path` rejette `PROJECT_DIR` lui-même (À FAIRE)
+- **Constat** : run pytest complet sur Windows (H:\Projet-JARVIS) après 7.5 → 23 failed / 779 passed (vs 803 passed sur Linux dans le même commit). Non reproduit sous Linux — spécifique au sandbox path Windows.
+- **Symptôme** : `FileSystemService.authorize_path()` logue `"Tentative de path traversal bloquée (lecteur Windows)"` et rejette systématiquement, y compris pour `PROJECT_DIR` lui-même (`WindowsPath('H:/Projet-JARVIS')`) et pour des dossiers temp légitimes (`tempfile.mkdtemp()`).
+- **Fichiers impactés** : `services/file_system.py` (logique de blocage lecteur Windows, log ligne 79) ; tests rouges : `tests/test_api_files.py` (6), `tests/test_file_system.py` (11), `tests/test_toolbox.py` (5)
+- **Cas critique** : `TestFileSystemSecureByDefault::test_secure_by_default_en_production` échoue sur `svc.authorize_path(PROJECT_DIR)` — si le sandbox refuse même son propre dossier projet, aucune route `/api/files/*` n'est utilisable en usage réel sur Windows
+- **RED** : déjà rouge sur Windows (voir run ci-dessus) — pas reproductible dans le sandbox Linux de dev, donc écrire un test qui simule explicitement un chemin `H:\...`/drive letter Windows sans dépendre de l'OS hôte
+- **GREEN** : identifier pourquoi le durcissement 7.1 ("lecteur Windows") bloque un chemin légitime — probablement une regex/comparaison de lecteur trop stricte introduite lors du hardening cross-platform
+- **Commit** : `fix(security): corrige le faux positif path-traversal sur lecteur Windows dans authorize_path`
+
 ---
+
+## 🪟 Phase 7-bis — Suivi Windows (issue live)
+
+### État constaté (run réel du 25/07, commit 6a2e4fd)
+- 23 failed / 779 passed / 40 skipped / 1 xfailed / 2 warnings sur Windows, vs 803 passed / 0 failed sur Linux (même commit)
+- Tous les échecs remontent à la même cause racine (7.6) : `authorize_path()` bloque toute autorisation de dossier sous Windows, y compris légitime
+- Priorité : à traiter avant Phase 8 (perf) — un sandbox fichiers cassé sur la plateforme cible principale (Windows) est bloquant pour l'usage réel
 
 ## ⚡ Phase 8 — Performance (RTOC+CoT)
 
