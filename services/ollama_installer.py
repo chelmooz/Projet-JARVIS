@@ -178,7 +178,8 @@ def _install_linux_tar(log: _LogFn) -> str | None:
                 else:
                     shutil.copy2(ep, dp)
         
-        result = os.path.join(BIN_DIR, "ollama")
+        # ✅ CORRECTION PHASE 6.1 : Retourne le chemin correct pour Linux (BIN_LINUX)
+        result = os.path.join(BIN_LINUX, "ollama")
     finally:
         if os.path.exists(dl_bin):
             shutil.rmtree(dl_bin, ignore_errors=True)
