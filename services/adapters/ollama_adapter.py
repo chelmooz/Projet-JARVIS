@@ -1,5 +1,4 @@
 """OllamaAdapter — Backend LLM via Ollama API native."""
-import contextlib
 import json
 import logging
 import os
@@ -39,13 +38,17 @@ class OllamaAdapter(LLMAdapter):
         # CORRECTION : Marquer comme fermé AVANT de fermer le client
         self._closed = True
         if self._http is not None:
-            with contextlib.suppress(Exception):
+            try:
                 self._http.close()
+            except Exception as e:
+                _logger.debug("Error closing HTTP client: %s", e)
             self._http = None
 
     def __del__(self):
-        with contextlib.suppress(Exception):
+        try:
             self.close()
+        except Exception as e:
+            _logger.debug("Error in __del__ during close: %s", e)
 
     def ping(self) -> bool:
         return OllamaAdapter._check_endpoint(self._base_url)

@@ -103,13 +103,15 @@ def _install_deps(python_path: str, requirements: str, log: Callable[..., Any]) 
     Returns:
         ``True`` si l'installation a réussi, ``False`` sinon.
     """
-    # Mise à jour silencieuse de pip
-    with contextlib.suppress(Exception):
+    # Mise à jour silencieuse de pip (best-effort)
+    try:
         subprocess.run(
             [python_path, "-m", "pip", "install", "--quiet", "--upgrade", "pip"],
             capture_output=True, timeout=30,
         )
         _logger.info("pip mis à jour avec succès")
+    except Exception as e:
+        _logger.debug("pip upgrade skipped: %s", e)
     
     r = subprocess.run(
         [python_path, "-m", "pip", "install", "--quiet", "-r", requirements],

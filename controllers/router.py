@@ -252,7 +252,8 @@ def _check_ollama() -> bool:
     try:
         from services.inference import InferenceService
         return InferenceService().ping()
-    except Exception:
+    except Exception as e:
+        _logger.warning("Legacy _check_ollama failed: %s", e)
         return False
 
 

@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from config.constants import MIN_GRAPH_EDGES, MIN_GRAPH_NODES
+
 BASE = Path(__file__).resolve().parent.parent
 
 
@@ -42,11 +44,11 @@ class TestStateModelStructure:
 
     def test_at_least_7_nodes(self):
         m = _load_model()
-        assert len(m["nodes"]) >= 7
+        assert len(m["nodes"]) >= MIN_GRAPH_NODES
 
     def test_at_least_42_edges(self):
         m = _load_model()
-        assert len(m["edges"]) >= 42
+        assert len(m["edges"]) >= MIN_GRAPH_EDGES
 
     def test_initial_node_exists(self):
         m = _load_model()

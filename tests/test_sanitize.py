@@ -4,6 +4,8 @@ import base64
 import pytest
 
 import services.sanitize as sanitize
+from config.constants import MAX_PATH_SEGMENT
+from services.sanitize import MAX_MODEL_NAME
 
 
 class TestCleanText:
@@ -29,7 +31,7 @@ class TestSafeModelName:
         assert sanitize.safe_model_name("llama3:8b") == "llama3:8b"
 
     def test_too_long_returns_empty(self):
-        assert sanitize.safe_model_name("a" * 200) == ""
+        assert sanitize.safe_model_name("a" * (MAX_MODEL_NAME + 1)) == ""
 
     def test_strips_special_chars(self):
         assert sanitize.safe_model_name("hello@world!") == "helloworld"
@@ -55,7 +57,7 @@ class TestSafePathSegment:
 
     def test_truncates_long(self):
         result = sanitize.safe_path_segment("a" * 2000)
-        assert len(result) == 1024
+        assert len(result) == MAX_PATH_SEGMENT
 
 
 class TestValidateBase64Image:

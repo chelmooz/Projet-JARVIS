@@ -4,6 +4,7 @@ import json
 import pytest
 
 import services.file_utils as fu
+from config.constants import RETRY_SUCCESS_CALLS
 
 
 class TestReadJson:
@@ -56,7 +57,7 @@ class TestRetry:
             return 42
 
         assert ok() == 42
-        assert len(calls) == 1
+        assert len(calls) == RETRY_SUCCESS_CALLS
 
     def test_retries_on_failure_then_succeeds(self):
         n = 0

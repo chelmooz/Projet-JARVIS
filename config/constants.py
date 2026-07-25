@@ -43,6 +43,10 @@ AGENT_TIMEOUT_SECONDS: Final[int] = 120  # Garde-fou wall-clock par agent.
 MAX_VECTOR_DOCS: Final[int] = 5000  # Borne de l'index vectoriel sur clef USB.
 MAX_FIND_FILES: Final[int] = 1000  # Borne des résultats de find_files.
 EMBEDDING_DIM: Final[int] = 768  # Dimension des embeddings nomic-embed-text-v2-moe.
+MAX_PATH_SEGMENT: Final[int] = 1024  # Longueur max segment de chemin (sanitize).
+RETRY_SUCCESS_CALLS: Final[int] = 1  # Nombre d'appels attendus en cas de succès immédiat (retry).
+MIN_GRAPH_NODES: Final[int] = 7  # Nombre minimum de nœuds dans le graphe d'états.
+MIN_GRAPH_EDGES: Final[int] = 42  # Nombre minimum d'arêtes dans le graphe d'états.
 
 # ---------------------------------------------------------------------------
 # Backend par défaut
@@ -98,6 +102,10 @@ MAX_ADAPTIVE_ATTEMPTS: Final[int] = 3
 
 CHUNK_SIZE: Final[int] = 500
 CHUNK_OVERLAP: Final[int] = 50
+
+# ---------------------------------------------------------------------------
+# Tests / Assertions (valeurs métier pour éviter les magic numbers)
+# ---------------------------------------------------------------------------
 
 if not (WEIGHT_MIN < WEIGHT_MAX):
     raise ValueError(f"WEIGHT_MIN ({WEIGHT_MIN}) must be < WEIGHT_MAX ({WEIGHT_MAX})")
@@ -228,6 +236,10 @@ __all__ = [
     "MAX_VECTOR_DOCS",
     "MAX_FIND_FILES",
     "EMBEDDING_DIM",
+    "MAX_PATH_SEGMENT",
+    "RETRY_SUCCESS_CALLS",
+    "MIN_GRAPH_NODES",
+    "MIN_GRAPH_EDGES",
     # Backend
     "DEFAULT_MODEL",
     "DEFAULT_BACKEND",

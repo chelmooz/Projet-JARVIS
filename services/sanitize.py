@@ -19,9 +19,10 @@ from typing import Callable, Match
 # Caractères ASCII imprimables autorisés dans les entrées textuelles libres
 _PRINTABLE: set[str] = set(string.printable) - {chr(127)}
 
+# Limites publiques (exportées pour tests)
+MAX_MODEL_NAME: int = 128
+MAX_PATH_LEN: int = 1024
 _MAX_TASK_LEN: int = 20_000
-_MAX_MODEL_NAME: int = 128
-_MAX_PATH_LEN: int = 1024
 
 
 def clean_text(text: str, max_len: int = _MAX_TASK_LEN) -> str:
@@ -56,7 +57,7 @@ def safe_model_name(name: str) -> str:
     Returns:
         Nom filtré, ou chaîne vide si invalide ou trop long.
     """
-    if not name or len(name) > _MAX_MODEL_NAME:
+    if not name or len(name) > MAX_MODEL_NAME:
         return ""
     allowed = set(string.ascii_letters + string.digits + "./:-_")
     return "".join(c for c in name if c in allowed)
@@ -73,7 +74,7 @@ def safe_path_segment(segment: str) -> str:
         segment: Segment de chemin à nettoyer.
 
     Returns:
-        Segment nettoyé, tronqué à ``_MAX_PATH_LEN``.
+        Segment nettoyé, tronqué à ``MAX_PATH_LEN``.
     """
     if not segment:
         return ""
@@ -81,7 +82,7 @@ def safe_path_segment(segment: str) -> str:
     cleaned = segment.replace("\\0", "").replace("\0", "")
     # Supprime les tentatives de traversée de répertoire
     cleaned = re.sub(r"(\.\.[/\\])+", "", cleaned)
-    return cleaned[:_MAX_PATH_LEN]
+    return cleaned[:MAX_PATH_LEN]
 
 
 def validate_base64_image(data: str, max_mb: int = 4) -> bool:
@@ -215,6 +216,8 @@ def scrub(text: str) -> str:
 
 
 __all__ = [
+    "MAX_MODEL_NAME",
+    "MAX_PATH_LEN",
     "clean_text",
     "safe_model_name",
     "safe_path_segment",

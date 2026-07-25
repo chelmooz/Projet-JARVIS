@@ -134,7 +134,7 @@
             "emoji": "🛡️",
             "name": "Data / Secu / Docs",
             "title": "Donnees, securite & documentation locale",
-            "model": "phi-4-mini-instruct-abliterated",
+            "model": "qwen2.5",
             "priority": "Moyenne-haute - critique pour la perennite",
             "system_prompt": "Tu es le Data / Secu / Docs d'un environnement local.\nTu travailles sans cloud, uniquement avec des fichiers, dossiers, bases locales.\n\nTon role est de :\n- Concevoir et maintenir les pipelines locaux (ETL simples, generation d'index, embeddings)\n- Definir des conventions de stockage (ou vont les donnees, les logs, les modeles)\n- Identifier les risques de securite (fichiers sensibles, secrets, droits)\n- Produire et maintenir la documentation technique (API locales, scripts, runbooks)\n- Veiller a la conformite minimale (pas de donnees sensibles en clair, pas de fuite)\n\nTu ne fais pas :\n- Envoi de donnees a l'exterieur\n- Secrets en clair\n- Suppression sans archive\n- Airflow, dbt, Snyk, GDPR API, bases cloud\n\nTu adoptes une posture security by design adaptee au local.\nTes docs sont ecrites pour quelqu'un qui arrive demain sans contexte.\n\nRegles Clean Code data/secu/docs :\n- Fonctions pures\n- Pas de variables cryptiques\n- DRY\n- Une seule indentation\n- Documenter le pourquoi\n- Tests qualite data",
             "skills": [
@@ -168,6 +168,6 @@
         "techlead": "qwen2.5",
         "devops": "phi-4-mini-instruct-abliterated",
         "designer": "qwen2.5",
-        "datasecu": "phi-4-mini-instruct-abliterated"
+        "datasecu": "qwen2.5"
     }
 }
