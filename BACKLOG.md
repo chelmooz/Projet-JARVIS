@@ -1,8 +1,8 @@
 # 📋 BACKLOG.md — Plan de Micro-Tâches TDD (mise à jour)
 
 **Projet** : JARVIS Portable Edition v5.4
-**État** : Phases 1-7.3 + 7.5 complétées ✅ · 803 tests verts sur Linux (0 failed) · ⚠️ 23 failed sur Windows (voir 7.6) · Score audit en progression
-**Objectif** : Passer à 90+/100 en corrigeant les HIGH restants (dont 7.4, 7.6) + perf + polish
+**État** : Phases 1-7.3 + 7.5 + 7.6 complétées ✅ · 803 tests verts sur Linux ET Windows (0 failed, confirmé réel) · Score audit en progression
+**Objectif** : Passer à 90+/100 en corrigeant les HIGH restants (dont 7.4) + perf + polish
 **Règle d'or** : 1 micro-tâche = 1 fichier = 1 cycle RED/GREEN = 1 commit
 
 ---
@@ -53,16 +53,14 @@
 - **Preuve** : suite complète Linux 803 passed / 0 failed (comportement inchangé sur Linux/macOS, `IS_WINDOWS=False`)
 - **Commit** : `fix(security): corrige le faux positif path-traversal sur lecteur Windows dans authorize_path`
 - Fichier modifié : `services/file_system.py`
-- ⚠️ **À confirmer par toi sur ta machine Windows réelle** — l'émulation `ntpath` est fiable mais ne remplace pas un run natif
+- **Confirmé en réel sur Windows** (commit `addb18e`) : 803 passed / 0 failed, les 23 échecs ont disparu
 
 ---
 
-## 🪟 Phase 7-bis — Suivi Windows (issue live)
+## 🪟 Historique — Régression Windows 7.6 (résolue)
 
-### État constaté (run réel du 25/07, commit 6a2e4fd)
-- 23 failed / 779 passed / 40 skipped / 1 xfailed / 2 warnings sur Windows, vs 803 passed / 0 failed sur Linux (même commit)
-- Tous les échecs remontent à la même cause racine (7.6) : `authorize_path()` bloque toute autorisation de dossier sous Windows, y compris légitime
-- Priorité : à traiter avant Phase 8 (perf) — un sandbox fichiers cassé sur la plateforme cible principale (Windows) est bloquant pour l'usage réel
+- **25/07, commit `6a2e4fd`** : run réel Windows → 23 failed / 779 passed (vs 803/0 sur Linux, même commit) — cause racine : `authorize_path()` bloquait toute autorisation de dossier sous Windows, y compris légitime
+- **25/07, commit `addb18e`** : fix `services/file_system.py` appliqué + confirmé en réel Windows → 803 passed / 0 failed, identique à Linux
 
 ## ⚡ Phase 8 — Performance (RTOC+CoT)
 
