@@ -46,14 +46,14 @@
 - **Commit** : `fix(security): log les 5 except:pass silencieux restants + garde-fou AST anti-régression`
 - Fichiers modifiés : `services/analysis_audit.py`, `services/launcher.py`, `services/vector.py`, `services/diagnostics/checks.py`, `tests/test_no_silent_except.py`
 
-### 7.6 🔴 Régression Windows — `authorize_path` rejette `PROJECT_DIR` lui-même (À FAIRE)
-- **Constat** : run pytest complet sur Windows (H:\Projet-JARVIS) après 7.5 → 23 failed / 779 passed (vs 803 passed sur Linux dans le même commit). Non reproduit sous Linux — spécifique au sandbox path Windows.
-- **Symptôme** : `FileSystemService.authorize_path()` logue `"Tentative de path traversal bloquée (lecteur Windows)"` et rejette systématiquement, y compris pour `PROJECT_DIR` lui-même (`WindowsPath('H:/Projet-JARVIS')`) et pour des dossiers temp légitimes (`tempfile.mkdtemp()`).
-- **Fichiers impactés** : `services/file_system.py` (logique de blocage lecteur Windows, log ligne 79) ; tests rouges : `tests/test_api_files.py` (6), `tests/test_file_system.py` (11), `tests/test_toolbox.py` (5)
-- **Cas critique** : `TestFileSystemSecureByDefault::test_secure_by_default_en_production` échoue sur `svc.authorize_path(PROJECT_DIR)` — si le sandbox refuse même son propre dossier projet, aucune route `/api/files/*` n'est utilisable en usage réel sur Windows
-- **RED** : déjà rouge sur Windows (voir run ci-dessus) — pas reproductible dans le sandbox Linux de dev, donc écrire un test qui simule explicitement un chemin `H:\...`/drive letter Windows sans dépendre de l'OS hôte
-- **GREEN** : identifier pourquoi le durcissement 7.1 ("lecteur Windows") bloque un chemin légitime — probablement une regex/comparaison de lecteur trop stricte introduite lors du hardening cross-platform
+### 7.6 ✅ Régression Windows — `authorize_path` rejetait `PROJECT_DIR` lui-même (CLOSED)
+- **Cause racine** : Cas A (`re.match(r'^[A-Za-z]:', ...)`) s'appliquait sans condition d'OS. Sur Windows natif, tout chemin absolu légitime commence par une lettre de lecteur → rejet systématique, y compris `PROJECT_DIR`
+- **Fix** : garde `not IS_WINDOWS` (constante réutilisée depuis `config/paths.py`) — Cas A ne s'applique plus que sur Linux/macOS, seul OS où l'artefact décrit dans le commentaire d'origine existe
+- **Validation** : émulation `ntpath`/`PureWindowsPath` (pas de host Windows disponible ici) — `PROJECT_DIR` autorisé, `C:\Windows\System32` et temp externe correctement refusés hors sandbox
+- **Preuve** : suite complète Linux 803 passed / 0 failed (comportement inchangé sur Linux/macOS, `IS_WINDOWS=False`)
 - **Commit** : `fix(security): corrige le faux positif path-traversal sur lecteur Windows dans authorize_path`
+- Fichier modifié : `services/file_system.py`
+- ⚠️ **À confirmer par toi sur ta machine Windows réelle** — l'émulation `ntpath` est fiable mais ne remplace pas un run natif
 
 ---
 

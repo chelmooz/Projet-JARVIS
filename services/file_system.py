@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from config.constants import JARVIS_DEV, MAX_FIND_FILES, PROJECT_DIR
+from config.paths import IS_WINDOWS
 
 _logger = logging.getLogger("jarvis.file_system")
 
@@ -74,8 +75,13 @@ class FileSystemService:
         normalized_path = path.replace("\\", "/")
             
         # Cas A : Rejet défensif des chemins absolus Windows (ex: "C:\...")
-        # Empêche l'artefact Linux où "C:" est traité comme un dossier relatif.
-        if re.match(r'^[A-Za-z]:', normalized_path):
+        # quand on tourne SUR Linux/macOS. Sur ces OS, ':' n'a aucun sens
+        # de séparateur pour os.path : "C:\Users\x" est traité comme un nom
+        # de fichier relatif littéral, ce qui peut créer un faux-négatif de
+        # sandboxing. Sur Windows natif, à l'inverse, le lecteur fait partie
+        # de TOUT chemin absolu légitime (y compris PROJECT_DIR lui-même) :
+        # ce garde-fou ne doit donc s'appliquer que hors Windows.
+        if not IS_WINDOWS and re.match(r'^[A-Za-z]:', normalized_path):
             _logger.warning("Tentative de path traversal bloquée (lecteur Windows) : %s", path)
             return False
             
