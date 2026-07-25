@@ -15,6 +15,7 @@ Dettes signalées (non corrigées ici) :
 from __future__ import annotations
 
 import logging
+import secrets
 import time
 
 from fastapi import FastAPI, Request
@@ -123,11 +124,13 @@ def _setup_middlewares(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def _security_headers_middleware(request: Request, call_next):
+        nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce
         resp = await call_next(request)
         resp.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            f"style-src 'self' 'nonce-{nonce}'; "
             "img-src 'self' data:; "
             "connect-src 'self'; "
             "form-action 'self'"

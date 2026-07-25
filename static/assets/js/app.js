@@ -205,6 +205,26 @@ document.getElementById('vision-btn').addEventListener('click', () => document.g
 document.getElementById('image-input').addEventListener('change', handleImageSelect);
 document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('vision-file').click());
 
+// Click delegation for CSP nonce compliance — replace onclick handlers
+document.addEventListener('click', e => {
+  const convItem = e.target.closest('[data-conv-id]');
+  if (convItem && !e.target.closest('[data-del-conv-id]')) {
+    loadConv(convItem.dataset.convId);
+    return;
+  }
+  const delBtn = e.target.closest('[data-del-conv-id]');
+  if (delBtn) {
+    e.stopPropagation();
+    deleteConv(delBtn.dataset.delConvId);
+    return;
+  }
+  const revokeBtn = e.target.closest('[data-revoke-path]');
+  if (revokeBtn) {
+    revokePath(atob(revokeBtn.dataset.revokePath));
+    return;
+  }
+});
+
 function handleImageSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -241,7 +261,7 @@ function handleVisionFile(input) {
         result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que llama3.2-vision:11b est bien installe.';
         return;
       }
-      result.innerHTML = '<div style="margin-bottom:6px;color:#aaa;font-size:11px;">Modele: ' + escHtml(data.model||'?') + '</div>' + renderMarkdown(data.response);
+      result.innerHTML = '<div class="model-meta">Modele: ' + escHtml(data.model||'?') + '</div>' + renderMarkdown(data.response);
       updateBadges(data.agent, data.model, data.backend);
     } catch (err) {
       result.textContent = 'Erreur : ' + err.message;
@@ -393,8 +413,8 @@ function buildAgentCard(key, p) {
         <button class="assign-btn" title="Assigne le modèle sélectionné à l'agent ${p.name || key}" data-profile="${key}">Appliquer</button>
         <span class="assign-status" id="status-${key}"></span>
       </div>
-      <div style="margin-top:8px">
-        <button class="chat-agent-btn" data-agent="${key}" style="width:100%;background:#00d4ff;color:#000;border:none;border-radius:6px;padding:8px;font-weight:700;cursor:pointer;font-size:12px;">💬 Discuter avec cet agent</button>
+      <div class="mt-8">
+        <button class="chat-agent-btn agent-btn-primary" data-agent="${key}">💬 Discuter avec cet agent</button>
       </div>
       <div class="card-prompt">
         <details>
@@ -560,12 +580,12 @@ async function loadConvs(targetId) {
           const preview = (c.title || '(sans titre)').slice(0, 50);
           const msgCount = c.msg_count || 0;
           const time = c.updated_at ? c.updated_at.slice(11, 19) : '';
-          return `<div class="conv-item${active}" data-id="${c.id}" onclick="loadConv('${c.id}')">
+          return `<div class="conv-item${active}" data-conv-id="${c.id}">
             <div class="conv-info">
               <div class="conv-title">${escHtml(preview)}</div>
               <div class="conv-meta">${msgCount} msg · ${time}</div>
             </div>
-            <button class="conv-del" onclick="event.stopPropagation();deleteConv('${c.id}')" title="Supprimer">✕</button>
+            <button class="conv-del" data-del-conv-id="${c.id}" title="Supprimer">✕</button>
           </div>`;
         }).join('');
     targetIds.forEach(id => {
@@ -823,7 +843,7 @@ async function refreshAnalytics() {
       });
     }
   } catch (e) {
-    document.getElementById('analytics-kpis').innerHTML = `<div class="analytics-card"><div class="label" style="color:#ff4444;">Erreur chargement analytics : ${escHtml(e.message)}</div></div>`;
+    document.getElementById('analytics-kpis').innerHTML = `<div class="analytics-card"><div class="label error-label">Erreur chargement analytics : ${escHtml(e.message)}</div></div>`;
   }
 }
 
@@ -1022,13 +1042,13 @@ async function refreshPathAuth() {
     if (!container) return;
     if (data.paths && data.paths.length > 0) {
       container.innerHTML = data.paths.map(p =>
-        `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#1a1a24;border-radius:4px;">
-          <span style="color:#ccc;font-family:monospace;font-size:11px;">${p}</span>
-          <button onclick='revokePath(atob("${btoa(p)}"))' style="padding:2px 8px;background:#440000;color:#ff4444;border:none;border-radius:4px;cursor:pointer;font-size:10px;">Revoquer</button>
+        `<div class="path-row">
+          <span class="path-name">${p}</span>
+          <button class="revoke-btn" data-revoke-path="${btoa(p)}">Revoquer</button>
         </div>`
       ).join('');
     } else {
-      container.innerHTML = '<span style="color:#555;">Aucun dossier autorise.</span>';
+      container.innerHTML = '<span class="empty-paths">Aucun dossier autorise.</span>';
     }
   } catch (e) {
     console.error('refreshPathAuth error:', e);

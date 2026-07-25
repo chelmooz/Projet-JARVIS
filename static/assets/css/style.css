@@ -282,6 +282,17 @@ textarea:focus-visible,
 
 /* --- Toast --- */
 .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+
+/* Utility classes for CSP nonce compliance — replace inline styles */
+.d-none { display: none !important; }
+.model-meta { margin-bottom:6px; color:#aaa; font-size:11px; }
+.agent-btn-primary { width:100%; background:#00d4ff; color:#000; border:none; border-radius:6px; padding:8px; font-weight:700; cursor:pointer; font-size:12px; }
+.path-row { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:#1a1a24; border-radius:4px; }
+.path-name { color:#ccc; font-family:monospace; font-size:11px; }
+.revoke-btn { padding:2px 8px; background:#440000; color:#ff4444; border:none; border-radius:4px; cursor:pointer; font-size:10px; }
+.error-label { color:#ff4444; }
+.empty-paths { color:#555; }
+.mt-8 { margin-top:8px; }
 .toast { padding: 10px 18px; border-radius: 8px; font-size: 13px; color: #fff; pointer-events: auto; animation: toast-in 0.3s ease; box-shadow: var(--shadow); max-width: 360px; word-wrap: break-word; }
 .toast.info { background: #0c3a52; border: 1px solid rgba(56, 189, 248, 0.35); }
 .toast.success { background: #0b3d2e; border: 1px solid rgba(52, 211, 153, 0.35); }

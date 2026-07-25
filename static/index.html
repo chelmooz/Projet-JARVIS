@@ -133,7 +133,7 @@
         <p>Cliquez ou déposez une image ici</p>
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" id="vision-file" aria-label="Sélectionner une image">
       </div>
-      <img id="vision-preview" alt="Aperçu de l'image à analyser" style="display:none">
+      <img id="vision-preview" alt="Aperçu de l'image à analyser" class="d-none">
       <div id="vision-result" role="status" aria-live="polite"></div>
     </div>
   </div>
@@ -200,7 +200,7 @@
           <span>Mode hors-ligne</span>
           <input type="checkbox" id="s-offline">
         </label>
-        <div id="offline-banner" style="display:none"></div>
+        <div id="offline-banner" class="d-none"></div>
       </div>
       <div class="settings-group">
         <h3>Dossiers autorisés</h3>
@@ -220,7 +220,7 @@
 <div class="fb-overlay" id="fb-overlay" role="dialog" aria-label="Sélection de dossier" aria-modal="true">
   <div class="fb-modal">
     <div class="fb-header">
-      <button class="fb-back" id="fb-back" style="display:none" aria-label="Retour">←</button>
+      <button class="fb-back d-none" id="fb-back" aria-label="Retour">←</button>
       <h3 id="fb-title">Sélectionner un dossier</h3>
       <button class="fb-close" id="fb-close" aria-label="Fermer">✕</button>
     </div>
@@ -235,7 +235,7 @@
 </div>
 
 <div class="toast-container" id="toast-container" role="alert" aria-live="assertive"></div>
-<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" id="image-input" style="display:none" aria-label="Sélection d'image cachée">
+<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" id="image-input" class="d-none" aria-label="Sélection d'image cachée">
 
 <script src="assets/js/app.js" defer onerror="document.getElementById('toast-container').innerHTML='<div class=toast-error>Erreur chargement app.js</div>'"></script>
 
