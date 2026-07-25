@@ -1,6 +1,6 @@
 # ROADMAP.md — Projet JARVIS
 # Micro-tâches TDD — Une tâche = Un fichier = Un cycle RED/GREEN
-# Mis à jour : 24 juillet 2026
+# Mis à jour : 26 juillet 2026
 # Règle : cocher [x] UNIQUEMENT après preuve verte collée.
 
 ---
@@ -178,6 +178,64 @@
   ```
 - [x] **PREUVE** : Sur macOS avec Ollama système, JARVIS démarre sans erreur.
 - [x] **COMMIT** : `fix(portability): fallback Ollama système dans JARVIS.sh (macOS)`
+
+---
+
+---
+
+## PHASE 7 — SÉCURITÉ ✅ (juillet 2026)
+
+### 7.1 → 7.6 Sandbox, rate-limit, path traversal, error leakage, CSP nonce
+- [x] **RED** : Audit complet des failles de sécurité (error leakage, path traversal, format string, CSP, PII).
+- [x] **GREEN** : Correction `vectorize_conversations` → message générique + `exc_info=True`.
+- [x] **GREEN** : Suppression stubs legacy `_check_ollama` / `_sync_module_globals` (code mort).
+- [x] **GREEN** : Garde-fou headers sécurité (`test_security_headers.py` — X-XSS-Protection absent, X-Content-Type-Options et X-Frame-Options présents).
+- [x] **PREUVE** : 811+ tests passés, 0 failed.
+- [x] **COMMIT** : `fix(security): masque le détail d'exception brut dans vectorize_conversations`
+- [x] **COMMIT** : `refactor: supprime les stubs legacy _check_ollama/_sync_module_globals`
+- [x] **COMMIT** : `test(security): garde-fou headers sécurité + nettoie commentaire X-XSS-Protection obsolète`
+
+---
+
+## PHASE 8 — PERFORMANCE (orjson + profiling) ✅ (juillet 2026)
+
+### 8.0 → 8.5 Profiling, connection pooling, vector search, cache LRU, orjson
+- [x] **RED** : `scripts/profile_app.py` et `scripts/bench_runner.py` créés (baseline).
+- [x] **RED** : `tests/test_io_perf.py` (4 benchmarks I/O).
+- [x] **GREEN** : `services/file_utils.py` migré `json` → `orjson` (read/write atomique + `write_json_batch`).
+- [x] **GREEN** : `services/memory.py` migré `json.load` → `file_utils.read_json`.
+- [x] **GREEN** : Connection pooling Ollama (déjà en prod — `httpx.Client(timeout=...)`).
+- [x] **GREEN** : Vector search numpy vectorisé (`np.argpartition` + `np.argsort`).
+- [x] **GREEN** : Vector cache LRU TTL 300s (`OrderedDict`).
+- [x] **RÉSULTAT** : Large writes **4x plus rapides P50** (58.9ms → 14.4ms), lectures **1.8x**.
+- [x] **RAPPORT** : `rapport_perf.md` avec comparaison stdlib/orjson et métriques P50/P95/P99.
+- [x] **COMMIT** : Phase 8 groupée (orjson + profiling + rapport).
+
+---
+
+## PHASE 9 — POLISH UX ✅ (juillet 2026)
+
+### 9.1 Focus trap modales
+- [x] **RED** : Test renforcé (vrais cycles Tab/Shift+Tab, `preventDefault`, `firstFocusable`/`lastFocusable`).
+- [x] **GREEN** : `trapTabKey()`, `getFocusableElements()`, store/restore `_lastFocused` dans `app.js`.
+- [x] **COMMIT** : `feat(ui): focus trap réel sur modale File Browser + durcit le test`
+
+### 9.2 Skeleton loaders Skills & Analytics
+- [x] **RED** : Seuil `>= 3` → `>= 5` dans `tests/test_skeleton_loaders.py`.
+- [x] **GREEN** : `injectSkeletons(grid, 7)` dans `refreshSkills()` + `injectSkeletons(kpisGrid, 8)` dans `refreshAnalytics()`.
+- [x] **COMMIT** : `feat(ui): ajoute skeleton loaders aux grilles Skills et Analytics`
+
+### 9.3 Toasts feedback mémoire (👍👎)
+- [x] **RED** : `tests/test_feedback_toast.py` — présence de `toast()` dans `sendFeedback()` et `sendImplicit()`.
+- [x] **GREEN** : `toast()` après fetch dans `sendFeedback()` (👍/👎) + `sendImplicit()` (📋 copy).
+- [x] **COMMIT** : `feat(ui): toasts animés pour les feedbacks mémoire`
+
+### 9.4 Dark mode toggle
+- [x] **RED** : `tests/test_dark_mode.py` (3 tests : bouton, CSS light, JS persistence).
+- [x] **GREEN CSS** : `:root[data-theme="light"]` + variables inversées + transition douce.
+- [x] **GREEN HTML** : `#theme-toggle` dans sidebar-header avec `aria-pressed`.
+- [x] **GREEN JS** : `initThemeToggle()`, `getTheme()`, `setTheme()`, `toggleTheme()` + localStorage `jarvis_theme`.
+- [x] **COMMIT** : `feat(ui): dark mode toggle avec persistance localStorage`
 
 ---
 
