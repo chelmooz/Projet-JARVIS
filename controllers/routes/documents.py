@@ -79,8 +79,11 @@ def vectorize_conversations(context: AppContext = Depends(get_app_context)):
     for entry in batch:
         try:
             docs, error = _vectorize_one_conversation(context, entry["id"])
-        except Exception as e:  # noqa: BLE001 - défensif
-            errors.append({"id": entry["id"], "error": str(e)})
+        except Exception:
+            _logger.error(
+                "Échec vectorisation conversation %s", entry["id"], exc_info=True
+            )
+            errors.append({"id": entry["id"], "error": "Erreur interne lors de la vectorisation"})
             continue
         if error:
             errors.append({"id": entry["id"], "error": error})
