@@ -11,6 +11,21 @@ import pytest
 # ---------------------------------------------------------------------------
 # A1 — Double sauvegarde conversation (save_results + _save_conv)
 # ---------------------------------------------------------------------------
+def test_save_conv_persists_full_response_not_truncated():
+    """Ex audit Qwen 3.8 : _save_conv ne tronquait plus a 1000 caracteres."""
+    from controllers.routes.jarvis import _save_conv
+
+    captured = {}
+
+    class _Conv:
+        def add_message(self, cid, role, content, **kw):
+            captured[role] = content
+
+    long_resp = "R" * 1500  # > 1000 (ancien plafond) et < 2000 (MAX_MESSAGE_LENGTH)
+    _save_conv("c", "t", {"response": long_resp, "agent": "dev", "model": "m"}, "dev", _Conv())
+    assert captured["assistant"] == long_resp  # plus de troncature a 1000
+
+
 def test_no_double_conversation_write_on_request(tmp_path):
     from controllers.routes.jarvis import _save_conv
     from services.conversation import ConversationService

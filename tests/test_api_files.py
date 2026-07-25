@@ -102,3 +102,21 @@ class TestApiFilesOperations:
         data = resp.json()
         assert data["success"]
         assert len(data["matches"]) >= 1
+
+
+class TestApiFilesBrowse:
+    """Route /api/files/browse (delegue a list_dir securise)."""
+
+    def test_files_browse_route_exists(self):
+        resp = client.get("/api/files/browse", params={"path": "."})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "success" in body
+
+    def test_files_drives_route_exists(self):
+        resp = client.get("/api/files/drives")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body.get("success") is True
+        assert "drives" in body
+        assert isinstance(body["drives"], list)

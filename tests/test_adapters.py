@@ -70,6 +70,30 @@ class TestOllamaAdapter:
         payload = call_kwargs[1]["json"]
         assert payload.get("keep_alive") == -1
 
+    def test_close_releases_http_client(self):
+        """Ex audit Qwen 3.8 : close() doit fermer et liberer le client httpx."""
+        a = OllamaAdapter(base_url="http://x")
+        fake = MagicMock()
+        a._http = fake
+        a.close()
+        fake.close.assert_called_once()
+        assert a._http is None
+
+    def test_fetch_models_cached_within_ttl(self):
+        """Ex audit Qwen 3.8 : _fetch_models() met en cache dans le TTL."""
+        a = OllamaAdapter(base_url="http://x")
+
+        class _Resp:
+            def json(self):
+                return {"models": [{"name": "m1"}]}
+
+        fake = MagicMock()
+        fake.get.return_value = _Resp()
+        a._http = fake
+        assert a._fetch_models() == ["m1"]
+        assert a._fetch_models() == ["m1"]  # hit cache
+        assert fake.get.call_count == 1
+
 
 # ─── AdapterRegistry ──────────────────────────────────────────────────────────
 
