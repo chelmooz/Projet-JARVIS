@@ -1,6 +1,5 @@
 """Route API — Code Review : sécurité, performance, maintenabilité."""
-
-from __future__ import annotations
+from __future__ import annotations  # ← CORRECTION : doubles underscores obligatoires
 
 from fastapi import APIRouter, Depends, Query
 

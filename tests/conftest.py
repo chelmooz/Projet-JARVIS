@@ -259,14 +259,25 @@ def app_context(orchestrator, fake_inference, fake_memory, fake_vector, fake_log
 
 @pytest.fixture
 def client(app_context, monkeypatch):
-    """Client de test FastAPI avec contexte injecté (sans état global réel)."""
+    """Client de test FastAPI avec contexte injecté (sans état global réel).
+
+    Utilise ``controllers.router.create_app()`` (et non ``context.build_app()``,
+    qui ne monte aucun routeur métier — ``/openapi.json``, ``/docs``, ``/static``
+    uniquement, vérifié empiriquement) pour que les routes ``/api/*`` répondent
+    réellement dans les tests utilisant ce fixture.
+    """
     from fastapi.testclient import TestClient
     import controllers.context as ctx_module
-    
+    from controllers.router import create_app
+
     # Patch de la façade legacy pour pointer vers notre contexte fake
     # C'est le seul endroit où monkeypatch est autorisé : le wiring de test.
     monkeypatch.setattr(ctx_module, "get_context", lambda: app_context)
     monkeypatch.setattr(ctx_module, "_ctx", app_context)
-    
-    app = ctx_module.build_app()
+
+    app = create_app()
+    # create_app() capture `_ctx` au moment de l'import du module router.py :
+    # le monkeypatch ci-dessus ne suffit pas à lui seul, on réassigne donc
+    # explicitement le contexte de l'app vers notre fake.
+    app.state.context = app_context
     return TestClient(app)

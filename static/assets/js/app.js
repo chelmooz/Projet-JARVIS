@@ -38,6 +38,26 @@ function renderMarkdown(text) {
     return safe;
 }
 
+// --- Skeleton Loaders (MT-FE-3) ---
+function buildSkeletonCard() {
+    return `<div class="skeleton-card">
+        <div class="skeleton-row">
+            <div class="skeleton skeleton-emoji"></div>
+            <div class="skeleton-col">
+                <div class="skeleton skeleton-line h-18 w-60"></div>
+                <div class="skeleton skeleton-line w-40"></div>
+            </div>
+        </div>
+        <div class="skeleton skeleton-line w-80"></div>
+        <div class="skeleton skeleton-line w-60"></div>
+    </div>`;
+}
+
+function injectSkeletons(grid, count) {
+    if (!grid) return;
+    grid.innerHTML = Array.from({ length: count }, buildSkeletonCard).join('');
+}
+
 // --- Tab switching ---
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -45,7 +65,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-        
+
         if (btn.dataset.tab === 'agents') refreshAgents();
         if (btn.dataset.tab === 'tools') refreshTools();
         if (btn.dataset.tab === 'settings') refreshPathAuth();
@@ -77,7 +97,7 @@ function addMsg(role, content, meta) {
     if (meta) {
         const m = document.createElement('div');
         m.className = 'meta';
-        m.innerHTML = Object.entries(meta).map(([k,v]) => `<span class="badge badge-${escHtml(k)}">${escHtml(v)}</span>`).join('');
+        m.innerHTML = Object.entries(meta).map(([k, v]) => `<span class="badge badge-${escHtml(k)}">${escHtml(v)}</span>`).join('');
         div.appendChild(m);
     }
     chat.appendChild(div);
@@ -90,11 +110,11 @@ let _lastRevisit = { id: null, t: 0 };
 function buildFeedbackRow(convId, msg) {
     const row = document.createElement('div');
     row.className = 'feedback-row';
-    row.innerHTML = 
+    row.innerHTML =
         '<button class="fb-btn" data-act="up" title="Utile (👍)">👍</button>' +
         '<button class="fb-btn" data-act="down" title="Pas utile (👎)">👎</button>' +
         '<button class="fb-btn" data-act="copy" title="Copier la reponse">📋</button>';
-        
+
     row.querySelectorAll('.fb-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const act = btn.dataset.act;
@@ -115,7 +135,7 @@ function renderAssistantMsg(convId, msg) {
     const div = document.createElement('div');
     div.className = 'msg assistant';
     div.innerHTML = renderMarkdown(msg.content || '');
-    
+
     if (msg.agent) {
         const meta = document.createElement('div');
         meta.className = 'meta';
@@ -124,7 +144,7 @@ function renderAssistantMsg(convId, msg) {
             + (msg.backend ? `<span class="badge badge-backend">${escHtml(msg.backend)}</span>` : '');
         div.appendChild(meta);
     }
-    
+
     if (msg.id && convId) {
         div.appendChild(buildFeedbackRow(convId, msg));
     }
@@ -156,14 +176,14 @@ async function enhanceLastAssistant(convId) {
         const conv = await resp.json();
         const c = conv.data || conv;
         if (c.error) return;
-        
+
         const msgs = c.messages || [];
         let target = null;
         for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i].role === 'assistant' && msgs[i].id) { target = msgs[i]; break; }
         }
         if (!target) return;
-        
+
         const last = chat.lastElementChild;
         if (last && last.classList.contains('assistant')) {
             last.replaceWith(renderAssistantMsg(convId, target));
@@ -178,7 +198,7 @@ function maybeRevisit(conv) {
         if (msgs[i].id) { lastId = msgs[i].id; break; }
     }
     if (!lastId) return;
-    
+
     const now = Date.now();
     if (_lastRevisit.id === conv.id && now - _lastRevisit.t < 60000) return;
     _lastRevisit = { id: conv.id, t: now };
@@ -240,25 +260,25 @@ function handleImageSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(ev) { pendingImage = ev.target.result; };
+    reader.onload = function (ev) { pendingImage = ev.target.result; };
     reader.readAsDataURL(file);
 }
 
 // --- Vision ---
-function handleVisionFile(input) {
-    const file = input.files[0];
+function handleVisionFile(inputEl) {
+    const file = inputEl.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async function(e) {
+    reader.onload = async function (e) {
         const preview = document.getElementById('vision-preview');
         preview.src = e.target.result;
         preview.style.display = 'block';
         document.querySelector('.upload-zone .icon').textContent = '✅';
-        
+
         const result = document.getElementById('vision-result');
         result.style.display = 'block';
         result.textContent = 'Analyse en cours...';
-        
+
         try {
             const resp = await fetch('/api/vision', {
                 method: 'POST',
@@ -266,7 +286,7 @@ function handleVisionFile(input) {
                 body: JSON.stringify({ image: e.target.result, task: 'Decris cette image en detail' })
             });
             const data = await resp.json();
-            
+
             if (!resp.ok) {
                 result.textContent = '❌ Erreur ' + resp.status + ' : ' + (data.error || JSON.stringify(data));
                 return;
@@ -275,8 +295,8 @@ function handleVisionFile(input) {
                 result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que llama3.2-vision:11b est bien installe.';
                 return;
             }
-            
-            result.innerHTML = '<div class="model-meta">Modele: ' + escHtml(data.model||'?') + '</div>' + renderMarkdown(data.response);
+
+            result.innerHTML = '<div class="model-meta">Modele: ' + escHtml(data.model || '?') + '</div>' + renderMarkdown(data.response);
             updateBadges(data.agent, data.model, data.backend);
         } catch (err) {
             result.textContent = 'Erreur : ' + err.message;
@@ -323,8 +343,9 @@ function populateDefaultModelSelect() {
 async function refreshAgents() {
     const grid = document.getElementById('agents-grid');
     const count = document.getElementById('agent-count');
+    injectSkeletons(grid, 4);
     if (availableModels.length === 0) await fetchModels();
-    
+
     try {
         const resp = await fetch('/api/agents');
         if (!resp.ok) {
@@ -335,30 +356,30 @@ async function refreshAgents() {
         const profiles = (data.data || {}).profiles || {};
         const keys = Object.keys(profiles);
         count.textContent = keys.length;
-        
+
         if (keys.length === 0) {
             grid.innerHTML = '<div class="tools-empty">Aucun profil trouve.</div>';
             return;
         }
-        
+
         let html = '';
         for (const key of keys) {
             const p = profiles[key];
             html += buildAgentCard(key, p);
         }
         grid.innerHTML = html;
-        
+
         document.querySelectorAll('.assign-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const profile = e.target.dataset.profile;
                 const select = document.getElementById('model-' + profile);
                 const model = select.value;
-                
+
                 if (!availableModels.includes(model)) {
                     toast('Modele indisponible: ' + model, 'error');
                     return;
                 }
-                
+
                 e.target.disabled = true;
                 try {
                     const r = await fetch('/api/agents/assign', {
@@ -375,7 +396,7 @@ async function refreshAgents() {
                 e.target.disabled = false;
             });
         });
-        
+
         document.querySelectorAll('.chat-agent-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const agent = e.target.dataset.agent;
@@ -387,8 +408,8 @@ async function refreshAgents() {
                     ]);
                     const beData = await beResp.json();
                     const agData = await agResp.json();
-                    const profiles = (agData.data || {}).profiles || {};
-                    const profile = profiles[agent] || {};
+                    const profs = (agData.data || {}).profiles || {};
+                    const profile = profs[agent] || {};
                     const model = profile.model || '—';
                     const backend = beData.backend || '—';
                     updateBadges(agent, model, backend);
@@ -409,10 +430,10 @@ function buildAgentCard(key, p) {
     const modelOpts = availableModels.length > 0
         ? availableModels.map(m => `<option value="${m}" ${p.model === m ? 'selected' : ''}>${m}</option>`).join('')
         : `<option value="${p.model}" selected>${p.model}</option>`;
-        
+
     const skills = (p.skills || []).map(s => `<span class="skill-tag">${s}</span>`).join('');
-    const tools = Object.entries(p.tools || {}).map(([k,v]) => `<span class="tool-tag" title="${v}">${k}</span>`).join('');
-    
+    const tools = Object.entries(p.tools || {}).map(([k, v]) => `<span class="tool-tag" title="${v}">${k}</span>`).join('');
+
     return `<div class="agent-card">
         <div class="card-header">
             <div class="card-emoji">${p.emoji || '🤖'}</div>
@@ -445,6 +466,7 @@ function buildAgentCard(key, p) {
 // --- Tools (Diagnostic) ---
 async function refreshTools() {
     const grid = document.querySelector('#tab-tools .tools-grid');
+    injectSkeletons(grid, 6);
     try {
         const resp = await fetch('/api/diag');
         if (!resp.ok) { grid.innerHTML = '<div class="tools-empty">API /api/diag indisponible (HTTP ' + resp.status + ')</div>'; return; }
@@ -485,12 +507,12 @@ async function refreshSkills() {
         const enabledIds = data.enabled_ids || [];
         count.textContent = skills.length;
         status.textContent = enabledIds.length + ' skill' + (enabledIds.length > 1 ? 's' : '') + ' actif' + (enabledIds.length > 1 ? 's' : '');
-        
+
         if (skills.length === 0) {
             grid.innerHTML = '<div class="tools-empty">Aucun skill configure.</div>';
             return;
         }
-        
+
         grid.innerHTML = skills.map(s => {
             const checked = enabledIds.includes(s.id) ? 'checked' : '';
             return `<div class="skill-card" data-id="${s.id}">
@@ -540,11 +562,11 @@ async function pollStatus() {
         setSide('st-ollama', s.ollama ? 'OK' : 'HS', s.ollama ? 'ok' : 'err');
         setSide('st-memory', s.memory_ok ? 'OK' : 'ERR', s.memory_ok ? 'ok' : 'err');
         setSide('st-vector', s.vector_ok ? 'OK' : 'ERR', s.vector_ok ? 'ok' : 'err');
-    } catch(e) {
+    } catch (e) {
         document.getElementById('st-backend').innerHTML = '<span class="status-dot dot-err"></span>HS';
         document.getElementById('st-ollama').innerHTML = '<span class="status-dot dot-err"></span>HS';
     }
-    
+
     try {
         const mr = await fetch('/api/metrics');
         const m = await mr.json();
@@ -552,7 +574,7 @@ async function pollStatus() {
         document.getElementById('st-rss').textContent = rss;
         document.getElementById('st-requests').textContent = (m.requests || 0).toLocaleString();
         document.getElementById('st-uptime').textContent = m.uptime_human || '—';
-    } catch(e) {}
+    } catch (e) {}
 }
 
 pollStatus();
@@ -581,7 +603,7 @@ async function loadConvs(targetId) {
         const data = await resp.json();
         const convs = (data.data || data).conversations || [];
         const className = convs.length === 0 ? 'sidebar-convs-list empty' : 'sidebar-convs-list';
-        
+
         const html = convs.length === 0
             ? 'Aucune conversation'
             : convs.map(c => {
@@ -597,7 +619,7 @@ async function loadConvs(targetId) {
                     <button class="conv-del" data-del-conv-id="${c.id}" title="Supprimer">✕</button>
                 </div>`;
             }).join('');
-            
+
         targetIds.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -620,20 +642,20 @@ async function loadConv(id) {
         const conv = await resp.json();
         const c = conv.data || conv;
         if (c.error) return;
-        
+
         currentConvId = c.id;
-        const chat = document.getElementById('chat-messages');
-        chat.innerHTML = '';
-        
+        const chatEl = document.getElementById('chat-messages');
+        chatEl.innerHTML = '';
+
         for (const msg of (c.messages || [])) {
             if (msg.role === 'assistant') {
-                chat.appendChild(renderAssistantMsg(conv.id, msg));
+                chatEl.appendChild(renderAssistantMsg(conv.id, msg));
                 continue;
             }
             const div = document.createElement('div');
             div.className = 'msg ' + (msg.role === 'user' ? 'user' : 'system');
             div.textContent = msg.content;
-            
+
             if (msg.agent) {
                 const meta = document.createElement('div');
                 meta.className = 'meta';
@@ -642,13 +664,13 @@ async function loadConv(id) {
                     + (msg.backend ? `<span class="badge badge-backend">${msg.backend}</span>` : '');
                 div.appendChild(meta);
             }
-            chat.appendChild(div);
+            chatEl.appendChild(div);
         }
-        
+
         if (conv.id) maybeRevisit(conv);
-        chat.scrollTop = chat.scrollHeight;
+        chatEl.scrollTop = chatEl.scrollHeight;
         loadConvs();
-        
+
         const chatTab = document.querySelector('.tab-btn[data-tab="chat"]');
         if (chatTab) chatTab.click();
     } catch (e) {
@@ -684,25 +706,25 @@ async function clearAllConvs() {
 async function send() {
     const text = input.value.trim();
     if (!text) return;
-    
+
     const isOffline = document.getElementById('s-offline').checked;
     if (isOffline) {
         addMsg('system', '🔌 Mode hors-ligne activé. Désactivez-le dans Settings pour envoyer des messages.');
         return;
     }
-    
+
     input.value = '';
     input.style.height = 'auto';
-    
+
     let taskText = text;
     if (selectedAgent && !text.startsWith('@')) {
         taskText = '@' + selectedAgent + ' ' + text;
     }
-    
+
     addMsg('user', taskText);
     sendBtn.disabled = true;
     addTyping();
-    
+
     try {
         if (!currentConvId) {
             const titleText = text.replace(/^@\S+\s*/, '').slice(0, 60) || text.slice(0, 60);
@@ -714,22 +736,22 @@ async function send() {
             const cd = await cr.json();
             currentConvId = (cd.data || cd).conversation_id;
         }
-        
+
         const body = { task: taskText, conversation_id: currentConvId };
         if (pendingImage) { body.image = pendingImage; pendingImage = null; }
-        
+
         const resp = await fetch('/api/jarvis', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
         const data = await resp.json();
-        
+
         removeTyping();
         const response = data.response || JSON.stringify(data, null, 2);
         addMsg('assistant', response, { agent: data.agent, model: data.model, backend: data.backend });
         updateBadges(data.agent, data.model, data.backend);
-        
+
         if (data.suggested_skill) refreshSkills();
         enhanceLastAssistant(currentConvId);
         loadConvs();
@@ -754,7 +776,7 @@ let lastVectorizeResult = null;
 function updateOrCreateChart(canvasId, type, labels, datasets, options) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
-    
+
     if (analyticsCharts[canvasId]) {
         const chart = analyticsCharts[canvasId];
         chart.data.labels = labels;
@@ -762,7 +784,7 @@ function updateOrCreateChart(canvasId, type, labels, datasets, options) {
         chart.update();
         return chart;
     }
-    
+
     analyticsCharts[canvasId] = new Chart(canvas.getContext('2d'), {
         type: type,
         data: { labels: labels, datasets: datasets },
@@ -773,7 +795,7 @@ function updateOrCreateChart(canvasId, type, labels, datasets, options) {
 
 async function refreshAnalytics() {
     if (!document.getElementById('tab-analytics').classList.contains('active')) return;
-    
+
     try {
         const [analyticsResp, metricsResp, vectorResp, agentsResp] = await Promise.all([
             fetch('/api/analytics'),
@@ -781,18 +803,18 @@ async function refreshAnalytics() {
             fetch('/api/vectorize'),
             fetch('/api/agents'),
         ]);
-        
+
         const analytics = await analyticsResp.json();
         const metrics = (await metricsResp.json()).data || {};
         const vector = await vectorResp.json();
         const agentsData = (await agentsResp.json()).data || {};
         const agentProfiles = agentsData.profiles || {};
-        
+
         const agentNameMap = {};
         for (const [key, val] of Object.entries(agentProfiles)) {
             agentNameMap[key] = val.name || key;
         }
-        
+
         const queries = (analytics.queries || []).filter(q => q && q.agent !== undefined);
         const totalQueries = metrics.requests || queries.length;
         const totalErrors = metrics.errors || 0;
@@ -804,7 +826,7 @@ async function refreshAnalytics() {
             : '—';
         const vecConvs = lastVectorizeResult ? lastVectorizeResult.conversations : 0;
         const vecRemaining = lastVectorizeResult ? lastVectorizeResult.remaining : '—';
-        
+
         document.getElementById('analytics-kpis').innerHTML = `
             <div class="analytics-card"><div class="value">${totalQueries}</div><div class="label">Requêtes totales</div></div>
             <div class="analytics-card"><div class="value">${errorRate}%</div><div class="label">Taux d'erreur</div></div>
@@ -815,7 +837,7 @@ async function refreshAnalytics() {
             <div class="analytics-card"><div class="value">${vecRemaining}</div><div class="label">Restantes</div></div>
             <div class="analytics-card"><div class="value">${metrics.pipeline_runs || 0}</div><div class="label">Pipelines exécutés</div></div>
         `;
-        
+
         const agentCounts = {};
         const agentLatencies = {};
         queries.forEach(q => {
@@ -824,22 +846,22 @@ async function refreshAnalytics() {
             if (!agentLatencies[agent]) agentLatencies[agent] = [];
             agentLatencies[agent].push(q.latency_ms || 0);
         });
-        
+
         const agentKeys = Object.keys(agentCounts);
         const agentLabels = agentKeys.map(k => agentNameMap[k] || k);
         const agentData = agentKeys.map(k => agentCounts[k]);
-        const agentColors = ['#00d4ff','#7b2ff7','#ffaa00','#00ff88','#ff4444','#888'];
-        
+        const agentColors = ['#00d4ff', '#7b2ff7', '#ffaa00', '#00ff88', '#ff4444', '#888'];
+
         if (typeof Chart !== 'undefined' && agentLabels.length) {
             updateOrCreateChart('chart-agent', 'doughnut', agentLabels, [{ data: agentData, backgroundColor: agentColors, borderWidth: 0 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#888', font: { size: 10 } } } } });
-            
+
             const avgLatPerAgent = agentKeys.map(k => {
                 const vals = agentLatencies[k];
-                return vals.length ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(0) : 0;
+                return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(0) : 0;
             });
             updateOrCreateChart('chart-latency', 'bar', agentLabels, [{ label: 'ms', data: avgLatPerAgent, backgroundColor: '#004466', borderRadius: 4 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#666' } }, x: { ticks: { color: '#888', font: { size: 10 } } } } });
         }
-        
+
         const hourly = new Array(24).fill(0);
         queries.forEach(q => {
             const ts = q.ts || q.timestamp;
@@ -848,11 +870,10 @@ async function refreshAnalytics() {
                 if (h >= 0 && h < 24) hourly[h]++;
             }
         });
-        
+
         if (typeof Chart !== 'undefined') {
-            updateOrCreateChart('chart-hourly', 'bar', Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+'h'), [{ data: hourly, backgroundColor: hourly.map(v => v > 0 ? '#004466' : '#1a1a24'), borderRadius: 2 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#666', stepSize: 1 } }, x: { ticks: { color: '#555', font: { size: 9 }, maxRotation: 0 } } } });
-            
-            const vecTotal = vectorized + pendingV;
+            updateOrCreateChart('chart-hourly', 'bar', Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + 'h'), [{ data: hourly, backgroundColor: hourly.map(v => v > 0 ? '#004466' : '#1a1a24'), borderRadius: 2 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#666', stepSize: 1 } }, x: { ticks: { color: '#555', font: { size: 9 }, maxRotation: 0 } } } });
+
             updateOrCreateChart('chart-vector', 'doughnut', ['Vectorisés', 'En attente'], [{ data: [vectorized, pendingV], backgroundColor: ['#00d4ff', '#2a2a3a'], borderWidth: 0 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#888', font: { size: 10 } } } } });
         }
     } catch (e) {
@@ -867,12 +888,12 @@ document.getElementById('btn-vectorize-convs')?.addEventListener('click', async 
     btn.disabled = true;
     btn.textContent = '⏳ Vectorisation en cours...';
     status.textContent = '';
-    
+
     try {
         const resp = await fetch('/api/vectorize/conversations', { method: 'POST' });
         const data = await resp.json();
         lastVectorizeResult = data;
-        
+
         if (data.conversations > 0) {
             status.textContent = `✅ ${data.conversations} conversation(s) traitee(s), ${data.vectorized} document(s) vectorise(s)`;
             refreshAnalytics();
@@ -894,28 +915,28 @@ document.getElementById('btn-ingest-doc')?.addEventListener('click', async () =>
     const nameInput = document.getElementById('doc-name');
     const contentInput = document.getElementById('doc-content');
     const content = contentInput.value.trim();
-    
+
     if (!content) {
         status.textContent = '⚠️ Veuillez saisir un contenu';
         return;
     }
-    
+
     btn.disabled = true;
     btn.textContent = '⏳ Ingestion...';
     status.textContent = '';
-    
+
     try {
         const doc = { text: content };
         const name = nameInput.value.trim();
         if (name) doc.metadata = { title: name };
-        
+
         const resp = await fetch('/api/ingest', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ documents: [doc], source: 'manual' }),
         });
         const data = await resp.json();
-        
+
         if (data.error) {
             status.textContent = `❌ ${data.error}`;
         } else {
@@ -937,12 +958,12 @@ fetchModels();
 
 // --- Keyboard shortcuts (Modal & Chat) ---
 document.addEventListener('keydown', e => {
-    // 1. Fermer la modale File Browser avec la touche Escape
+    // 1. Fermer la modale File Browser avec la touche Escape (MT-FE-2)
     if (e.key === 'Escape') {
         closeBrowser();
     }
-    
-    // 2. Raccourci Ctrl+C pour aller au chat (si on n'est pas en train de taper)
+
+    // 2. Raccourci Ctrl+C pour aller au chat
     if (e.key === 'c' && (e.ctrlKey || e.metaKey) && document.activeElement !== input) {
         e.preventDefault();
         document.querySelector('.tab-btn[data-tab="chat"]').click();
@@ -988,7 +1009,7 @@ function applyOfflineState(offline) {
     }
     const banner = document.getElementById('offline-banner');
     if (banner) banner.style.display = offline ? 'block' : 'none';
-    
+
     const chatInput = document.getElementById('chat-input');
     if (chatInput) chatInput.placeholder = offline ? 'Mode hors-ligne — désactivez dans Settings' : 'Posez votre question à JARVIS...';
     if (sendBtn) sendBtn.disabled = !!offline;
@@ -1019,19 +1040,19 @@ refreshSkills();
 
 // --- File Path authorization ---
 async function authorizePath() {
-    const input = document.getElementById('fp-path');
+    const pathInput = document.getElementById('fp-path');
     const fb = document.getElementById('fp-feedback');
-    const path = input ? input.value.trim() : '';
+    const path = pathInput ? pathInput.value.trim() : '';
     if (!path) return;
-    
+
     try {
         const r = await fetch('/api/files/authorize', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path}),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path }),
         });
         const data = await r.json();
-        
+
         if (data.success) {
             fb.className = 'fp-feedback ok';
             fb.textContent = `✅ Dossier autorise : ${path}`;
@@ -1043,7 +1064,7 @@ async function authorizePath() {
         fb.className = 'fp-feedback err';
         fb.textContent = `❌ Erreur reseau : ${e.message}`;
     }
-    input.value = '';
+    pathInput.value = '';
     refreshPathAuth();
     setTimeout(() => { fb.className = 'fp-feedback'; }, 4000);
 }
@@ -1053,11 +1074,11 @@ async function revokePath(path) {
     try {
         const r = await fetch('/api/files/authorize', {
             method: 'DELETE',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path}),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path }),
         });
         const data = await r.json();
-        
+
         if (data.success) {
             fb.className = 'fp-feedback ok';
             fb.textContent = `🔓 Acces revoque : ${path}`;
@@ -1079,7 +1100,7 @@ async function refreshPathAuth() {
         const data = await r.json();
         const container = document.getElementById('fp-list');
         if (!container) return;
-        
+
         if (data.paths && data.paths.length > 0) {
             container.innerHTML = data.paths.map(p =>
                 `<div class="path-row">
@@ -1115,21 +1136,21 @@ async function loadDrives() {
     const bread = document.getElementById('fb-breadcrumb');
     const backBtn = document.getElementById('fb-back');
     const pathInput = document.getElementById('fb-path');
-    
+
     if (pathInput) pathInput.value = '';
     backBtn.style.display = 'none';
     bread.innerHTML = '<span>Lecteurs</span>';
     body.innerHTML = '<div class="fb-empty">Chargement...</div>';
-    
+
     try {
         const r = await fetch('/api/files/drives');
         const data = await r.json();
-        
+
         if (!data.drives || data.drives.length === 0) {
             body.innerHTML = '<div class="fb-empty">Aucun lecteur trouve.</div>';
             return;
         }
-        
+
         body.innerHTML = data.drives.map(d =>
             `<div class="fb-drive" data-path="${d.name}">
                 <span class="icon">💾</span>
@@ -1137,7 +1158,7 @@ async function loadDrives() {
                 <span class="space">${d.free_gb} Go / ${d.total_gb} Go libres</span>
             </div>`
         ).join('');
-        
+
         body.querySelectorAll('.fb-drive').forEach(el => {
             el.addEventListener('click', () => browseDir(el.dataset.path));
         });
@@ -1151,27 +1172,27 @@ async function browseDir(path) {
     const bread = document.getElementById('fb-breadcrumb');
     const backBtn = document.getElementById('fb-back');
     const pathInput = document.getElementById('fb-path');
-    
+
     if (pathInput) pathInput.value = path;
     fbHistory.push(path);
     backBtn.style.display = 'inline-block';
     body.innerHTML = '<div class="fb-empty">Chargement...</div>';
-    
+
     const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
     let cumul = '';
     bread.innerHTML = '<a class="fb-crumb" data-target="">Lecteurs</a>';
-    
+
     parts.forEach((p, i) => {
         cumul += (i === 0 && /^[A-Z]$/i.test(p) ? ':' : '') + (i > 0 && cumul ? '/' : '') + p;
         const displayPath = cumul.match(/^[A-Z]:$/i) ? cumul + '\\' : cumul;
-        
+
         if (i < parts.length - 1) {
             bread.innerHTML += `<span>›</span> <a class="fb-crumb" data-target="${displayPath.replace(/\\/g, '/')}">${p}</a>`;
         } else {
             bread.innerHTML += `<span>›</span> <span>${p}</span>`;
         }
     });
-    
+
     bread.querySelectorAll('.fb-crumb').forEach(el => {
         el.addEventListener('click', () => {
             const t = el.dataset.target;
@@ -1179,23 +1200,23 @@ async function browseDir(path) {
             else browseDir(t.replace(/\//g, '\\'));
         });
     });
-    
+
     try {
         const r = await fetch('/api/files/browse?path=' + encodeURIComponent(path));
         const data = await r.json();
-        
+
         if (!data.entries || data.entries.length === 0) {
             body.innerHTML = '<div class="fb-empty">Dossier vide ou inaccessible.</div>';
             return;
         }
-        
+
         body.innerHTML = data.entries.map(e =>
             `<div class="fb-folder" data-path="${e.path}">
                 <span class="icon">📁</span>
                 <span>${e.name}</span>
             </div>`
         ).join('');
-        
+
         body.querySelectorAll('.fb-folder').forEach(el => {
             el.addEventListener('click', () => browseDir(el.dataset.path));
         });
@@ -1220,7 +1241,7 @@ function browserSelect() {
     if (!pathInput) return;
     const path = pathInput.value;
     if (!path) return;
-    
+
     const fpPath = document.getElementById('fp-path');
     if (fpPath) fpPath.value = path;
     closeBrowser();
