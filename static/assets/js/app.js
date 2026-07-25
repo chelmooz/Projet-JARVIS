@@ -84,7 +84,7 @@ function addMsg(role, content, meta) {
     chat.scrollTop = chat.scrollHeight;
 }
 
-// --- Feedback mémoire (auto-amélioration) ---
+// --- Feedback mémoire ---
 let _lastRevisit = { id: null, t: 0 };
 
 function buildFeedbackRow(convId, msg) {
@@ -212,7 +212,6 @@ input.addEventListener('keydown', e => {
 });
 
 sendBtn.addEventListener('click', send);
-document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'l') { e.preventDefault(); clearChat(); } });
 document.getElementById('vision-btn').addEventListener('click', () => document.getElementById('image-input').click());
 document.getElementById('image-input').addEventListener('change', handleImageSelect);
 document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('vision-file').click());
@@ -329,7 +328,7 @@ async function refreshAgents() {
     try {
         const resp = await fetch('/api/agents');
         if (!resp.ok) {
-            grid.innerHTML = '<div class="tools-empty">API /api/agents indisponible (HTTP ' + resp.status + '). Redemarrez JARVIS.</div>';
+            grid.innerHTML = '<div class="tools-empty">API /api/agents indisponible (HTTP ' + resp.status + ').</div>';
             return;
         }
         const data = await resp.json();
@@ -831,7 +830,7 @@ async function refreshAnalytics() {
         const agentData = agentKeys.map(k => agentCounts[k]);
         const agentColors = ['#00d4ff','#7b2ff7','#ffaa00','#00ff88','#ff4444','#888'];
         
-        if (Chart && agentLabels.length) {
+        if (typeof Chart !== 'undefined' && agentLabels.length) {
             updateOrCreateChart('chart-agent', 'doughnut', agentLabels, [{ data: agentData, backgroundColor: agentColors, borderWidth: 0 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#888', font: { size: 10 } } } } });
             
             const avgLatPerAgent = agentKeys.map(k => {
@@ -850,7 +849,7 @@ async function refreshAnalytics() {
             }
         });
         
-        if (Chart) {
+        if (typeof Chart !== 'undefined') {
             updateOrCreateChart('chart-hourly', 'bar', Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+'h'), [{ data: hourly, backgroundColor: hourly.map(v => v > 0 ? '#004466' : '#1a1a24'), borderRadius: 2 }], { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#666', stepSize: 1 } }, x: { ticks: { color: '#555', font: { size: 9 }, maxRotation: 0 } } } });
             
             const vecTotal = vectorized + pendingV;
@@ -936,12 +935,24 @@ document.getElementById('btn-ingest-doc')?.addEventListener('click', async () =>
 loadConvs();
 fetchModels();
 
-// --- Keyboard shortcut ---
+// --- Keyboard shortcuts (Modal & Chat) ---
 document.addEventListener('keydown', e => {
+    // 1. Fermer la modale File Browser avec la touche Escape
+    if (e.key === 'Escape') {
+        closeBrowser();
+    }
+    
+    // 2. Raccourci Ctrl+C pour aller au chat (si on n'est pas en train de taper)
     if (e.key === 'c' && (e.ctrlKey || e.metaKey) && document.activeElement !== input) {
         e.preventDefault();
         document.querySelector('.tab-btn[data-tab="chat"]').click();
         input.focus();
+    }
+
+    // 3. Raccourci Ctrl+L pour vider le chat
+    if (e.key === 'l' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        clearChat();
     }
 });
 
