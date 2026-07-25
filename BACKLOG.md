@@ -61,9 +61,18 @@ Fuite réelle trouvée et corrigée : **`controllers/routes/documents.py:83`** (
 
 ## 🎨 Phase 9 — Polish UX (confirmée, avec une nuance importante sur 9.1)
 
-### 9.1 🔴 Focus Trap complet (modals) — TOUJOURS À FAIRE, attention au faux positif
+### 9.1 ✅ Focus Trap complet (modals) — CLOSED (26/07/2026)
 `tests/test_modal_accessibility.py` existe et **passe**, mais son assertion est trop faible (`querySelectorAll` apparaît n'importe où dans `app.js`, donc le test est vert sans que la fonctionnalité existe). Vérification directe : **aucun handler `Tab`/`shiftKey` de cycle de focus n'existe** dans `app.js` — seule la fermeture par `Escape` est implémentée (MT-FE-2).
-- **Action recommandée** : renforcer le test (vérifier un vrai cycle Tab/Shift+Tab dans la modale) avant de le re-valider, puis implémenter le focus trap.
+
+#### Micro-tâches exécutées (26/07/2026)
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| 9.1.1 | **RED** : renforcer le test (vérifier vrais cycles Tab/Shift+Tab, `preventDefault`, `firstFocusable`/`lastFocusable`) | ✅ |
+| 9.1.2 | **GREEN** : implémenter `trapTabKey()` + stockage `_lastFocused` + restauration dans `closeBrowser()` | ✅ |
+| 9.1.3 | **Focus initial** : `firstFocusable.focus()` dans `openBrowser()` | ✅ |
+| 9.1.4 | **Refactor** : `getFocusableElements()` + `trapTabKey()` utilitaires réutilisables | ✅ |
+| 9.1.5 | **Vérification** : 6 tests modal + 45 tests connexes passés, 0 failed | ✅ |
+- **Fichiers modifiés** : `tests/test_modal_accessibility.py`, `static/assets/js/app.js`
 - **Commit** : `feat(ui): focus trap réel sur modale File Browser + durcit le test`
 
 ### 9.2 ✅ Skeleton Loaders — Skills & Analytics — CLOSED (26/07/2026)
@@ -114,14 +123,12 @@ Aucune occurrence d'`os.system` dans `services/launcher.py`. Rien à coder.
 
 | Priorité | Tâche | Effort estimé | Impact |
 |----------|-------|----------------|--------|
-| 🔴 1 | 9.3 Toasts feedback mémoire | 30 min | UX rapide |
-| 🔴 2 | 9.1 Focus trap réel (+ durcir le test existant) | 1-2h | Accessibilité |
-| 🔴 3 | 8.4 I/O `orjson` + batch writes | 2-3h | Perf |
-| 🔴 4 | 8.0 + 8.5 Outillage perf + rapport final | 2h | Mesure/doc |
-| 🟢 5 | 9.4 Dark mode toggle (optionnel) | 2h | UX confort |
-| 🔵 6 | 10.1 / 10.2 / 10.3 Docs (ROADMAP, CHANGELOG, nettoyage commentaire) | 1-2h | Doc |
+| 🔴 1 | 8.4 I/O `orjson` + batch writes | 2-3h | Perf |
+| 🔴 2 | 8.0 + 8.5 Outillage perf + rapport final | 2h | Mesure/doc |
+| 🟢 3 | 9.4 Dark mode toggle (optionnel) | 2h | UX confort |
+| 🔵 4 | 10.1 / 10.2 / 10.3 Docs (ROADMAP, CHANGELOG, nettoyage commentaire) | 1-2h | Doc |
 
-**Déjà fait, rien à planifier** : 0.1 (commit README), 7.4 (fuite d'erreur documents.py), 8.1 (pooling Ollama), 8.2 (numpy vector search), 8.3 (LRU vector cache), 9.2 (skeleton loaders Skills/Analytics), 10.4 (subprocess.run), 10.5 (stubs legacy supprimés).
+**Déjà fait, rien à planifier** : 0.1 (commit README), 7.4 (fuite d'erreur documents.py), 8.1 (pooling Ollama), 8.2 (numpy vector search), 8.3 (LRU vector cache), 9.1 (focus trap modal), 9.2 (skeleton loaders Skills/Analytics), 10.4 (subprocess.run), 10.5 (stubs legacy supprimés).
 
 ---
 
@@ -158,8 +165,10 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 - **RED** : `tests/test_feedback_toast.py` (créé) — présence de `toast(` dans `sendFeedback()` et `sendImplicit()`
 - **GREEN** : `toast()` après fetch dans `sendFeedback()` (👍/👎) et `sendImplicit()` (📋 copy)
 - **Preuve** : 34 tests passés (2 nouveaux + 32 existants), 0 failed
-```bash
-# Prochaine tâche : 9.1 (focus trap réel)
-# Renforcer test_modal_accessibility.py puis implémenter le cycle Tab/Shift+Tab
-# Voir BACKLOG.md lignes 64-67
-```
+
+### Session du 26/07/2026 — 9.1 ✅ focus trap
+- **Tâche** : 9.1 Focus trap réel sur modales
+- **9.1.1 RED** : test renforcé (6 tests, 0 implémentation → 3 failed)
+- **9.1.2–9.1.4 GREEN** : `trapTabKey()`, `getFocusableElements()`, focus initial, store/restore `_lastFocused`
+- **9.1.5 Vérification** : 6/6 test modal accessibilité + 45 tests connexes passés
+- **Prochaine tâche** : 8.4 I/O `orjson` + batch writes (ou autre priorité)

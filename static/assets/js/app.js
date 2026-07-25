@@ -1124,16 +1124,61 @@ async function refreshPathAuth() {
 // --- File browser (Settings → Parcourir) ---
 let fbHistory = [];
 
+const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function getFocusableElements(container) {
+    return container.querySelectorAll(FOCUSABLE_SELECTOR);
+}
+
+function trapTabKey(e, firstFocusable, lastFocusable) {
+    if (e.key === 'Tab') {
+        if (e.shiftKey) {
+            if (document.activeElement === firstFocusable) {
+                e.preventDefault();
+                lastFocusable.focus();
+            }
+        } else {
+            if (document.activeElement === lastFocusable) {
+                e.preventDefault();
+                firstFocusable.focus();
+            }
+        }
+    }
+}
+
 function closeBrowser() {
-    document.getElementById('fb-overlay').classList.remove('show');
+    const overlay = document.getElementById('fb-overlay');
+    const modal = document.querySelector('.fb-modal');
+    if (modal && modal._trapHandler) {
+        modal.removeEventListener('keydown', modal._trapHandler);
+        delete modal._trapHandler;
+    }
+    if (overlay._lastFocused && overlay._lastFocused.focus) {
+        overlay._lastFocused.focus();
+    }
+    overlay.classList.remove('show');
     fbHistory = [];
 }
 
 function openBrowser() {
     const overlay = document.getElementById('fb-overlay');
+    overlay._lastFocused = document.activeElement;
     overlay.classList.add('show');
     fbHistory = [];
     loadDrives();
+
+    const modal = document.querySelector('.fb-modal');
+    const focusableEls = getFocusableElements(modal);
+    const firstFocusable = focusableEls[0];
+    const lastFocusable = focusableEls[focusableEls.length - 1];
+
+    function handler(e) {
+        trapTabKey(e, firstFocusable, lastFocusable);
+    }
+    modal._trapHandler = handler;
+    modal.addEventListener('keydown', handler);
+
+    if (firstFocusable) firstFocusable.focus();
 }
 
 async function loadDrives() {
