@@ -1,5 +1,35 @@
 """Tests Fix #2 — Vérifie que les except silencieux (pass) loggent l'erreur."""
+import ast
+from pathlib import Path
 from unittest.mock import mock_open, patch
+
+from config.constants import PROJECT_DIR
+
+_EXCLUDED_DIRS = {".venv", "node_modules", ".git", "tests", "logs", "static"}
+
+
+def _bare_except_pass_offenders() -> list[str]:
+    """Liste 'fichier:ligne' des except dont le corps est un simple `pass` (sans log)."""
+    offenders: list[str] = []
+    for path in Path(PROJECT_DIR).rglob("*.py"):
+        if any(part in _EXCLUDED_DIRS for part in path.parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ExceptHandler) and len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
+                offenders.append(f"{path.relative_to(PROJECT_DIR)}:{node.lineno}")
+    return offenders
+
+
+class TestNoBareExceptPass:
+    """Phase 7.5 — Aucun `except ...: pass` silencieux ne doit subsister en prod (AUDIT_REPORT §8)."""
+
+    def test_no_silent_except_pass_in_production_code(self):
+        offenders = _bare_except_pass_offenders()
+        assert offenders == [], f"except:pass sans logging trouvés : {offenders}"
 
 
 class TestNoSilentExcept:

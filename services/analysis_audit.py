@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import ast
 import contextlib
+import logging
 import os
 import subprocess
 import sys
 from typing import Any
+
+_logger = logging.getLogger("jarvis.analysis_audit")
 
 from services.analysis_core import (
     _PROJECT_ROOT,
@@ -324,8 +327,8 @@ class QualityAuditor:
                     text = f.read()
                 file_contents[fp] = text
                 all_content_parts.append(text)
-            except OSError:
-                pass
+            except OSError as e:
+                _logger.debug("Fichier illisible ignoré dans l'audit (%s): %s", fp, e)
         all_content = "\n".join(all_content_parts)
 
         dead: list[str] = []

@@ -38,12 +38,13 @@
 - **GREEN** : Logger avec `exc_info=True`, retourner message générique
 - **Commit** : `fix(security): masque les stack traces côté client`
 
-### 7.5 🔴 Logging des 15 bare excepts (À FAIRE)
-- **Fichiers** : 12 fichiers (voir AUDIT_REPORT §8)
-- **Problème** : `except Exception: pass` sans log
-- **RED** : Étendre `tests/test_no_silent_except.py`
-- **GREEN** : Ajouter `_logger.warning()` ou `_logger.error()` partout
-- **Commit** : `fix(security): log tous les bare excepts`
+### 7.5 ✅ Logging des bare excepts (CLOSED)
+- **Constat** : les 15 excepts listés en AUDIT_REPORT §8 étaient déjà loggés (fix antérieur non reflété dans ce backlog)
+- **RED réel** : garde-fou AST (`tests/test_no_silent_except.py::TestNoBareExceptPass`) a détecté 5 `except: pass` silencieux supplémentaires, hors de la liste §8 : `services/analysis_audit.py:327`, `services/launcher.py:54`, `services/vector.py:166`, `services/diagnostics/checks.py:54`, `services/diagnostics/checks.py:155`
+- **GREEN** : `_logger.debug(...)` ajouté sur les 5 (logger créé dans `analysis_audit.py`, absent avant) ; le garde-fou AST scanne désormais tout le code de prod en continu (anti-régression)
+- **Preuve** : suite complète 803 passed / 0 failed / 40 skipped / 1 xfailed (vs 802 avant, +1 = le nouveau test de garde-fou)
+- **Commit** : `fix(security): log les 5 except:pass silencieux restants + garde-fou AST anti-régression`
+- Fichiers modifiés : `services/analysis_audit.py`, `services/launcher.py`, `services/vector.py`, `services/diagnostics/checks.py`, `tests/test_no_silent_except.py`
 
 ---
 

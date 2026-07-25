@@ -51,8 +51,8 @@ def wait_for_port_free(host: str, port: int, max_attempts: int = PORT_POLL_MAX_A
                 s.settimeout(SOCKET_TIMEOUT)
                 if s.connect_ex((host, port)) != 0:
                     return True
-        except OSError:
-            pass
+        except OSError as e:
+            _logger.debug("Erreur socket pendant l'attente de libération du port %d: %s", port, e)
         time.sleep(PORT_POLL_WAIT)
     _logger.warning("Port %d toujours occupé après %d tentatives", port, max_attempts)
     return False

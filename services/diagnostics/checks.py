@@ -51,8 +51,8 @@ def check_os() -> dict[str, Any]:
         try:
             release = platform.freedesktop_os_release()
             dist = " ".join(release.get(x, "?") for x in ["ID", "VERSION_ID"])
-        except OSError:
-            pass
+        except OSError as e:
+            _logger.debug("freedesktop_os_release indisponible, fallback platform.platform(): %s", e)
     return {
         "os": platform.system().lower(),
         "dist": dist,
@@ -152,8 +152,8 @@ def _parse_nvidia_vram(stdout: str) -> float:
                     return round(float(vram_str.replace("mib", "").strip()) / 1024, 1)
                 if "gib" in vram_str:
                     return round(float(vram_str.replace("gib", "").strip()), 1)
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as e:
+                _logger.debug("Format VRAM non reconnu (%r): %s", vram_str, e)
     return 0.0
 
 

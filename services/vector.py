@@ -163,8 +163,8 @@ class VectorService(VectorPort):
             try:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                _logger.debug("Échec du nettoyage du fichier temporaire %s: %s", temp_path, cleanup_err)
             raise
 
     # ==============================================================================
