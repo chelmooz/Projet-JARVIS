@@ -982,6 +982,27 @@ document.addEventListener('keydown', e => {
     }
 });
 
+// --- Mobile Sidebar Toggle (MT-FE-12) ---
+const hamburger = document.getElementById('hamburger');
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+if (hamburger && sidebar && sidebarBackdrop) {
+    hamburger.addEventListener('click', () => {
+        const isOpen = sidebar.classList.toggle('show');
+        sidebarBackdrop.classList.toggle('show', isOpen);
+        hamburger.setAttribute('aria-expanded', isOpen);
+        hamburger.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
+    });
+
+    sidebarBackdrop.addEventListener('click', () => {
+        sidebar.classList.remove('show');
+        sidebarBackdrop.classList.remove('show');
+        hamburger.setAttribute('aria-expanded', 'false');
+        hamburger.setAttribute('aria-label', 'Ouvrir le menu');
+    });
+}
+
 // --- Settings persistence ---
 document.getElementById('s-default-model').addEventListener('change', e => {
     localStorage.setItem('jarvis_default_model', e.target.value);
@@ -1335,3 +1356,20 @@ function initThemeToggle() {
 }
 
 initThemeToggle();
+
+// --- Mobile sidebar hamburger (MT-FE-12.1) ---
+const hamburger = document.getElementById('hamburger');
+const sidebar = document.querySelector('.sidebar');
+const sidebarBackdrop = document.querySelector('.sidebar-backdrop');
+
+if (hamburger && sidebar && sidebarBackdrop) {
+    hamburger.addEventListener('click', () => {
+        sidebar.classList.toggle('show');
+        sidebarBackdrop.classList.toggle('show');
+    });
+
+    sidebarBackdrop.addEventListener('click', () => {
+        sidebar.classList.remove('show');
+        sidebarBackdrop.classList.remove('show');
+    });
+}
