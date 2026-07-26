@@ -11,8 +11,6 @@ et sauvegarde dans ``profile_output.prof`` (visualisable avec ``snakeviz``).
 import argparse
 import cProfile
 import pstats
-import sys
-import time
 
 from fastapi.testclient import TestClient
 

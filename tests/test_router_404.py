@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from controllers.router import app
 
-
 client = TestClient(app)
 
 

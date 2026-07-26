@@ -18,7 +18,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Base commune — politique de validation stricte (DRY + invariant unique)
 # ---------------------------------------------------------------------------

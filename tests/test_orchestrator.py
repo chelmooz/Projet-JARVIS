@@ -6,7 +6,6 @@ Posture TDD stricte :
 - Suppression des tests de méthodes privées (_build_fallback_response, etc.).
 - Suppression des patchs globaux (injection via le constructeur).
 """
-import pytest
 
 
 class TestOrchestratorTextFlow:

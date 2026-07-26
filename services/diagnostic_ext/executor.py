@@ -4,6 +4,7 @@ normaliser le résultat/erreur. Délègue la vérification binaire (SHA256) et l
 résolution de chemin à ses modules spécialisés (security / binary).
 """
 from __future__ import annotations
+
 import re
 import subprocess
 import sys

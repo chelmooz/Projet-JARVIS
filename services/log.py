@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from config.constants import MAX_LOG_ENTRIES, PROJECT_DIR
-from ports import LogPort, LogLevel
+from ports import LogLevel, LogPort
 from services.file_utils import write_json_atomic
 
 _logger = logging.getLogger("jarvis.log")

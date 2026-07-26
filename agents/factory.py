@@ -30,7 +30,6 @@ from agents.cyber import CyberAgent
 from agents.generic import GenericAgent
 from agents.vision import VisionAgent
 
-
 # ---------------------------------------------------------------------------
 # Contrats structurels des services injectés (ISP).
 # Union des sous-ensembels réellement consommés par les 3 classes d'agents

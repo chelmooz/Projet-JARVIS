@@ -8,18 +8,17 @@ Fournit les constantes de chemins et les utilitaires pour :
 """
 from __future__ import annotations
 
-import contextlib
 import logging
 import os
 import shutil
 import subprocess
 import sys
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 _logger = logging.getLogger(__name__)
 
-from config.paths import (
+from config.paths import (  # noqa: E402  # avoid circular import
     BIN_DIR,
     BIN_LINUX,
     BIN_MAC,
@@ -209,6 +208,8 @@ __all__ = [
     "BASE_DIR",
     "PYTHON",
     "VENV_DIR",
+    "BIN_LINUX",
+    "BIN_MAC",
     "find_python",
     "ensure_venv",
     "get_ollama_path",

@@ -2,13 +2,10 @@
 
 Verifies that POST /api/jarvis is blocked server-side when offline=true.
 """
-import os
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
-from services.selector import read_preferences
 
 
 def _get_client():
@@ -36,6 +33,7 @@ def _get_client():
         def get_active_backend(self): return "ollama"
 
     from unittest.mock import MagicMock
+
     import controllers.context as ctx_mod
     ctx_mod._ctx.inference = FakeInference()
     ctx_mod._ctx.orchestrator = MagicMock()
@@ -82,8 +80,9 @@ class TestOfflineEnforcement:
         """Once set, offline mode should persist until explicitly disabled."""
         client = _get_client()
         client.put('/api/settings', json={'key': 'offline', 'value': True})
-        from config.paths import PREFERENCES_FILE
         import json
+
+        from config.paths import PREFERENCES_FILE
         with open(PREFERENCES_FILE, encoding="utf-8") as f:
             prefs = json.load(f)
         assert prefs.get("offline") is True

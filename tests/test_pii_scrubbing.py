@@ -42,8 +42,8 @@ class TestPiiScrubbing:
 
     def test_search_scrubs_results(self):
         """Les résultats de recherche doivent être scrubés (PII masquées)."""
-        from controllers.routes.documents import search_documents
         from controllers.di import AppContext
+        from controllers.routes.documents import search_documents
         from services.sanitize import scrub
 
         class FakeVector:

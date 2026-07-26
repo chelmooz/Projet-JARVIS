@@ -106,7 +106,7 @@ class VectorIndex:
                 return data
             raise ValueError("Structure de données JSON invalide")
 
-        except (json.JSONDecodeError, OSError, ValueError) as e:
+        except (json.JSONDecodeError, OSError, ValueError):
             _logger.critical(
                 "Fichier d'index vectoriel corrompu (%s). Sauvegarde et réinitialisation.",
                 self._path

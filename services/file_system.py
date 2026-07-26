@@ -3,6 +3,7 @@ Permissions : seuls les dossiers explicitement autorisés par l'utilisateur
 sont lisibles. Rien n'est copié, tout est lu en RAM (max 10 Ko/fichier).
 """
 from __future__ import annotations
+
 import glob as glob_mod
 import logging
 import os

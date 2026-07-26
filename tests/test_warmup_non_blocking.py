@@ -1,7 +1,10 @@
 """Test que le warmup ne bloque pas le lifespan > 2s même si Ollama est down."""
 import time
+
 from fastapi.testclient import TestClient
+
 from controllers.router import create_app
+
 
 def test_lifespan_ready_under_2s_without_ollama():
     """Le lifespan doit démarrer en < 2s même si Ollama est injoignable."""

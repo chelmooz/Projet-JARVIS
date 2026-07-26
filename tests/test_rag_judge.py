@@ -6,11 +6,12 @@ Vérifie que LlmResponseJudge :
 - lève une exception si le JSON est invalide
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-from services.adapters.protocols import IResponseJudge, LLMAdapter
-from services.rag_judge import LlmResponseJudge, JudgeParseError
+import pytest
+
+from services.adapters.protocols import LLMAdapter
+from services.rag_judge import LlmResponseJudge
 
 
 @pytest.fixture

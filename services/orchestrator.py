@@ -11,8 +11,8 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import Any, Protocol
 from collections.abc import Callable
+from typing import Any, Protocol
 
 from ports import (
     AnalyticsPort,
@@ -114,10 +114,7 @@ class OrchestratorService:
         self.metrics.incr_requests("/api/jarvis")
         start = time.time()
 
-        if image:
-            result = self._handle_vision(task, image, conv_id, start)
-        else:
-            result = self._handle_text(task, conv_id, start)
+        result = self._handle_vision(task, image, conv_id, start) if image else self._handle_text(task, conv_id, start)
 
         if isinstance(result, dict):
             result["conversation_id"] = conv_id

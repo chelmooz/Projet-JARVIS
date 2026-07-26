@@ -12,8 +12,9 @@ Comportement attendu après correction :
 - Valeurs validées par regex ^[A-Za-z0-9_.\-]{1,128}$
 - Absence de allowed_params = liste vide (fail-safe)
 """
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, ANY
 
 
 class TestCommandExecutorBuildArgs:

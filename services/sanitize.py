@@ -14,8 +14,8 @@ from __future__ import annotations
 import base64
 import re
 import string
-from re import Match
 from collections.abc import Callable
+from re import Match
 
 # Caractères ASCII imprimables autorisés dans les entrées textuelles libres
 _PRINTABLE: set[str] = set(string.printable) - {chr(127)}

@@ -9,7 +9,6 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict
-from typing import Tuple
 
 # --- État global du rate limiter ---
 # _hits : dictionnaire IP -> liste de timestamps (secondes)

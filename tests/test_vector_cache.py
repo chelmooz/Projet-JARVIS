@@ -1,13 +1,11 @@
 """Tests VectorService et VectorCache — Cache LRU, TTL horodaté et invalidation."""
+import numpy as _np
 import pytest
 
 from controllers import context as ctx_mod
 from services import vector as vector_mod
 from services.vector import VECTOR_CACHE_TTL_SECONDS, VectorService
 from services.vector_cache import VectorCache
-
-
-import numpy as _np
 
 
 class _FakeInference:

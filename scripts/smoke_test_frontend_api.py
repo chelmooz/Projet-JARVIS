@@ -20,8 +20,6 @@ Scénario 2 - Chat & Conversations:
 
 import asyncio
 import sys
-import time
-from pathlib import Path
 
 import httpx
 
@@ -258,8 +256,8 @@ async def test_agents_assign_persist(client: httpx.AsyncClient) -> bool:
         resp = await client.post("/api/agents/assign", json={"profile": "techlead", "model": "qwen2.5"}, timeout=TIMEOUT)
         assert resp.status_code == 200, f"Status {resp.status_code}"
 
-        import os
         import json
+        import os
         pref_path = "config/model_preferences.json"
         assert os.path.exists(pref_path), f"Fichier {pref_path} introuvable"
         with open(pref_path, encoding="utf-8") as f:
@@ -483,6 +481,7 @@ async def test_vision_with_image(client: httpx.AsyncClient) -> bool:
     On valide que le statut est soit 200, soit une erreur 503 bien formée."""
     try:
         import base64
+
         # Tiny 1x1 red PNG
         import struct
         import zlib

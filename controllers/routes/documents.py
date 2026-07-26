@@ -14,14 +14,14 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from controllers.context import get_app_context, _ctx
+from config.constants import CHUNK_OVERLAP, CHUNK_SIZE
+from controllers.context import _ctx, get_app_context
 from controllers.di import AppContext
 from controllers.responses import ok
 from models.schemas import IngestRequest
 from services.chunker import chunk_text
 from services.sanitize import scrub
 from services.vector import EXPECTED_MODEL
-from config.constants import CHUNK_SIZE, CHUNK_OVERLAP
 
 _logger = logging.getLogger(__name__)
 

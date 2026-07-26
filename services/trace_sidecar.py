@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
-from datetime import datetime
 from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
 
 from services.adapters.protocols import TraceRecord
 

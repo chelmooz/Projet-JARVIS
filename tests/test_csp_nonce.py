@@ -1,7 +1,6 @@
 """Tests CSP Nonce — Phase 1 TDD (RED → GREEN → REFACTOR)."""
 
 import re
-import secrets
 
 from fastapi.testclient import TestClient
 

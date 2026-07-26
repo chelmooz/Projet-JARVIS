@@ -7,8 +7,8 @@ from config.constants import (
     FEEDBACK_ABSENT,
     FEEDBACK_THUMBS_DOWN,
     FEEDBACK_THUMBS_UP,
-    JUDGE_WEIGHT,
     FEEDBACK_WEIGHT,
+    JUDGE_WEIGHT,
     RECIDIVE_PENALTY,
 )
 

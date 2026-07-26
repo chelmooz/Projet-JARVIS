@@ -4,9 +4,10 @@ Vérifie que le feedback modifie les métadonnées des chunks et que
 la consolidation élimine les chunks toxiques.
 """
 
-import pytest
 import time
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from services.vector import VectorService
 
@@ -103,10 +104,7 @@ def test_vector_consolidate_prunes_toxic_chunks(vector_service):
     vector_service._data["documents"] = docs
 
     # On mock WeightConsolidator pour isoler la logique de toxicité
-    with patch("services.vector.WeightConsolidator") as MockWC:
-        mock_wc = MagicMock()
-        MockWC.return_value = mock_wc
-
+    with patch("services.vector.WeightConsolidator") as mock_wc:
         # dedup ne supprime rien
         mock_wc.dedup.return_value = set()
         # prune garde TOUS les documents (on teste uniquement la logique toxique)

@@ -20,8 +20,12 @@ from fastapi import APIRouter
 
 _logger = logging.getLogger(__name__)
 
-from models.schemas import AuthorizePathRequest, FilePathRequest, FindFilesRequest
-from services.file_system import FileSystemService
+from models.schemas import (  # noqa: E402  # avoid circular import
+    AuthorizePathRequest,
+    FilePathRequest,
+    FindFilesRequest,
+)
+from services.file_system import FileSystemService  # noqa: E402  # avoid circular import
 
 router = APIRouter()
 _fs = FileSystemService()

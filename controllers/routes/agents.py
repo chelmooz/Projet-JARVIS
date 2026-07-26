@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from config.paths import CONFIG_DIR, PROFILES_FILE
-from controllers.context import get_app_context, _ctx
+from controllers.context import _ctx, get_app_context
 from controllers.di import AppContext
 from controllers.responses import fail, ok
 from models.schemas import AssignRequest, VisionRequest

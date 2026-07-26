@@ -4,11 +4,12 @@ Chaque responsabilite devient un module independant ; VectorService reste une
 façade fine qui delegate. Le contrat public + l'acces a v._data sont preserves
 (tests existants y accedent).
 """
-import config.constants as constants
-from services import vector as vector_mod
+import threading
 
 import numpy as _np
-import threading
+
+import config.constants as constants
+from services import vector as vector_mod
 
 
 class _FakeInference:

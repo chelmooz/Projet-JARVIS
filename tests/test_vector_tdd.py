@@ -4,12 +4,11 @@ Le contrat public est preserve ; on verifie que VectorService orchestre sans
 tout refaire lui-meme (delegation aux modules vector_index/embedder/dimension/
 weighting).
 """
+import numpy as _np
 import pytest
 
 from services import vector as vector_mod
 from services.vector import VectorService
-
-import numpy as _np
 
 
 class _FakeInference:

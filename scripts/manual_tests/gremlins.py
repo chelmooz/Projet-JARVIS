@@ -41,8 +41,7 @@ def main():
     print(f"Starting Gremlins stress test against {url}")
     print(f"Logs will be saved to: {log_file}")
 
-    with open(log_file, "w", encoding="utf-8") as logf:
-        with sync_playwright() as p:
+    with open(log_file, "w", encoding="utf-8") as logf, sync_playwright() as p:
             try:
                 browser = p.chromium.launch(headless=True)
             except Exception as e:

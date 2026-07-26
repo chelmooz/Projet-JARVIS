@@ -4,9 +4,9 @@ Vérifie que VectorService détecte un changement de dimension d'embedding
 (stockée vs dimension courante attendue) et déclenche un re-index ou un
 reset propre sans crash.
 """
-from services.vector import EXPECTED_DIM, VectorService
-
 import numpy as _np
+
+from services.vector import EXPECTED_DIM, VectorService
 
 
 class _FakeInference:

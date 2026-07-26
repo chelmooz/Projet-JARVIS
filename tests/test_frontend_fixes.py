@@ -8,6 +8,7 @@ Tests pour valider les correctifs frontend v5.4.1 :
 import re
 from pathlib import Path
 
+
 def test_rendermarkdown_regex_valid():
     """Vérifie que renderMarkdown est sécurisé et que les regex sont intactes."""
     app_js = Path("static/assets/js/app.js").read_text(encoding="utf-8")

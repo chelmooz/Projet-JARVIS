@@ -6,13 +6,13 @@ Vérifie que PipelineService :
 - fonctionne toujours sans trace_store ni vector_search (backward compat)
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from models import Pipeline, PipeStep
 from services.adapters.protocols import ITraceStore, TraceRecord
 from services.pipeline import PipelineService
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────
 

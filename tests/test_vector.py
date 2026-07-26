@@ -1,13 +1,11 @@
 """Tests VectorService — Embedding cache et recherche."""
+import numpy as _np
 import pytest
 
 from controllers import context as ctx_mod
 from services import vector as vector_mod
 from services.vector import VectorService
 from services.vector_search import cosine_search
-
-
-import numpy as _np
 
 
 class _FakeInference:

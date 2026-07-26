@@ -6,7 +6,9 @@ aux responsabilites separees (resolution, args, subprocess, format, erreurs).
 import os
 import sys
 import tempfile
+
 import yaml
+
 from services.diagnostic_ext import DiagnosticExtService
 from services.diagnostic_ext.executor import CommandExecutor
 

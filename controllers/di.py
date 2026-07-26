@@ -12,22 +12,8 @@ from typing import Any
 
 from agents.factory import create_agents
 from agents.supervisor import AgentSupervisor
-from config.constants import DEFAULT_MODEL
-from config.paths import CONFIG_DIR, OLLAMA_PORT
-from controllers.responses import ok, fail
+from config.paths import CONFIG_DIR
 from graph.agent_graph import AgentGraph
-from ports import (
-    AnalyticsPort,
-    ChatPort,
-    ConversationPort,
-    EmbeddingPort,
-    HabitPort,
-    LogPort,
-    MetricsPort,
-    ModelRegistryPort,
-    MultimodalPort,
-    VectorPort,
-)
 from services.analytics import AnalyticsService
 from services.conversation import ConversationService
 from services.inference import InferenceService

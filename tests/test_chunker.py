@@ -1,5 +1,4 @@
 """Tests pour chunk_text — découpage sémantique avec overlap (D8)."""
-import pytest
 
 from services.chunker import chunk_text
 

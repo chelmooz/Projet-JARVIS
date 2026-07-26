@@ -15,8 +15,8 @@ import re
 import threading
 import time
 import uuid
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 from config.constants import MAX_CONVERSATION_MESSAGES, PROJECT_DIR
 from ports import ConversationPort

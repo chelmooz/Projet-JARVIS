@@ -7,8 +7,9 @@
 - Le hack sys.path est supprimé : exécutez pytest depuis la racine du projet.
 """
 import os
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 def _ollama_disponible() -> bool:
@@ -207,8 +208,8 @@ def orchestrator(fake_inference, fake_memory, fake_vector, fake_log,
                  fake_analytics, fake_conversations, fake_metrics,
                  fake_agents, fake_router, fake_toolbox):
     """Orchestrateur câblé avec des Fakes (aucune dépendance externe)."""
-    from services.orchestrator import OrchestratorService
     from graph import AgentGraph
+    from services.orchestrator import OrchestratorService
 
     def fake_graph_factory():
         graph = MagicMock(spec=AgentGraph)
@@ -267,6 +268,7 @@ def client(app_context, monkeypatch):
     réellement dans les tests utilisant ce fixture.
     """
     from fastapi.testclient import TestClient
+
     import controllers.context as ctx_module
     from controllers.router import create_app
 

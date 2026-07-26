@@ -133,7 +133,7 @@ class VectorService(VectorPort):
             else:
                 raise ValueError("Structure de données invalide")
 
-        except (json.JSONDecodeError, OSError, ValueError) as e:
+        except (json.JSONDecodeError, OSError, ValueError):
             _logger.critical(
                 "Fichier vectoriel corrompu (%s). Sauvegarde automatique vers %s",
                 VECTOR_PATH, VECTOR_BACKUP_PATH

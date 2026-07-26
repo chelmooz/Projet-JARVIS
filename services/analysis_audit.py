@@ -20,7 +20,7 @@ from typing import Any
 
 _logger = logging.getLogger("jarvis.analysis_audit")
 
-from services.analysis_core import (
+from services.analysis_core import (  # noqa: E402  # avoid circular import
     _PROJECT_ROOT,
     _SOURCE_DIRS,
     _TEST_DIR,

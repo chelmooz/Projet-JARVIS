@@ -15,7 +15,7 @@ import yaml
 from config.constants import DEFAULT_MODEL, MAX_ADAPTIVE_ATTEMPTS, PROJECT_DIR
 from models import Pipeline, PipeStep
 from ports.pipeline import PipelinePort
-from services.adapters.protocols import ITraceStore, IResponseJudge, IVectorSearch, TraceRecord
+from services.adapters.protocols import IResponseJudge, ITraceStore, IVectorSearch, TraceRecord
 from services.rag_judge import JUDGE_THRESHOLD
 
 _logger = logging.getLogger("jarvis.pipeline")

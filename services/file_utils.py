@@ -15,8 +15,8 @@ import logging
 import os
 import threading
 import time
-from typing import Any, TypeVar
 from collections.abc import Callable
+from typing import Any, TypeVar
 
 import orjson
 

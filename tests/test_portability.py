@@ -3,8 +3,8 @@ Tests de portabilité (Phase 6 du ROADMAP)
 Vérifie que les chemins d'installation sont corrects selon l'OS.
 """
 import os
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 def test_ollama_installer_linux_path():

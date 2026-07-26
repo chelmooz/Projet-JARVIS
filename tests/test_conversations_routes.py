@@ -7,7 +7,6 @@ LE RED / GREEN / REFACTOR est :
 Ce module est immunisé contre la pollution d'état par test_api.py
 (qui sauvegarde le contexte avant build_app() et le restore à None).
 """
-import pytest
 from fastapi.testclient import TestClient
 
 from controllers.di import AppContext

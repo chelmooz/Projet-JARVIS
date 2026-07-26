@@ -1,9 +1,10 @@
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from services.adapters.protocols import TraceRecord
 from services.trace_sidecar import JsonlTraceStore
+
 
 def test_jsonl_trace_store_appends_record(tmp_path: Path):
     store = JsonlTraceStore(tmp_path)

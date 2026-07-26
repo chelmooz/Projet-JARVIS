@@ -18,7 +18,6 @@ import shutil
 import subprocess
 import urllib.request
 import zipfile
-from typing import Any
 from collections.abc import Callable
 
 from config.constants import (

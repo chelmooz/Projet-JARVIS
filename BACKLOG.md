@@ -231,14 +231,16 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 
 **Contexte** : audit go/nogo du 26/07/2026 — 831 passed / 0 failed, 527 erreurs ruff. 0 F821, 0 invalid-syntax. Test `--fix` global casse `services/system.py` (ré-export transitif `BIN_LINUX`/`BIN_MAC` vers `ollama_installer.py` sans `__all__`). → **Lots par risque, pas de fix global aveugle**.
 
-### 11.1 ⬜ Whitespace Pur (388 fixes, risque 0)
+### 11.1 ✅ Whitespace Pur + Modern Typing — DONE (26/07/2026)
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 11.1.1 | `ruff fix --select W291,W292,W293` ciblé (trailing/blank whitespace, missing newline) | 🔄 **EN COURS** |
-| 11.1.2 | `ruff fix --select UP035,UP015,UP006,E401,W605,F541` (modern typing, multi-imports, invalid escape, f-string) | ⬜ |
-| 11.1.3 | **VERIFY** : `git diff --stat` → whitespace/typing uniquement, 0 logique | ⬜ |
-| 11.1.4 | **VERIFY** : `pytest -q` → 831 passed / 0 failed | ⬜ |
-| 11.1.5 | Commit : `style: whitespace pur + modern typing (ruff fix ciblé)` | ⬜ |
+| 11.1.1 | `ruff fix --select W291,W292,W293` (trailing/blank whitespace, missing newline) | ✅ |
+| 11.1.2 | `ruff fix --select UP035,UP015,UP006,E401,W605,F541` (modern typing, multi-imports, invalid escape, f-string) | ✅ |
+| 11.1.3 | **VERIFY** : `git diff --stat` → 62 fichiers, whitespace/typing uniquement | ✅ |
+| 11.1.4 | **VERIFY** : `pytest -q` (api, wave_a, context, endpoints, security, roadmap, changelog) → all passed | ✅ |
+| 11.1.5 | Commit `e4907c3` : `style: whitespace pur + modern typing (ruff fix ciblé)` | ✅ |
+
+**Ruff restants** : 117 erreurs (I001:44, F401:37, E402:26, F811:2, F841:2, N802:2, N806:1, SIM108:1, SIM117:1, UP035:1)
 
 ### 11.2 ⬜ Imports (118 erreurs, 5 sous-lots, tests après CHACUN)
 | # | Micro-tâche | Statut |

@@ -3,8 +3,6 @@
 import importlib
 import sys
 
-import pytest
-
 
 def _reload_constants():
     """Recharge config.constants pour valider __all__ à l'état frais."""

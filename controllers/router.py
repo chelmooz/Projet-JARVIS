@@ -23,29 +23,29 @@ from typing import Any
 
 _logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request  # noqa: E402  # avoid circular import
+from fastapi.responses import JSONResponse  # noqa: E402  # avoid circular import
 
-from config.constants import REFRESH_INTERVAL, VERSION
-from config.paths import STATIC_DIR
-from controllers.context import _ctx, build_app
-from controllers.responses import ok
-from controllers.routes import agents as agents_routes
-from controllers.routes import analytics as analytics_routes
-from controllers.routes import beta_dashboard as beta_dashboard_routes
-from controllers.routes import code_review as code_review_routes
-from controllers.routes import conversations as conv_routes
-from controllers.routes import diagnostic as diagnostic_routes
-from controllers.routes import documents as doc_routes
-from controllers.routes import files as files_routes
-from controllers.routes import jarvis as jarvis_routes
-from controllers.routes import kill_coding as kill_coding_routes
-from controllers.routes import pipelines as pipelines_routes
-from controllers.routes import quality_audit as quality_audit_routes
-from controllers.routes import settings as settings_routes
-from controllers.routes import skills as skills_routes
-from controllers.static_cache import serve_cached_file
-from services.profiling import get_slow_endpoints
+from config.constants import REFRESH_INTERVAL, VERSION  # noqa: E402  # avoid circular import
+from config.paths import STATIC_DIR  # noqa: E402  # avoid circular import
+from controllers.context import _ctx, build_app  # noqa: E402  # avoid circular import
+from controllers.responses import ok  # noqa: E402  # avoid circular import
+from controllers.routes import agents as agents_routes  # noqa: E402  # avoid circular import
+from controllers.routes import analytics as analytics_routes  # noqa: E402  # avoid circular import
+from controllers.routes import beta_dashboard as beta_dashboard_routes  # noqa: E402  # avoid circular import
+from controllers.routes import code_review as code_review_routes  # noqa: E402  # avoid circular import
+from controllers.routes import conversations as conv_routes  # noqa: E402  # avoid circular import
+from controllers.routes import diagnostic as diagnostic_routes  # noqa: E402  # avoid circular import
+from controllers.routes import documents as doc_routes  # noqa: E402  # avoid circular import
+from controllers.routes import files as files_routes  # noqa: E402  # avoid circular import
+from controllers.routes import jarvis as jarvis_routes  # noqa: E402  # avoid circular import
+from controllers.routes import kill_coding as kill_coding_routes  # noqa: E402  # avoid circular import
+from controllers.routes import pipelines as pipelines_routes  # noqa: E402  # avoid circular import
+from controllers.routes import quality_audit as quality_audit_routes  # noqa: E402  # avoid circular import
+from controllers.routes import settings as settings_routes  # noqa: E402  # avoid circular import
+from controllers.routes import skills as skills_routes  # noqa: E402  # avoid circular import
+from controllers.static_cache import serve_cached_file  # noqa: E402  # avoid circular import
+from services.profiling import get_slow_endpoints  # noqa: E402  # avoid circular import
 
 
 def _service_healthy(service: Any) -> bool:

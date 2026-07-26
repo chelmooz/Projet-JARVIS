@@ -1,5 +1,4 @@
 """TDD — Profil low I/O / low VRAM (M23b)."""
-import importlib
 import sys
 
 
@@ -32,6 +31,7 @@ def test_vector_cache_default_uses_profile(monkeypatch):
     monkeypatch.setenv("JARVIS_LOW_IO", "1")
     constants = _fresh_constants()
     import importlib
+
     import services.vector_cache as vc_mod
     importlib.reload(vc_mod)
     cache = vc_mod.VectorCache()

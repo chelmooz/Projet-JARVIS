@@ -12,8 +12,8 @@ Refacto DevOps / SOLID / Async :
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 import logging
+from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 

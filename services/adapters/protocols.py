@@ -4,8 +4,8 @@ Ce module définit les interfaces que le code métier utilise,
 sans connaître les implémentations concrètes.
 """
 
-from typing import Protocol, Any
 from dataclasses import dataclass
+from typing import Any, Protocol
 
 from models import Result
 
