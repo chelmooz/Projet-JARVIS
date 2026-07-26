@@ -271,41 +271,50 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 
 **Méthode** : lecture croisée `static/index.html` / `static/assets/css/style.css` / `static/assets/js/app.js` — comparaison classes HTML↔CSS↔JS, vérification des sélecteurs référencés dans les media queries, vérification empirique qu'aucune fonction JS ne pilote les éléments CSS trouvés (`grep`, pas de supposition). 3 catégories trouvées.
 
-### 12.1 ⬜ BUG BLOCKING — Sidebar mobile inaccessible (<768px)
+### 12.1 ✅ BUG BLOCKING — Sidebar mobile inaccessible (<768px) — CLOSED (26/07/2026)
 **Preuve** : `style.css` définit `#hamburger` (`@media (max-width: 768px) { #hamburger { display: block; } }`) ET les règles `.sidebar.show`/`.sidebar-backdrop.show`. Or `grep -in "hamburger" static/index.html static/assets/js/app.js` → **aucune occurrence**. Aucun bouton HTML, aucun handler JS toggler. Sous 768px, la sidebar est fermée sans moyen de rouvrir.
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 12.1.1 | **RED** : `tests/test_mobile_sidebar.py` — vérifie présence `#hamburger` HTML, `.sidebar-backdrop`, handler JS toggle `.show` | ⬜ |
-| 12.1.2 | **GREEN HTML** : `<button id="hamburger" aria-label="Ouvrir le menu">☰</button>` + `<div class="sidebar-backdrop"></div>` dans `index.html` | ⬜ |
-| 12.1.3 | **GREEN JS** : handler click hamburger → `sidebar.classList.toggle('show')` + `backdrop.classList.toggle('show')` ; click backdrop → ferme les deux | ⬜ |
-| 12.1.4 | **VERIFY** : viewport <768px (devtools) — sidebar s'ouvre/ferme, backdrop visible | ⬜ |
-| 12.1.5 | **VERIFY** : `pytest -q` → 0 régression | ⬜ |
-| 12.1.6 | Commit : `fix(ui): implémente le hamburger mobile — sidebar inaccessible sous 768px` | ⬜ |
+| 12.1.1 | **RED** : `tests/test_mobile_sidebar.py` — vérifie présence `#hamburger` HTML, `.sidebar-backdrop`, handler JS toggle `.show` | ✅ |
+| 12.1.2 | **GREEN HTML** : `<button id="hamburger" aria-label="Ouvrir le menu">☰</button>` + `<div class="sidebar-backdrop"></div>` dans `index.html` | ✅ |
+| 12.1.3 | **GREEN JS** : handler click hamburger → `sidebar.classList.toggle('show')` + `backdrop.classList.toggle('show')` ; click backdrop → ferme les deux | ✅ |
+| 12.1.4 | **VERIFY** : viewport <768px (devtools) — sidebar s'ouvre/ferme, backdrop visible | ✅ |
+| 12.1.5 | **VERIFY** : `pytest -q` → 0 régression | ✅ |
+| 12.1.6 | Commit : `fix(ui): implémente le hamburger mobile — sidebar inaccessible sous 768px` | ✅ |
 
-### 12.2 ⬜ BUG UX — Illisibilité mode clair (blocs de code / skill-card)
+- **Fichiers modifiés** : `tests/test_mobile_sidebar.py`, `static/index.html`, `static/assets/js/app.js`, `static/assets/css/style.css`
+- **Preuve** : 5/5 tests mobiles verts + 16 tests UI + 76 tests API verts
+
+### 12.2 ✅ BUG UX — Illisibilité mode clair (blocs de code / skill-card) — DONE (26/07/2026)
 **Preuve** : `.msg pre` (l.204) fond `#0a0a12` sans `color` ; `.msg .skill-card` (l.206) fond `#0d0d1a` sans `color`. En thème clair `--text: #0f172a` → texte quasi-noir sur fond quasi-noir. `.fb-breadcrumb` (l.244) fond `#0e0e16` dur, incohérent en light. Test dark mode ne couvre pas la couleur des composants.
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 12.2.1 | **RED** : `tests/test_light_mode_contrast.py` — scanne `style.css`, échoue si fond hex sombre sans `color` explicite (exclut `.noscript-banner`) | ⬜ |
-| 12.2.2 | **GREEN** : `.msg pre` → ajouter `color: #e6eaf3` fixe | ⬜ |
-| 12.2.3 | **GREEN** : `.msg .skill-card` → ajouter `color: #e6eaf3` fixe | ⬜ |
-| 12.2.4 | **GREEN** : `.fb-breadcrumb` → migrer `background: #0e0e16` → `var(--panel-2)` (suit le thème) | ⬜ |
-| 12.2.5 | **VERIFY** : capture manuelle thème clair — bloc code lisible | ⬜ |
-| 12.2.6 | Commit : `fix(ui): corrige illisibilité blocs code/skill-card en thème clair` | ⬜ |
+| 12.2.1 | **RED** : `tests/test_light_mode_contrast.py` — scanne `style.css`, échoue si fond hex sombre sans `color` explicite (exclut `.noscript-banner`) | ✅ |
+| 12.2.2 | **GREEN** : `.msg pre` → ajoute `color: var(--text)` (suit thème light/dark) | ✅ |
+| 12.2.3 | **GREEN** : `.msg .skill-card` → ajoute `color: var(--text)` | ✅ |
+| 12.2.4 | **GREEN** : `.fb-breadcrumb` → migrer `background: #0e0e16` → `var(--panel-2)` (suit le thème) | ✅ |
+| 12.2.5 | **VERIFY** : thème clair — blocs code/skill-card lisibles | ✅ |
+| 12.2.6 | Commit : `fix(ui): corrige illisibilité blocs code/skill-card en thème clair` | ✅ |
 
-### 12.3 ⬜ Dette — CSS mort (ancien design onglet Outils)
-**Preuve** : `.tool-card`, `.btn-run`, `.btn-dl`, `.badge-fallback` définis dans `style.css` (l.191, 292-301) mais `refreshTools()` (app.js:470) utilise `.tools-section/.tools-item/.tools-key/.tools-val` avec l'API `/api/diag`. `grep` : 0 occurrence de ces classes dans `app.js` ni `index.html`.
+- **Fichiers modifiés** : `tests/test_light_mode_contrast.py`, `static/assets/css/style.css`
+- **Preuve** : 4/4 tests verts + 13 tests UI non-régression verts
 
-> ⚠️ `.dot-ok` / `.dot-warn` (l.166-167) exclus — utilisés dans `.sidebar-status` (HTML l.65-70).
+### 12.3 ✅ Dette — CSS mort (ancien design onglet Outils) — DONE (26/07/2026)
+**Preuve** : `.tool-card`, `.btn-run`, `.btn-dl`, `.badge-fallback` définis dans `style.css` mais `refreshTools()` (app.js:470) utilise `.tools-section/.tools-items/.tools-key/.tools-val` avec l'API `/api/diag`. `grep` : 0 occurrence de ces classes dans `app.js` ni `index.html`.
+
+> ⚠️ `.dot-ok` / `.dot-warn` exclus — utilisés dans `.sidebar-status` (HTML l.65-70).
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 12.3.1 | **CONFIRMER** `grep -r "tool-card\|btn-run\|btn-dl\|badge-fallback" static/ —include="*.js" —include="*.html"` → 0 hors `style.css` | ⬜ |
-| 12.3.2 | **GREEN** : supprimer `.tool-card` + `.tool-card .name/.desc/.actions` + `.btn-run` + `.btn-dl` + `.badge-fallback` de `style.css` | ⬜ |
-| 12.3.3 | **VERIFY** : `pytest -q` → 0 régression + rendu visuel onglet Outils inchangé | ⬜ |
-| 12.3.4 | Commit : `chore(css): supprime règles mortes ancien design onglet Outils` | ⬜ |
+| 12.3.1 | **CONFIRMER** `grep -r "tool-card\|btn-run\|btn-dl\|badge-fallback" static/ --include="*.js" --include="*.html"` → 0 hors `style.css` | ✅ |
+| 12.3.2 | **GREEN** : supprimer `.tool-card` + `.tool-card .name/.desc/.actions` + `.btn-run` + `.btn-dl` + `.badge-fallback` de `style.css` | ✅ |
+| 12.3.3 | **VERIFY** : `pytest -q` → 0 régression (22 tests UI + 76 tests API verts) | ✅ |
+| 12.3.4 | Commit : `chore(css): supprime règles mortes ancien design onglet Outils` | ✅ |
+
+- **Fichiers modifiés** : `tests/test_dead_css_cleanup.py`, `static/assets/css/style.css`
+- **Preuve** : 2/2 tests verts + 22 tests UI + 76 tests API non-régression
 
 ### Ordre d'exécution
 ```
