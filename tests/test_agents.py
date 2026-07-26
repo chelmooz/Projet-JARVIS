@@ -296,7 +296,7 @@ class TestDefaultPromptRealRun:
         memory = MagicMock()
         agent = GenericAgent(model, memory, profile_key="techlead",
                              domain_prompt="Tu es un assistant technique.")
-        result = agent.run("ping", "qwen2.5:7b", {})
+        result = agent.run("ping", "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", {})
         assert result["response"] == "ok"
         assert "assistant technique" in result["model"] or "assistant technique" in model.calls[0][2]
 
@@ -304,14 +304,14 @@ class TestDefaultPromptRealRun:
         model = _FakeModel()
         memory = MagicMock()
         agent = CyberAgent(model, memory)
-        result = agent.run("analyse les logs", "qwen2.5:7b", {})
+        result = agent.run("analyse les logs", "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", {})
         assert result["response"] == "ok"
 
     def test_vision_textual_run_applies_domain_prompt(self):
         model = _FakeModel()
         memory = MagicMock()
         agent = VisionAgent(model, memory)
-        result = agent.run("decris", "qwen2.5:7b", {})
+        result = agent.run("decris", "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", {})
         assert result["response"] == "ok"
 
     def test_build_messages_accepts_default_prompt(self):

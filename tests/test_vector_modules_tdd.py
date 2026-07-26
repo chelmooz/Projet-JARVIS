@@ -28,9 +28,9 @@ class TestVectorDimensionExtraction:
         monkeypatch.setattr(vector_mod, "VECTOR_PATH", str(index))
         from services.vector_dimension import DimensionManager
         data = {"documents": [{"text": "a", "embedding": None}], "embedding_dim": 768,
-                "embedding_model": "nomic-embed-text-v2-moe"}
+                "embedding_model": "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"}
         mgr = DimensionManager(data)
-        status = mgr.ensure_dimension(expected_dim=512, expected_model="nomic-embed-text-v2-moe")
+        status = mgr.ensure_dimension(expected_dim=512, expected_model="hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M")
         assert status in ("reindexed", "reset")
 
     def test_dimension_manager_reindex_keeps_text(self, tmp_path, monkeypatch):
@@ -38,9 +38,9 @@ class TestVectorDimensionExtraction:
         monkeypatch.setattr(vector_mod, "VECTOR_PATH", str(index))
         from services.vector_dimension import DimensionManager
         data = {"documents": [{"text": "keep", "embedding": [0.0] * 768}],
-                "embedding_dim": 768, "embedding_model": "nomic-embed-text-v2-moe"}
+                "embedding_dim": 768, "embedding_model": "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"}
         mgr = DimensionManager(data)
-        status = mgr._schedule_reindex(data["documents"], 512, "nomic-embed-text-v2-moe", 1)
+        status = mgr._schedule_reindex(data["documents"], 512, "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M", 1)
         assert status == "reindexed"
         assert data["documents"][0]["embedding"] is None
         assert data["documents"][0]["text"] == "keep"

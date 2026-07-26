@@ -48,13 +48,13 @@ class ChatPort(Protocol):
 
 @runtime_checkable
 class MultimodalPort(Protocol):
-    """Analyse d'images (llama3.2-vision, etc.)."""
+    """Analyse d'images (Llama-3.2-11B-Vision, etc.)."""
     def query_multimodal(self, model: str, prompt: str, image_base64: str) -> dict[str, Any]: ...
 
 
 @runtime_checkable
 class EmbeddingPort(Protocol):
-    """Calcul d'embeddings vectoriels (nomic-embed-text, etc.)."""
+    """Calcul d'embeddings vectoriels (nomic-embed-text-v2-moe, etc.)."""
     def embed(self, text: str, model: str | None = None) -> list[float]: ...
 
 

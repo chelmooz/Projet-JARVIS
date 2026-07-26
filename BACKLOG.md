@@ -321,3 +321,29 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 12.1 (mobile blocker) → 12.2 (UX lisibilité) → 12.3 (dette non-bloquante)
 ```
 Chaque bug = cycle RED/GREEN/VERIFY/COMMIT indépendant.
+
+---
+
+## ✅ Phase 13 — Migration modèles 100% HuggingFace (26/07/2026)
+
+| # | Tâche | Statut |
+|---|-------|--------|
+| 13.1 | Remplacer `qwen2.5:7b` → `hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` dans config, services, tests, docs | ✅ |
+| 13.2 | Remplacer `deepseek-coder-v2-lite-instruct` → `hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M` | ✅ |
+| 13.3 | Remplacer `ornith-1.0-9b` → `hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M` (@cyber) + `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M` (@network) | ✅ |
+| 13.4 | Remplacer `llama3.2-vision:11b-instruct-q4_K_M` → `hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | ✅ |
+| 13.5 | Conserver `phi-4-mini-instruct-abliterated` → `hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M` (nom HF) | ✅ |
+| 13.6 | Conserver `nomic-embed-text-v2-moe` → `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` (nom HF) | ✅ |
+| 13.7 | Mettre à jour `config/model_sizes.json` avec nouvelles clés et specs | ✅ |
+| 13.8 | Mettre à jour `config/constants.py` (DEFAULT_MODEL) | ✅ |
+| 13.9 | Mettre à jour `config/adapters.yaml` (embedding model) | ✅ |
+| 13.10 | Mettre à jour `services/selector.py` (fallback_models, VISION_MODELS, DEFAULT_FALLBACK_MODEL) | ✅ |
+| 13.11 | Mettre à jour `services/vector.py` et `services/adapters/ollama_adapter.py` (embed model) | ✅ |
+| 13.12 | Mettre à jour `config/agent_profiles.json` (profiles + agent_model_map) | ✅ |
+| 13.13 | Mettre à jour `AGENTS.md` et `README.md` (tables, commandes pull WSL/Mac) | ✅ |
+| 13.14 | Mettre à jour `static/assets/js/app.js`, `models/ollama/MODELS.md` | ✅ |
+| 13.15 | Mettre à jour tous les tests (10 fichiers) | ✅ |
+| 13.16 | Mettre à jour docs mineurs (RUNBOOK.md, ADR-003, ports/__init__.py) | ✅ |
+
+- **Fichiers modifiés** : 24 fichiers
+- **Nouveau bloc pull** : 7 modèles 100% HuggingFace

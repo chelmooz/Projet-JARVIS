@@ -31,8 +31,8 @@ def _get_client():
         def query(self, prompt, model, **kw): return {"response": "ok", "model": model}
         def query_multimodal(self, model, task, image): return {"response": "vision ok", "model": model}
         def embed(self, texts): return [[0.0]*384 for _ in texts]
-        def list_models(self): return ["qwen2.5:latest"]
-        def first_available(self): return "qwen2.5:latest"
+        def list_models(self): return ["hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"]
+        def first_available(self): return "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
         def select_backend(self, name): return None
         def get_active_backend(self): return "ollama"
 

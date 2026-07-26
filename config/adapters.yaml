@@ -6,7 +6,7 @@ ollama:
   models_dir: "models/ollama/"
 
 embedding:
-  model: "nomic-embed-text-v2-moe"
+  model: "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
 
 default_backend: "ollama"
 timeout: 120

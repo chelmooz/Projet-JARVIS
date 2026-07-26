@@ -32,7 +32,7 @@ class TestOllamaAdapterEmbed:
             mock_post.return_value = mock_response
             adapter.embed("test")
             _, kwargs = mock_post.call_args
-            assert kwargs["json"]["model"] == "nomic-embed-text-v2-moe"
+            assert kwargs["json"]["model"] == "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
             assert kwargs["json"]["input"] == ["test"]
 
     def test_embed_custom_model(self):

@@ -189,8 +189,8 @@ class OllamaAdapter(LLMAdapter):
     def _repo_name(tag: str) -> str:
         """Extrait le nom de dépôt d'un tag Ollama (suffixe -gguf retiré).
 
-        'qwen2.5:latest'                 -> 'qwen2.5'
         'hf.co/org/Repo-GGUF:Q4_K_M'     -> 'repo'
+        'hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M' -> 'qwen2.5-7b-instruct'
         """
         name = tag.rsplit("/", 1)[-1].lower()
         return name.split(":", 1)[0].removesuffix("-gguf")
@@ -220,7 +220,7 @@ class OllamaAdapter(LLMAdapter):
     def resolve_model(self, model: str) -> str | None:
         """Retourne le tag Ollama réel correspondant à un nom court de config.
 
-        'qwen2.5' -> 'qwen2.5:latest'
+        'qwen2.5' -> 'hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M'
         'phi-4-mini-instruct-abliterated' -> 'hf.co/Melvin56/...-GGUF:Q4_K_M'
         Renvoie None si aucun modèle ne matche.
         """
@@ -240,7 +240,7 @@ class OllamaAdapter(LLMAdapter):
         return models[0] if models else None
 
     def embed(self, text: str, model: str | None = None) -> list[float]:
-        model = model or "nomic-embed-text-v2-moe"
+        model = model or "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
         model = self.resolve_model(model) or model
         data = self._call_with_retry(f"{self._base_url}/api/embed", {
             "model": model, "input": [text],

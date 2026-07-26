@@ -14,7 +14,7 @@ def test_nomic_embed_vector_output():
     response = client.post(
         "/api/vectorize",
         json={
-            "model": "nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M",
+            "model": "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M",
             "text": "Ceci est un texte à vectoriser."
         }
     )

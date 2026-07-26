@@ -99,16 +99,16 @@ class TestOllamaAdapter:
     def test_get_active_backend(self):
         assert self.adapter.get_active_backend() == "ollama"
 
-    @has_model("qwen2.5:7b")
+    @has_model("hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
     def test_query_qwen(self):
-        result = self.adapter.query("Reponds uniquement par 'ok'.", model="qwen2.5:7b")
+        result = self.adapter.query("Reponds uniquement par 'ok'.", model="hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
         assert result.success is True
         assert "response" in result.data
         assert len(result.data["response"]) > 0
 
-    @has_model("qwen2.5:7b")
+    @has_model("hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
     def test_chat_qwen(self):
-        result = self.adapter.chat("qwen2.5:7b", [
+        result = self.adapter.chat("hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", [
             {"role": "user", "content": "Reponds uniquement par 'ok'."},
         ])
         assert result.success is True
@@ -122,7 +122,7 @@ class TestOllamaAdapter:
 
     def test_embed_nomic(self):
         """Test embed with nomic-embed-text if available."""
-        if "nomic-embed-text" not in MODELS:
+        if "nomic-embed" not in MODELS:
             try:
                 vec = self.adapter.embed("hello world")
                 assert isinstance(vec, list)
@@ -135,14 +135,14 @@ class TestOllamaAdapter:
             assert isinstance(vec, list)
             assert len(vec) > 0
 
-    @has_model("qwen2.5:7b")
+    @has_model("hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
     def test_timeout_config_respected(self):
         """Short timeout should fail on a large prompt."""
         import time
         adapter = OllamaAdapter(base_url=OLLAMA_URL)
         t0 = time.time()
         # A short simple prompt should still work quickly
-        result = adapter.query("Reponds 'ok'.", model="qwen2.5:7b")
+        result = adapter.query("Reponds 'ok'.", model="hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
         elapsed = time.time() - t0
         assert result.success is True
         assert elapsed < 30

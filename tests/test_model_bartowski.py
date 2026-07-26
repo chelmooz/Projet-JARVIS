@@ -1,7 +1,7 @@
 r"""
-TDD Test Suite: hf.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF:Q4_K_M
+TDD Test Suite: hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M
 
-Domaine: Code generation avec LLM spécialisé.
+Domaine: Generation et refactoring de code multi-langages.
 Cas d'usage: Générer du code Python/SQL à partir d'instruction en langage naturel.
 
 Installation: pytest, starlette.testclient
@@ -19,10 +19,10 @@ from config.paths import OLLAMA_HOST
 pytestmark = pytest.mark.live
 
 
-class TestBartowtskiCodeGeneration:
-    """Suite TDD pour DeepSeek-Coder (bartowski)"""
+class TestGraniteCodeGeneration:
+    """Suite TDD pour Granite-4.1-8B"""
 
-    MODEL_NAME = "hf.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF:Q4_K_M"
+    MODEL_NAME = "hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M"
     OLLAMA_MODELS = r"J:\Projet JARVIS\models\ollama"
 
     @classmethod
@@ -42,7 +42,7 @@ class TestBartowtskiCodeGeneration:
         )
 
         assert result.returncode == 0, f"ollama list failed: {result.stderr}"
-        assert "bartowski" in result.stdout.lower() or "deepseek" in result.stdout.lower(), \
+        assert "granite" in result.stdout.lower() or "ibm" in result.stdout.lower(), \
             f"Model not in ollama list. Output:\n{result.stdout}"
 
     def test_model_present_in_registry(self):
@@ -57,11 +57,11 @@ class TestBartowtskiCodeGeneration:
 
         assert result.returncode == 0
         models = result.stdout
-        # Cherche bartowski ou deepseek dans la liste
-        assert any(keyword in models.lower() for keyword in ["bartowski", "deepseek-coder", "q4"]), \
+        # Cherche granite dans la liste
+        assert any(keyword in models.lower() for keyword in ["granite", "ibm", "q4"]), \
             f"Expected model not found in list:\n{models}"
 
-    def test_bartowski_code_generation_prompt(self):
+    def test_granite_code_generation_prompt(self):
         """B1.4.3.2 — Test prompt → code generation (nominal case)"""
         prompt = 'Write Python code to check if a number is prime:\n```python'
 
@@ -80,7 +80,7 @@ class TestBartowtskiCodeGeneration:
         assert "```" in output or "def" in output.lower() or "prime" in output.lower(), \
             f"Unexpected output format:\n{output[:200]}"
 
-    def test_bartowski_code_generation_sql(self):
+    def test_granite_code_generation_sql(self):
         """B1.4.3.3 — Test SQL generation edge case"""
         prompt = 'Generate SQL to get top 10 users by creation date'
 
@@ -98,7 +98,7 @@ class TestBartowtskiCodeGeneration:
         assert "SELECT" in output or "select" in output, \
             f"Expected SQL output, got:\n{output[:200]}"
 
-    def test_bartowski_response_not_empty(self):
+    def test_granite_response_not_empty(self):
         """B1.4.3.4 — Cas critique: réponse non vide"""
         prompt = "Hello, what is 2+2?"
 
@@ -113,7 +113,7 @@ class TestBartowtskiCodeGeneration:
         assert result.returncode == 0, f"ollama run failed: {result.stderr}"
         assert len(result.stdout.strip()) > 0, "Response is empty"
 
-    def test_bartowski_timeout_protection(self):
+    def test_granite_timeout_protection(self):
         """B1.4.3.5 — Edge case: timeout 30s max"""
         prompt = "Test timeout protection"
 
@@ -129,7 +129,7 @@ class TestBartowtskiCodeGeneration:
         # Ne doit pas timeout
         assert result is not None, "Process timed out"
 
-    def test_bartowski_model_responds_to_different_prompts(self):
+    def test_granite_model_responds_to_different_prompts(self):
         """B1.4.3.6 — Multi-prompt test (stabilité)"""
         prompts = [
             "What is Python?",
@@ -151,10 +151,10 @@ class TestBartowtskiCodeGeneration:
 
 
 # Classe pour agrégation et reporting
-class TestBartowtskiAggregated:
+class TestGraniteAggregated:
     """Agrégation: tous tests doivent passer pour marquer B1.4 [x]"""
 
-    def test_all_bartowski_pass(self):
+    def test_all_granite_pass(self):
         """B1.4.4 — Relecture: tous tests PASS ou SKIP (pas FAIL)"""
         # Ce test agit comme gate-keeper
         # Si exécuté en dernier, confirme que tous les tests ci-dessus ont passé

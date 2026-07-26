@@ -31,7 +31,7 @@ class TestVectorDimensionMigration:
 
         # La dimension attendue (EXPECTED_DIM) doit être enregistrée dans le store.
         assert v._data.get("embedding_dim") == EXPECTED_DIM
-        assert v._data.get("embedding_model") == "nomic-embed-text-v2-moe"
+        assert v._data.get("embedding_model") == "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
         # Et persistée sur disque.
         import json
         on_disk = json.loads(index.read_text())
@@ -84,7 +84,7 @@ class TestVectorDimensionMigration:
             "documents": [],
             "embeddings": [],
             "embedding_dim": 768,
-            "embedding_model": "nomic-embed-text-v2-moe",
+            "embedding_model": "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M",
         }))
 
         monkeypatch.setattr(

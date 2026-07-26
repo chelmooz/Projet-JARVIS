@@ -295,7 +295,7 @@ function handleVisionFile(inputEl) {
                 return;
             }
             if (!data.response) {
-                result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que llama3.2-vision:11b est bien installe.';
+                result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que le modele Llama-3.2-11B-Vision est bien installe.';
                 return;
             }
 
@@ -339,7 +339,7 @@ function populateDefaultModelSelect() {
     const sel = document.getElementById('s-default-model');
     if (!sel) return;
     const current = sel.value;
-    const models = availableModels.length > 0 ? availableModels : ['qwen2.5'];
+    const models = availableModels.length > 0 ? availableModels : ['hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M'];
     sel.innerHTML = models.map(m => `<option value="${escHtml(m)}"${m === current ? ' selected' : ''}>${escHtml(m)}</option>`).join('');
 }
 

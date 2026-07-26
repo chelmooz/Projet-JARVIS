@@ -9,12 +9,14 @@ from controllers.router import app  # Assurez-vous que votre application FastAPI
 
 client = TestClient(app)
 
+MODEL = "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+
 def test_qwen25_chat():
     # Simuler une requête à l'API pour une conversation avec le modèle Qwen2.5
     response = client.post(
         "/api/chat",
         json={
-            "model": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+            "model": MODEL,
             "messages": [
                 {"role": "user", "content": "Quelle est la capitale de la France ?"}
             ]
@@ -31,7 +33,7 @@ def test_qwen25_vectorize_fallback():
     response = client.post(
         "/api/vectorize",
         json={
-            "model": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+            "model": MODEL,
             "text": "Ceci est un texte pour tester le fallback de vectorisation."
         }
     )

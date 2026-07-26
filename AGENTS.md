@@ -23,14 +23,13 @@ réassignation explicite via l'onglet **Agents** de l'interface web ou l'API
 
 | @mention | Modèle | Taille |
 |----------|--------|--------|
-| `@cyber` | `ornith-1.0-9b` | ~9,0 Go |
-| `@dev` | `deepseek-coder-v2-lite-instruct` | ~4,0 Go |
-| `@network` | `ornith-1.0-9b` | ~9,0 Go |
-| `@hardware` | `qwen2.5:7b` | ~4,5 Go |
-| `@vision` | `llama3.2-vision:11b-instruct-q4_K_M` | ~7,0 Go |
+| `@cyber` | `hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M` | ~4,7 Go |
+| `@dev` | `hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M` | ~4,9 Go |
+| `@network` | `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M` | ~4,9 Go |
+| `@hardware` | `hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` | ~4,7 Go |
+| `@vision` | `hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | ~7,0 Go |
 
-> `ornith-1.0-9b` équipe deux agents (@cyber et @network), d'où sa présence en double.
-> `nomic-embed-text-v2-moe` (embeddings, ~0,6 Go) équipe la recherche vectorielle (RAG),
+> `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` (embeddings, ~0,6 Go) équipe la recherche vectorielle (RAG),
 > pas un agent de chat.
 
 > ⚠️ Ne pas confondre avec le champ `"model"` de `config/agent_profiles.json` : c'est le

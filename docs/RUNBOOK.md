@@ -53,7 +53,7 @@ dir bin\win\ollama.exe                           # Windows
 bin/linux/ollama list                            # Linux/Mac
 bin\win\ollama.exe list                          # Windows
 # Telecharger un modele du registre si necessaire (avec Ollama lance)
-ollama pull qwen2.5
+ollama pull hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
 # Les modeles specifiques JARVIS sont importes depuis des .gguf locaux :
 #   python scripts/import_gguf.py
 ```

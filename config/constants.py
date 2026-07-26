@@ -52,7 +52,7 @@ MIN_GRAPH_EDGES: Final[int] = 42  # Nombre minimum d'arêtes dans le graphe d'é
 # Backend par défaut
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL: Final[str] = "qwen2.5:7b"
+DEFAULT_MODEL: Final[str] = "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 DEFAULT_BACKEND: Final[str] = "ollama"
 OLLAMA_VERSION: Final[str] = "0.30.10"  # Version pinnée pour déterminisme.
 

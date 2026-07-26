@@ -51,7 +51,7 @@ _logger = logging.getLogger("jarvis.vector")
 VECTOR_PATH = os.path.join(MEMORY_DIR, "vector_index.json")
 VECTOR_BACKUP_PATH = os.path.join(MEMORY_DIR, "vector_index.backup.json")
 EXPECTED_DIM = 768
-EXPECTED_MODEL = "nomic-embed-text-v2-moe"
+EXPECTED_MODEL = "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
 
 # Ré-export pour compatibilité ascendante (constants propres au cache)
 __all__ = [

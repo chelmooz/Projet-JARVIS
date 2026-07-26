@@ -3,14 +3,14 @@
 Table ci‑dessous : état des modèles stockés dans J:\Projet JARVIS\models\ollama (sources hf.co lorsque disponible).
 
 | Modèle (Ollama) | Source | Statut | Remarques |
-|---|---|---|---|
-| `hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF` | hf.co | Présent | manifest et blobs présents (7b)
-| `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` | hf.co | Présent | embedding
-| `hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M` | hf.co | Présent | petit modèle instruct
-| `hf.co/deepreinforce-ai/Ornith-1.0-9B-GGUF` | hf.co | Présent | 9B
-| `hf.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF:Q4_K_M` | hf.co | En attente | pull recommandé
-| `hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | hf.co | En attente | pull recommandé
-| `igorls/gemma-4-E4B-it-heretic-GGUF:Q4_K_M` | registry.ollama.ai | Présent | manifest importé depuis registry.ollama.ai
+|---|---|---|---|---|
+| `hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` | hf.co | À pull | Modèle par défaut, polyvalent
+| `hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M` | hf.co | À pull | Code & refactoring — @dev
+| `hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M` | hf.co | À pull | Sécurité offensive & défensive — @cyber
+| `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M` | hf.co | À pull | Analyse réseau & SOC — @network
+| `hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M` | hf.co | À pull | Petit modèle CPU, sans filtre
+| `hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | hf.co | À pull | Vision multimodale — @vision
+| `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` | hf.co | À pull | Embeddings RAG (768d)
 
 ## Notes
 - Les pulls hf.co ont été ciblés vers le répertoire portable J:\Projet JARVIS\models\ollama ; les manifests trouvés sous manifests\registry.ollama.ai\library indiquent plusieurs modèles déjà présents.

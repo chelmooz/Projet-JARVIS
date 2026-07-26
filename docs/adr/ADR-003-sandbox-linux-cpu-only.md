@@ -23,9 +23,9 @@ JARVIS doit fonctionner sur clé USB, branchée sur n'importe quelle machine Lin
 
 - ✅ Zéro installation système
 - ✅ Fonctionne sur n'importe quel Linux x86_64
-- ✅ Les modèles lourds (ornith-1.0-9b) sont lents mais fonctionnent
+- ✅ Les modèles raisonnement (DeepHat V1 7B, Foundation-Sec 8B) sont lents mais fonctionnent
 - ❌ Pas de GPU = pas de grands modèles (>13B)
-- ❌ Les modèles vision (llama3.2-vision) sont utilisables mais lents
+- ❌ Les modèles vision (Llama-3.2-11B-Vision) sont utilisables mais lents
 
 ## Alternatives
 

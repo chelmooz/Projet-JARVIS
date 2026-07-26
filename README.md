@@ -33,7 +33,7 @@ Le projet est aussi un terrain d'apprentissage et d'expérimentation autour de l
 | 🔌 **100% offline** | Pas besoin d'Internet — tout tourne en local |
 | 💾 **Portable** | Sur clef USB, zéro installation système |
 | 🌐 **Interface web** | UI dark moderne accessible sur `localhost:8000` |
-| 👁️ **Vision IA** | Analyse d'images via llama3.2-vision:11b |
+| 👁️ **Vision IA** | Analyse d'images via Llama-3.2-11B-Vision-Instruct |
 | 🛡️ **Cyber workflows** | NVISO security workflows intégrés |
 | 🔧 **Système de Skills** | Règles injectées dynamiquement dans le contexte |
 | 🧩 **Mémoire vectorielle** | Recherche sémantique via embeddings Ollama |
@@ -134,39 +134,36 @@ Détail architectural complet : [docs/adr/ADR-008-rag-diagnostic-amelioration-co
 
 | Agent | Rôle | Profil | Modèle |
 |-------|------|--------|--------|
-| `@cyber` | Sécurité, logs, audit | CyberAgent dédié | `ornith-1.0-9b` |
-| `@dev` | Développement, scripting | techlead | `deepseek-coder-v2-lite-instruct` |
-| `@network` | Réseaux, connectivité | devops | `ornith-1.0-9b` |
-| `@hardware` | Matériel, diagnostics | orchestrateur | `qwen2.5` |
-| `@vision` | Analyse d'images | VisionAgent dédié | `llama3.2-vision:11b-instruct-q4_K_M` |
+| `@cyber` | Sécurité, logs, audit | CyberAgent dédié | `DeepHat-V1-7B` |
+| `@dev` | Développement, scripting | techlead | `Granite-4.1-8B` |
+| `@network` | Réseaux, connectivité | devops | `Foundation-Sec-8B-Reasoning` |
+| `@hardware` | Matériel, diagnostics | orchestrateur | `Qwen2.5-7B` |
+| `@vision` | Analyse d'images | VisionAgent dédié | `Llama-3.2-11B-Vision-Instruct` |
 
 Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script python`.
 
-> 💡 `ornith-1.0-9b` équipe **deux** agents (@cyber et @network), d'où sa présence en double.
-> Les **6** modèles réellement installés sont détaillés juste en dessous.
+> Les **7** modèles réellement installés sont détaillés juste en dessous.
 
 > Les modèles sont configurables via l'onglet **Agents** dans l'interface web.
 > Voir [AGENTS.md](AGENTS.md) pour le détail complet des profils.
 
 ---
 
-## 🧠 Les 6 modèles — ce que chacun sait faire le mieux
-
-Les 5 agents de chat n'utilisent que 4 des 6 modèles installés : les 2 autres servent aux
-**profils de l'équipe dev** (`devops`, `datasecu`) et à la **recherche vectorielle (RAG)**.
+## 🧠 Les 7 modèles — 100% HuggingFace / Ollama portable
 
 | Modèle | Ce qu'il fait le mieux | Où il sert dans JARVIS | Poids |
-|--------|------------------------|------------------------|-------|
-| `qwen2.5:7b` | Polyvalent : raisonnement général, synthèse, suivi d'instructions | Modèle **par défaut** — @hardware + profils orchestrateur/techlead/designer | ~4,5 Go |
-| `deepseek-coder-v2-lite-instruct` | Génération et revue de **code** multi-langages | @dev (développement, scripting) | ~4,0 Go |
-| `ornith-1.0-9b` | Raisonnement approfondi orienté **sécurité & réseau** (le plus gros modèle, 9B) | @cyber + @network | ~9,0 Go |
-| `phi-4-mini-instruct-abliterated` | **Léger & rapide**, tourne en CPU pur (0 VRAM), sans filtre (*abliterated*) | Profils **devops** & **datasecu** (automatisation, data/sécu) | ~2,6 Go |
-| `llama3.2-vision:11b-instruct-q4_K_M` | **Multimodal** : comprend et décrit des images | @vision (analyse d'images) | ~7,0 Go |
+|--------|------------------------|------------------------|-------:|
+| `Qwen2.5-7B-Instruct` | Polyvalent : raisonnement général, synthèse, suivi d'instructions complexes | Modèle **par défaut** — `@hardware` + profils orchestrateur/techlead/designer/datasecu | ~4,7 Go |
+| `Granite-4.1-8B` | Génération, refactoring et revue de code multi-langages | `@dev` (développement, scripting) | ~4,9 Go |
+| `DeepHat-V1-7B` | Offensive/Défensive, analyse de vulnérabilités, scripts de test d'intrusion | `@cyber` (sécurité offensive & défensive) | ~4,7 Go |
+| `Foundation-Sec-8B-Reasoning` | Analyse réseau, tri de logs SOC, modélisation de menaces et conformité | `@network` (infrastructure, analyse trafic & sécurité réseau) | ~4,9 Go |
+| `phi-4-mini-instruct-abliterated` | **Léger & rapide**, tourne en CPU pur (0 VRAM), sans filtre (*abliterated*) | Profils **devops** (automatisation, parsing, scripts rapides) | ~2,6 Go |
+| `Llama-3.2-11B-Vision-Instruct` | **Multimodal** : analyse, compréhension et description d'images / schémas | `@vision` (analyse d'images et diagrammes) | ~7,0 Go |
 | `nomic-embed-text-v2-moe` | Transforme le texte en **vecteurs sémantiques** (768 dim.) | Recherche vectorielle / mémoire (RAG) — pas un agent de chat | ~0,6 Go |
 
 > ⚠️ **Modèles « abliterated » :** `phi-4-mini-instruct-abliterated` est fourni **sans
 > garde-fous de sécurité** (le filtrage du modèle d'origine a été retiré). Il sert aux
-> profils `devops` et `datasecu` (automatisation, data/sécu) en local. Utilisateur
+> profils `devops` en local. Utilisateur
 > averti : ce modèle peut générer du contenu non filtré. Aucune donnée ne quitte la
 > machine (usage 100 % offline), mais gardez cela à l'esprit si vous partagez les
 > sorties.
@@ -313,11 +310,12 @@ Start-Sleep 3
 ### Étape 5 — Télécharger les 6 modèles d'IA
 
 ```bash
-.\bin\ollama.exe pull qwen2.5:7b
+.\bin\ollama.exe pull hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/deepreinforce-ai/Ornith-1.0-9B-GGUF:latest
-.\bin\ollama.exe pull llama3.2-vision:11b-instruct-q4_K_M
+.\bin\ollama.exe pull hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
 ```
 
@@ -325,15 +323,16 @@ Start-Sleep 3
 > Si vous préférez utiliser la commande `ollama` globale (hors du dossier `bin\`), assurez-vous que `$env:OLLAMA_HOST="127.0.0.1:11436"` est défini — sinon elle cherchera sur le port 11434 par défaut et échouera.
 
 | Modèle | Ce qu'il fait le mieux | Poids |
-|---|---|---|
-| `qwen2.5:7b` | Polyvalent (par défaut) — raisonnement, synthèse, @hardware + profils | ~4,5 Go |
-| `deepseek-coder-v2-lite-instruct` | Code multi-langages — @dev | ~4,0 Go |
-| `ornith-1.0-9b` | Sécurité & réseau (le plus gros, 9B) — @cyber, @network | ~9,0 Go |
-| `phi-4-mini-instruct-abliterated` | Léger, tourne en CPU pur — profils devops & datasecu | ~2,6 Go |
-| `llama3.2-vision:11b-instruct-q4_K_M` | Analyse d'images (multimodal) — @vision | ~7,0 Go |
+|---|---|---:|
+| `Qwen2.5-7B-Instruct` | Polyvalent (par défaut) — raisonnement, synthèse, @hardware + profils | ~4,7 Go |
+| `Granite-4.1-8B` | Code multi-langages — @dev | ~4,9 Go |
+| `DeepHat-V1-7B` | Sécurité offensive & défensive — @cyber | ~4,7 Go |
+| `Foundation-Sec-8B-Reasoning` | Analyse réseau & conformité — @network | ~4,9 Go |
+| `phi-4-mini-instruct-abliterated` | Léger, tourne en CPU pur — profils devops | ~2,6 Go |
+| `Llama-3.2-11B-Vision-Instruct` | Analyse d'images (multimodal) — @vision | ~7,0 Go |
 | `nomic-embed-text-v2-moe` | Embeddings — recherche dans vos documents (RAG) | ~0,6 Go |
 
-> 📖 Détail de ce que chaque modèle sait faire le mieux : voir la section [🧠 Les 6 modèles](#-les-6-modèles--ce-que-chacun-sait-faire-le-mieux).
+> 📖 Détail de ce que chaque modèle sait faire le mieux : voir la section [🧠 Les 7 modèles](#-les-7-modèles--100-huggingface--ollama-portable).
 
 > ⏳ C'est l'étape la plus longue (plusieurs Go à télécharger). À ne faire qu'une seule fois.
 
@@ -357,7 +356,7 @@ Patientez ~5 secondes, puis ouvrez votre navigateur sur **http://localhost:8000*
 ### Étape 7 — Vérifier que tout fonctionne
 
 ```bash
-.\bin\ollama.exe list                    # doit lister vos 6 modèles
+.\bin\ollama.exe list                    # doit lister vos 7 modèles
 curl http://localhost:8000/api/status    # état des services JARVIS
 curl http://localhost:8000/api/agents    # liste des agents JARVIS
 ```
@@ -409,12 +408,13 @@ python3 -c "from services.launcher import ensure_ollama_binary; import logging; 
 chmod +x bin/linux/ollama
 OLLAMA_HOST=127.0.0.1:11436 OLLAMA_MODELS="$PWD/models/ollama" ./bin/linux/ollama serve &
 sleep 3
-# qwen2.5:7b est le MODÈLE PAR DÉFAUT (DEFAULT_MODEL) — à pull en priorité
-for m in qwen2.5:7b \
+# hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M est le MODÈLE PAR DÉFAUT (DEFAULT_MODEL) — à pull en priorité
+for m in hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
+  hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M \
+  hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M \
+  hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  hf.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF:Q4_K_M \
-  hf.co/deepreinforce-ai/Ornith-1.0-9B-GGUF:latest \
-  llama3.2-vision:11b-instruct-q4_K_M \
+  hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/linux/ollama pull "$m"
 done
@@ -462,11 +462,12 @@ chmod +x bin/mac/ollama
 
 OLLAMA_HOST=127.0.0.1:11436 OLLAMA_MODELS="$PWD/models/ollama" ./bin/mac/ollama serve &
 sleep 3
-for m in qwen2.5:7b \
+for m in hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
+  hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M \
+  hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M \
+  hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  hf.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF:Q4_K_M \
-  hf.co/deepreinforce-ai/Ornith-1.0-9B-GGUF:latest \
-  llama3.2-vision:11b-instruct-q4_K_M \
+  hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/mac/ollama pull "$m"
 done
