@@ -46,5 +46,6 @@ Démarrage             : `jarvis.py` → `ProcessManager` (Ollama + JARVIS Core)
 
 ## Décisions d'architecture (ADR)
 
-Voir `docs/adr/` (ADR-001 à ADR-007) : MVC/ports, suppression technos, sandbox
-CPU-only, fallback embeddings histogramme, sécu offline single-backend.
+Voir `docs/adr/` (ADR-001 à ADR-009) : MVC/ports, suppression technos, sandbox
+CPU-only, pipeline RAG, fallback embeddings histogramme (remplacé), sécu
+offline single-backend, amélioration continue RAG, fail-fast embedding.

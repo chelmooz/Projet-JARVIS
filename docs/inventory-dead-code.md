@@ -79,7 +79,7 @@ supplémentaire justifiée sans câblage explicite.
 
 | Élément | Preuve de mortalité | Action |
 |---------|---------------------|--------|
-| `services/kill_coding.py` (`KillCodingAnalyzer`, `KillCodingReport`) | Shim de réexport créé lors du renommage Kill Coding → Analysis (`services/analysis.py`). Zéro import ailleurs dans le dépôt (`controllers/routes/kill_coding.py` importe directement `Analyzer` depuis `services.analysis`, pas depuis ce shim). Non détecté par vulture (module valide, juste jamais importé — hors du périmètre de détection symbole par symbole). | Fichier supprimé |
+| `services/kill_coding.py` (`KillCodingAnalyzer`, `KillCodingReport`) | Shim de réexport créé lors du renommage Kill Coding → Analysis (`services/analysis.py`). Zéro import ailleurs dans le dépôt (`controllers/routes/kill_coding.py` importe directement `Analyzer` depuis `services.analysis`, pas depuis ce shim). Non détecté par vulture (module valide, juste jamais importé — hors du périmètre de détection symbole par symbole). | **Correction 26/07/2026** : le fichier existe toujours (shim de compatibilité, 5 lignes). À supprimer après vérification qu'aucun import externe ne le référence. |
 
 > Méthode complémentaire à vulture : recherche par module, pour chaque fichier
 > source, d'un `import <module>` ou `from <module> import` ailleurs dans le

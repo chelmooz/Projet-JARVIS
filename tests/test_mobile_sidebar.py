@@ -1,6 +1,6 @@
-import re
-import pytest
 from pathlib import Path
+
+import pytest
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 INDEX_HTML = STATIC_DIR / "index.html"

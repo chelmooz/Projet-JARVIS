@@ -6,7 +6,7 @@ Ce guide complète le `README.md` et le `CHANGELOG.md` pour contribuer au code.
 
 - Python 3.10+ (un Python portable 3.12 est fourni sur clef pré-remplie)
 - Ollama portable (téléchargé automatiquement au 1er lancement)
-- `pip install -r requirements.txt` (ou via `launchers/JARVIS.bat`)
+- `cp .env.example .env && pip install -r requirements.txt` (ou via `launchers/JARVIS.bat`)
 
 ## Lancer en local
 
@@ -31,17 +31,20 @@ python scripts/jarvis_doctor.py   # vérifie Python, .env, Ollama, port 11436
 
 | Dossier | Rôle |
 |---------|------|
-| `config/` | Constantes, chemins, adaptateurs |
+| `config/` | Constantes, chemins, profiles agents, pipelines |
 | `controllers/` | Routes FastAPI (`routes/`) + middleware (CSP, rate-limit) |
 | `models/` | Dataclasses + schémas Pydantic |
 | `ports/` | Interfaces abstraites (Protocol) |
-| `services/` | Métier : inference, vector store, mémoire, launcher |
+| `services/` | Métier : inference, vector store, mémoire, pipeline RAG, trace sidecar, score composite, chunker, launcher |
+| `services/adapters/` | Adaptateur Ollama |
+| `services/diagnostic_ext/` | Diagnostic étendu (exécution binaires externes) |
+| `services/diagnostics/` | Diagnostics matériels (CPU, RAM, GPU, disque) |
 | `agents/` | Factory + profils des 5 agents |
 | `graph/` | Orchestrateur séquentiel multi-agent |
 | `memory/` | Stockage local JSON (runtime) |
 | `static/` | Interface web HTML/CSS/JS |
 | `tests/` | Suite pytest (TDD) |
-| `scripts/` | Utilitaires (install, doctor) |
+| `scripts/` | Utilitaires (install, doctor, backup, restore) |
 | `docs/adr/` | Architectural Decision Records |
 
 ## Conventions

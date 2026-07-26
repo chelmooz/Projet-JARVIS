@@ -34,7 +34,7 @@ def header():
     """Header."""
     subprocess.run("cls" if SYSTEM == "windows" else "clear", shell=True)
     print(cyan("====================================================="))
-    print(cyan("  JARVIS Portable Edition v5.4"))
+    print(cyan("  JARVIS Portable Edition v5.6"))
     print(cyan("  Installateur multi-OS"))
     print(cyan("====================================================="))
     print(f"  Systeme : {SYSTEM} / {ARCH}")

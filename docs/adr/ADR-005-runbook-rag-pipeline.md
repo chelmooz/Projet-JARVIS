@@ -52,7 +52,7 @@ Le service VectorService existe deja dans le codebase et assure la gestion des e
 ### Pipeline detaillee
 
 #### Ingestion
-1. Fichier detecte par FileWatcher → POST `/api/ingest`
+1. Déclenchement manuel (POST `/api/ingest` ou bouton "Vectoriser" UI)
 2. `SHA256(content)` calcule le hash du document
 3. VectorService verifie si le hash existe deja dans `vector_index.json`
    - Si oui : ignore (ingestion incrementale)
@@ -64,9 +64,8 @@ Le service VectorService existe deja dans le codebase et assure la gestion des e
 3. Similarite cosinus contre tous les vecteurs de l'index
 4. Top-K resultats (configurable, defaut 5)
 
-#### Fallback embedding
-- Si Ollama est indisponible : VectorService utilise un histogramme de bytes (16 bins) comme vecteur de repli
-- L'embedding Ollama reste le comportement nominal
+#### Comportement sans Ollama
+- L'embedding est **Fail-Fast** : si Ollama est indisponible, la route retourne une erreur 503 (voir [ADR-009](ADR-009-fail-fast-embedding-sans-fallback.md)).
 
 ---
 
@@ -77,12 +76,10 @@ Le service VectorService existe deja dans le codebase et assure la gestion des e
 - **Recherche vectorielle** : comprehension semantique, pas de simple keyword matching
 - **Ingestion incrementale** : le hash SHA256 evite de re-indexer les documents deja connus
 - **Pas de nouveau service** : VectorService est reutilise, maintenance centralisee
-- **Fallback** : l'histogramme permet un fonctionnement meme sans Ollama
 
 ### Negatives
 
-- **Dependance Ollama** : l'embedding nominal necessite Ollama disponible et reactif
-- **Fallback degrade** : l'histogramme est moins pertinent que l'embedding semantique
+- **Dependance Ollama** : l'embedding necessite Ollama disponible et reactif
 - **Stockage disque** : `vector_index.json` contient les vecteurs en clair
 
 ---
@@ -90,5 +87,6 @@ Le service VectorService existe deja dans le codebase et assure la gestion des e
 ## Voir aussi
 
 - **ADR-001** — Architecture generale de JARVIS
+- **ADR-009** — Fail-Fast embedding (remplace le fallback histogramme)
 - **Skill runbook-rag** — Guide d'utilisation et de test de la pipeline
 - **Audit securite RAG** — Analyse des risques secu (`docs/archive/audit-securite-rag.md`)

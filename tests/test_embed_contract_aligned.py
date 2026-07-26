@@ -1,4 +1,4 @@
-"""Tests — contrat embed align (audit DevOps 3.2 / 5.4).
+"""Tests — contrat embed align (audit DevOps 3.2 / 5.6).
 
 Les deux contrats couvrent des couches differentes (facade InferencePort vs
 backend LLMAdapter) : ce n'est pas un doublon a fusionner, mais leurs signatures

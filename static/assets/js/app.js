@@ -1,4 +1,4 @@
-const APP_VERSION = '5.4';
+const APP_VERSION = '5.6';
 
 // --- Toast notifications ---
 function toast(msg, type) {
@@ -1357,19 +1357,3 @@ function initThemeToggle() {
 
 initThemeToggle();
 
-// --- Mobile sidebar hamburger (MT-FE-12.1) ---
-const hamburger = document.getElementById('hamburger');
-const sidebar = document.querySelector('.sidebar');
-const sidebarBackdrop = document.querySelector('.sidebar-backdrop');
-
-if (hamburger && sidebar && sidebarBackdrop) {
-    hamburger.addEventListener('click', () => {
-        sidebar.classList.toggle('show');
-        sidebarBackdrop.classList.toggle('show');
-    });
-
-    sidebarBackdrop.addEventListener('click', () => {
-        sidebar.classList.remove('show');
-        sidebarBackdrop.classList.remove('show');
-    });
-}

@@ -4,6 +4,12 @@ Date : 24/07/2026
 Méthode : `vibe-coding-audit` + `audit-qualite` (123 items, 11 couches)  
 Tests : 724/767 passed (94,4%), 0 failed, 43 skipped, 1 xfailed
 
+> ⚠️ **Mise à jour du 26/07/2026** : les 3 vulnérabilités HIGH (path traversal,
+> format string injection, error leakage) et la majorité des 15 bare excepts ont
+> été corrigés dans les sessions post-audit. Ce document est conservé comme
+> trace historique de l'état au 24/07/2026 — voir `CHANGELOG.md` pour l'état
+> actuel. La suite de tests est passée de 724 à 800+ tests validés.
+
 ---
 
 ## 1. Résumé Exécutif

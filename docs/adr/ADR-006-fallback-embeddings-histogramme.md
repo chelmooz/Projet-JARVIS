@@ -1,6 +1,11 @@
 # ADR-006 : Fallback embeddings histogramme
 
-**Statut :** Accepté
+**Statut :** Remplacé par ADR-009 (Fail-Fast embedding)
+
+> ⚠️ **Remplacé le 24/07/2026 par [ADR-009](ADR-009-fail-fast-embedding-sans-fallback.md).**
+> Le fallback histogramme a été supprimé du code. VectorEmbedder échoue
+> immédiatement (503) si Ollama est indisponible, sans fallback déterministe.
+> Ce document est conservé comme trace historique uniquement.
 **Date :** 2026-07-20
 **Décideur :** Data/Sécu/Docs + équipe JARVIS
 

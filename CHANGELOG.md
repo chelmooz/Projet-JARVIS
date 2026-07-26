@@ -1,5 +1,15 @@
 # Changelog — JARVIS Portable Edition
 
+## [5.6] — 2026-07-26
+
+- Mise à jour de version 5.4 → 5.6 (tous les fichiers)
+- Nettoyage tests temporaires : 8 fichiers TDD/one-shot supprimés
+- Nettoyage caches : `__pycache__`, `.ruff_cache`, `.pytest_cache`, `.pytest-temp`
+- Suppression `rapport_perf.md` (stale Phase 8), `jarvis.sh` racine (redirect obsolète)
+- Mise à jour `docs/` : architecture.md, DEVELOP.md, RUNBOOK.md, ADR-005/006, AUDIT_REPORT
+- Correction `inventory-dead-code.md` section 5 (kill_coding.py existe toujours)
+- Suppression `dev-history/ROADMAP.md` (terminé, remplacé par CHANGELOG/BACKLOG)
+
 ## [5.4] — 2026-07-21
 
 ### Audit DevOps Qwen 3.8 — Corrections critiques
@@ -144,7 +154,7 @@
 - Code mort : classe `Event`, `controllers/routes/__init__.py`
 - Librairies GPU : `lib/ollama/cuda_v12/`, `cuda_v13/`, `vulkan/`
 - Sections fantômes : `openwebui` dans `adapters.yaml`, `free_llm_enabled` dans `fallback_settings.json`
-- Launchers obsolètes : `jarvis.sh` racine, `launchers/launch_jarvis.bat`
+- Launchers obsolètes : `launchers/launch_jarvis.bat`
 - Backend Rust (Shimmy) supprimé : Ollama est désormais le seul backend LLM
 
 ### Technique

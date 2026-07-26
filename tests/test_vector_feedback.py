@@ -105,10 +105,11 @@ def test_vector_consolidate_prunes_toxic_chunks(vector_service):
 
     # On mock WeightConsolidator pour isoler la logique de toxicité
     with patch("services.vector.WeightConsolidator") as mock_wc:
+        mock_instance = mock_wc.return_value
         # dedup ne supprime rien
-        mock_wc.dedup.return_value = set()
+        mock_instance.dedup.return_value = set()
         # prune garde TOUS les documents (on teste uniquement la logique toxique)
-        mock_wc.prune.return_value = docs.copy()
+        mock_instance.prune.return_value = docs.copy()
 
         vector_service.consolidate()
 

@@ -22,7 +22,7 @@ def test_readme_python_version_badge_consistent():
 
 
 def test_readme_no_stale_v50_reference():
-    """Le README ne doit pas présenter l'installateur comme v5.0 (incohérent avec v5.4)."""
-    # v5.4 présent, et pas de mention d'un installateur v5.0
-    assert "v5.4" in README_TEXT
+    """Le README ne doit pas présenter l'installateur comme v5.0 (incohérent avec v5.6)."""
+    # v5.6 présent, et pas de mention d'un installateur v5.0
+    assert "v5.6" in README_TEXT
     assert "JARVIS Portable Edition v5.0" not in README_TEXT

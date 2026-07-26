@@ -379,10 +379,6 @@ Il n'y a pas un seul script magique, mais **trois briques** à des moments diff�
 | `launchers/JARVIS.bat` / `.sh` | à **chaque lancement** | détecte Python, réinstalle une dépendance manquante si besoin, lance `jarvis.py` |
 
 Les launchers rattrapent une dépendance oubliée, mais ce n'est **pas** une vraie installation : pour un premier démarrage propre, passez bien par les étapes 2 et 3.
-
-> 💡 **`jarvis.sh` à la racine** : simple raccourci qui redirige vers `launchers/JARVIS.sh`
-> (utile pour taper `./jarvis.sh` sans se souvenir du sous-dossier). Aucune logique propre,
-> il n'y a qu'un seul vrai lanceur par OS : `launchers/JARVIS.bat` et `launchers/JARVIS.sh`.
 </details>
 
 ---
@@ -616,5 +612,5 @@ MIT — utilisation libre, modification et distribution autorisées.
 ---
 
 <div align="center">
-  <sub>Propulsé par Ollama · Construit avec FastAPI · Mis à jour pour v5.4</sub>
+  <sub>Propulsé par Ollama · Construit avec FastAPI · Mis à jour pour v5.6</sub>
 </div>

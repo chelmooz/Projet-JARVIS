@@ -1,9 +1,9 @@
 @echo off
-title JARVIS Portable Edition v5.4
+title JARVIS Portable Edition v5.6
 cd /d "%~dp0.."
 
 echo ===================================================
-echo   JARVIS Portable Edition v5.4
+echo   JARVIS Portable Edition v5.6
 echo   100%% portable — zero install systeme
 echo ===================================================
 echo.

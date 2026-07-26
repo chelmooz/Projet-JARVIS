@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Request
 
 from config.constants import VERSION
-from config.paths import STATIC_DIR
+from config.paths import OLLAMA_PORT, STATIC_DIR
 from controllers.di import AppContext
 from controllers.middlewares import _setup_middlewares
 from controllers.status import _refresh_status_cache, _status_refresher
@@ -137,4 +137,5 @@ __all__ = [
     "_status_refresher",
     "_warmup_vector_store",
     "_ctx",
+    "OLLAMA_PORT",
 ]

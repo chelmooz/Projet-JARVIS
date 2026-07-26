@@ -7,7 +7,8 @@
 # Linux/Mac : ./launchers/JARVIS.sh
 
 # Ou directement :
-python3 jarvis.py
+python jarvis.py            # Windows
+python3 jarvis.py           # Linux/Mac
 # → API : http://localhost:8000
 # → Docs : http://localhost:8000/docs
 ```
@@ -17,21 +18,24 @@ Aucune installation requise. Le projet est 100% portable sur cle USB.
 ## Services
 
 | Service | Port | Commande |
-|---|---|---|
-| JARVIS API | 8000 | `python3 jarvis.py` |
-| Ollama | 11436 | `bin/linux/ollama serve` (ou ./launchers/JARVIS.sh) |
+|---------|------|----------|
+| JARVIS API | 8000 | `python jarvis.py` (Windows) / `python3 jarvis.py` (Linux/Mac) |
+| Ollama | 11436 | `bin\win\ollama.exe serve` (Windows) / `bin/linux/ollama serve` (Linux/Mac) |
 
 ## Diagnostics
 
 ```bash
 # Verifier les services
 curl http://localhost:8000/api/status
+# PowerShell : Invoke-RestMethod http://localhost:8000/api/status
 
 # Verifier Ollama
 curl http://localhost:11436/api/tags
+# PowerShell : Invoke-RestMethod http://localhost:11436/api/tags
 
 # Verifier les logs
-cat logs/api.json
+cat logs/api.json            # Linux/Mac
+type logs\api.json           # Windows
 ```
 
 ## Problemes courants
@@ -43,9 +47,11 @@ Re-telechargez le projet depuis la source d origine.
 ### Ollama ne demarre pas
 ```bash
 # Verifier que le binaire Ollama est present
-ls -la bin/linux/ollama
+ls -la bin/linux/ollama                          # Linux/Mac
+dir bin\win\ollama.exe                           # Windows
 # Verifier les modeles disponibles
-bin/linux/ollama list
+bin/linux/ollama list                            # Linux/Mac
+bin\win\ollama.exe list                          # Windows
 # Telecharger un modele du registre si necessaire (avec Ollama lance)
 ollama pull qwen2.5
 # Les modeles specifiques JARVIS sont importes depuis des .gguf locaux :
@@ -54,14 +60,17 @@ ollama pull qwen2.5
 
 ### Port deja utilise
 ```bash
-PORT=8001 python3 jarvis.py
+set PORT=8001 && python jarvis.py        # Windows (cmd)
+$env:PORT=8001; python jarvis.py        # Windows (PowerShell)
+PORT=8001 python3 jarvis.py             # Linux/Mac
 ```
 
 ## Tests & Lint
 
 ```bash
 # Tests
-python3 -m pytest -v
+python -m pytest -v                    # Windows
+python3 -m pytest -v                   # Linux/Mac
 
 # Linting
 ruff check .
@@ -75,7 +84,8 @@ ruff check --fix .
 ```bash
 # Docker (Ollama pour CI)
 docker compose up -d
-python3 -m pytest tests/test_integration_ollama.py -v
+python -m pytest tests/test_integration_ollama.py -v    # Windows
+python3 -m pytest tests/test_integration_ollama.py -v   # Linux/Mac
 
 # Portable (Linux)
 ./scripts/run_integration_tests.sh
@@ -116,12 +126,15 @@ make test        # pytest
 make lint        # ruff check
 make lint-fix    # ruff check --fix
 make run         # python3 jarvis.py
-make clean       # supprime __pycache__, .pytest_cache
+make clean       # supprime __pycache__, .pytest_cache, .ruff_cache
 ```
 
 ## Sauvegarde
 
 ```bash
-# Donnees utilisateur
+# Linux/Mac
 tar czf backup-$(date +%Y%m%d).tar.gz memory/ logs/ config/
+
+# Windows (PowerShell)
+Compress-Archive -Path memory, logs, config -DestinationPath backup-$(Get-Date -Format yyyyMMdd).zip
 ```

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# JARVIS Portable Edition v5.4 — Lanceur 100% portable
+# JARVIS Portable Edition v5.6 — Lanceur 100% portable
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -9,7 +9,7 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 echo "==================================================="
-echo "  JARVIS Portable Edition v5.4"
+echo "  JARVIS Portable Edition v5.6"
 echo "  OS : $OS / $ARCH"
 echo "==================================================="
 echo
