@@ -188,7 +188,6 @@ textarea:focus-visible,
 .badge-agent { background: rgba(56, 189, 248, 0.12); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.25); }
 .badge-model { background: rgba(251, 191, 36, 0.12); color: var(--warn); border: 1px solid rgba(251, 191, 36, 0.25); }
 .badge-backend { background: rgba(52, 211, 153, 0.12); color: var(--ok); border: 1px solid rgba(52, 211, 153, 0.25); }
-.badge-fallback { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
 
 /* --- Chat --- */
 .chat { flex: 1; min-height: 0; overflow-y: scroll; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
@@ -289,16 +288,12 @@ textarea:focus-visible,
 /* --- Tools Tab --- */
 .tools-area { flex: 1; padding: 20px; overflow-y: auto; }
 .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.tool-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: border-color var(--t-fast), transform var(--t-fast); backdrop-filter: blur(var(--glass-blur)); }
-.tool-card:hover { border-color: rgba(56, 189, 248, 0.35); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
-.tool-card .name { font-weight: 600; font-size: 13px; color: var(--text); }
-.tool-card .desc { font-size: 12px; color: var(--text-dim); margin: 8px 0; }
-.tool-card .actions { display: flex; gap: 6px; margin-top: 10px; }
-.tool-card .actions button { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 11px; font-weight: 600; transition: var(--t-fast); }
-.btn-run { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
-.btn-run:hover { background: rgba(56, 189, 248, 0.25); }
-.btn-dl { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
-.btn-dl:hover { background: rgba(251, 191, 36, 0.25); }
+.tools-section { margin-bottom: 20px; }
+.tools-section h4 { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.tools-items { display: flex; flex-direction: column; gap: 6px; }
+.tools-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; }
+.tools-key { color: var(--text-dim); font-family: monospace; }
+.tools-val { color: var(--text); font-family: monospace; }
 .tools-empty { text-align: center; color: var(--text-mute); padding: 60px; font-size: 14px; }
 
 /* --- Toast --- */
