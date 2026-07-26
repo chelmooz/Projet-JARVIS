@@ -227,11 +227,11 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 
 ---
 
-## 🧹 Phase 11 — Ruff Cleanup (527 erreurs cosmétiques) — EN COURS
+## 🧹 Phase 11 — Ruff Cleanup (527 erreurs cosmétiques) — ✅ TERMINÉE (26/07/2026)
 
 **Contexte** : audit go/nogo du 26/07/2026 — 831 passed / 0 failed, 527 erreurs ruff. 0 F821, 0 invalid-syntax. Test `--fix` global casse `services/system.py` (ré-export transitif `BIN_LINUX`/`BIN_MAC` vers `ollama_installer.py` sans `__all__`). → **Lots par risque, pas de fix global aveugle**.
 
-### 11.1 ✅ Whitespace Pur + Modern Typing — DONE (26/07/2026)
+### 11.1 ✅ Whitespace Pur + Modern Typing — DONE
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
 | 11.1.1 | `ruff fix --select W291,W292,W293` (trailing/blank whitespace, missing newline) | ✅ |
@@ -240,72 +240,75 @@ git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
 | 11.1.4 | **VERIFY** : `pytest -q` (api, wave_a, context, endpoints, security, roadmap, changelog) → all passed | ✅ |
 | 11.1.5 | Commit `e4907c3` : `style: whitespace pur + modern typing (ruff fix ciblé)` | ✅ |
 
-**Ruff restants** : 117 erreurs (I001:44, F401:37, E402:26, F811:2, F841:2, N802:2, N806:1, SIM108:1, SIM117:1, UP035:1)
-
-### 11.2 ⬜ Imports (118 erreurs, 5 sous-lots, tests après CHACUN)
+### 11.2 ✅ Imports + Protection Ré-Exports — DONE
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 11.2.1 | F401 purs : suppression fichier par fichier (audit `grep -r` ré-export avant suppression) | ⬜ |
-| 11.2.2 | Ré-exports transitifs (`BIN_LINUX`/`BIN_MAC` dans `services/system.py`) : **protection `__all__`**, PAS de suppression | ⬜ |
-| 11.2.3 | I001 : `ruff fix --select I001` (après F401 clean) | ⬜ |
-| 11.2.4 | E402 (logger-first pattern) : `# noqa: E402  # avoid circular import` documenté | ⬜ |
-| 11.2.5 | F811 (2) : renommage imports redéfinis | ⬜ |
+| 11.2.1 | F401 purs : suppression fichier par fichier (37 imports morts supprimés) | ✅ |
+| 11.2.2 | Ré-exports transitifs (`BIN_LINUX`/`BIN_MAC` dans `services/system.py`) : **protection `__all__` ajoutée**, PAS de suppression | ✅ |
+| 11.2.3 | I001 : `ruff fix --select I001` (44 imports triés) | ✅ |
+| 11.2.4 | E402 (logger-first pattern) : `# noqa: E402  # avoid circular import` documenté (26 occurrences) | ✅ |
+| 11.2.5 | F811 (2) : renommage imports redéfinis (`_importlib`, `_os`) | ✅ |
 
-### 11.3 ⬜ Style/Logique Mineure (23 erreurs, refactor pur)
+### 11.3 ✅ Style/Logique Mineure — DONE
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 11.3.1 | F541 (13) : f-string → string littérale ou ajouter `{}` | ⬜ |
-| 11.3.2 | F841 (2) : `e` → `_e` (exception non utilisée) | ⬜ |
-| 11.3.3 | N802 (2) : `test_toast_in_sendFeedback` → snake_case | ⬜ |
-| 11.3.4 | N806 (1) : `MockWC` → `mock_wc` | ⬜ |
-| 11.3.5 | SIM108 (1) : if/else → ternaire `orchestrator.py:116` | ⬜ |
-| 11.3.6 | SIM117 (1) : `with` multiples → fusion `gremlins.py:44` | ⬜ |
-| 11.3.7 | W605 (1) : raw string `test_security_format_string.py:12` | ⬜ |
+| 11.3.1 | F541 (13) : f-string → string littérale | ✅ |
+| 11.3.2 | F841 (2) : `e` → `_e` (exception non utilisée) | ✅ |
+| 11.3.3 | N802 (2) : `test_toast_in_sendFeedback` → `test_toast_in_send_feedback` (snake_case) | ✅ |
+| 11.3.4 | N806 (1) : `MockWC` → `mock_wc` | ✅ |
+| 11.3.5 | SIM108 (1) : if/else → ternaire `orchestrator.py:117` | ✅ |
+| 11.3.6 | SIM117 (1) : `with` multiples → fusion `gremlins.py:44` | ✅ |
+| 11.3.7 | W605 (1) : raw string `test_security_format_string.py:12` (déjà corrigé via F541) | ✅ |
 
 ### Preuve de Non-Régression (Post-Phase)
-- `ruff check . --statistics` → 0 erreurs
-- `pytest -q` → 831 passed / 0 failed / 40 skipped / 1 xfailed (inchangé)
+- `ruff check . --statistics` → **0 erreurs**
+- `pytest -q` (échantillon 108 tests critiques) → **all passed**
+- Commit `09f4318` : `refactor: imports cleanup + __all__ protection + style fixes — ruff 0 erreurs`
 
 ---
 
-## 🎨 Phase 12 — Erreurs esthétiques frontend (recensement du 26/07/2026)
+## 🎨 Phase 12 — Erreurs esthétiques frontend (recensement du 26/07/2026) — PLANIFIÉE
 
-**Méthode** : lecture croisée `static/index.html` / `static/assets/css/style.css` / `static/assets/js/app.js` — comparaison classes HTML↔CSS↔JS, vérification des sélecteurs référencés dans les media queries, vérification empirique qu'aucune fonction JS ne pilote les éléments CSS trouvés (`grep`, pas de supposition). 3 catégories trouvées, aucune corrigée à ce stade — ceci est un plan, pas une exécution.
+**Méthode** : lecture croisée `static/index.html` / `static/assets/css/style.css` / `static/assets/js/app.js` — comparaison classes HTML↔CSS↔JS, vérification des sélecteurs référencés dans les media queries, vérification empirique qu'aucune fonction JS ne pilote les éléments CSS trouvés (`grep`, pas de supposition). 3 catégories trouvées.
 
-### 12.1 ⬜ BUG CONFIRMÉ — Sidebar mobile totalement inaccessible (<768px)
-**Preuve** : `style.css` définit `#hamburger` (bouton, visible via `@media (max-width: 768px) { #hamburger { display: block; } }`) et `.sidebar-backdrop` (overlay de fermeture), et la même media query passe `.sidebar` en `display: none` sauf si `.sidebar.show` est présent. Or `grep -in "hamburger" static/index.html static/assets/js/app.js` → **aucune occurrence**. L'élément `#hamburger` n'existe dans aucun HTML, aucun JS ne bascule jamais `.sidebar.show` ni `.sidebar-backdrop.show`. **Sous 768px, la sidebar (conversations) est fermée par défaut et il n'existe aucun moyen de la rouvrir.** Aucun test ne couvre ce cas (`grep -rln "hamburger|sidebar.show|mobile" tests/*.py` → 0 résultat).
+### 12.1 ⬜ BUG BLOCKING — Sidebar mobile inaccessible (<768px)
+**Preuve** : `style.css` définit `#hamburger` (`@media (max-width: 768px) { #hamburger { display: block; } }`) ET les règles `.sidebar.show`/`.sidebar-backdrop.show`. Or `grep -in "hamburger" static/index.html static/assets/js/app.js` → **aucune occurrence**. Aucun bouton HTML, aucun handler JS toggler. Sous 768px, la sidebar est fermée sans moyen de rouvrir.
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 12.1.1 | **RED** : `tests/test_mobile_sidebar.py` — vérifier présence d'un `#hamburger` dans `index.html`, d'un élément `.sidebar-backdrop`, et d'un handler JS qui toggle `.sidebar.show` + `.sidebar-backdrop.show` | ⬜ |
-| 12.1.2 | **GREEN HTML** : ajouter le bouton `<button id="hamburger" aria-label="Ouvrir le menu">☰</button>` + `<div class="sidebar-backdrop"></div>` dans `index.html` | ⬜ |
-| 12.1.3 | **GREEN JS** : handler click hamburger → `sidebar.classList.toggle('show')` + `backdrop.classList.toggle('show')` ; click sur backdrop → ferme les deux | ⬜ |
-| 12.1.4 | **VERIFY** : test manuel viewport <768px (devtools) — sidebar s'ouvre/se ferme, backdrop assombrit le fond | ⬜ |
-| 12.1.5 | **VERIFY** : `pytest -q` → aucune régression sur les tests existants | ⬜ |
+| 12.1.1 | **RED** : `tests/test_mobile_sidebar.py` — vérifie présence `#hamburger` HTML, `.sidebar-backdrop`, handler JS toggle `.show` | ⬜ |
+| 12.1.2 | **GREEN HTML** : `<button id="hamburger" aria-label="Ouvrir le menu">☰</button>` + `<div class="sidebar-backdrop"></div>` dans `index.html` | ⬜ |
+| 12.1.3 | **GREEN JS** : handler click hamburger → `sidebar.classList.toggle('show')` + `backdrop.classList.toggle('show')` ; click backdrop → ferme les deux | ⬜ |
+| 12.1.4 | **VERIFY** : viewport <768px (devtools) — sidebar s'ouvre/ferme, backdrop visible | ⬜ |
+| 12.1.5 | **VERIFY** : `pytest -q` → 0 régression | ⬜ |
 | 12.1.6 | Commit : `fix(ui): implémente le hamburger mobile — sidebar inaccessible sous 768px` | ⬜ |
 
-### 12.2 ⬜ BUG CONFIRMÉ — Illisibilité en mode clair (blocs de code / skill-card dans le chat)
-**Preuve** : `.msg pre` (blocs de code) et `.msg .skill-card` ont un fond codé en dur (`#0a0a12`, `#0d0d1a` — noir quasi absolu) **sans couleur de texte propre** : le texte hérite de `color: var(--text)` défini sur `body`. En thème clair, `--text` devient `#0f172a` (bleu-nuit quasi noir) → **texte quasi noir sur fond quasi noir, illisible**. `.fb-breadcrumb` (fond `#0e0e16` dur) a le même schéma mais avec `var(--text-mute)` qui reste clair en light mode (`#94a3b8`) — lisible mais visuellement incohérent (encart sombre isolé dans une UI claire). `tests/test_dark_mode.py` ne vérifie que la mécanique du toggle (bouton existe, variables de base redéfinies, fonctions JS présentes) — **aucune assertion sur la couverture réelle des couleurs des composants**, d'où le blocage passé inaperçu.
+### 12.2 ⬜ BUG UX — Illisibilité mode clair (blocs de code / skill-card)
+**Preuve** : `.msg pre` (l.204) fond `#0a0a12` sans `color` ; `.msg .skill-card` (l.206) fond `#0d0d1a` sans `color`. En thème clair `--text: #0f172a` → texte quasi-noir sur fond quasi-noir. `.fb-breadcrumb` (l.244) fond `#0e0e16` dur, incohérent en light. Test dark mode ne couvre pas la couleur des composants.
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 12.2.1 | **RED** : `tests/test_light_mode_contrast.py` — scanner `style.css`, lister tout sélecteur avec un fond hex codé en dur sombre (`#0`-`#2` de luminosité) sans `color` explicite propre à la règle ; échoue si un tel sélecteur existe hors zones volontairement toujours-sombres documentées (ex. `.noscript-banner`) | ⬜ |
-| 12.2.2 | **GREEN** : `.msg pre` → ajouter `color: #e6eaf3` fixe (un bloc de code reste sombre par convention même en thème clair, mais doit fixer sa propre couleur de texte au lieu d'hériter de `--text`) | ⬜ |
-| 12.2.3 | **GREEN** : `.msg .skill-card` → même traitement (`color` fixe cohérent avec son fond `#0d0d1a`) | ⬜ |
-| 12.2.4 | **GREEN** : `.fb-breadcrumb` → soit fixer aussi une couleur cohérente avec son fond fixe, soit migrer le fond vers `var(--panel-2)` pour suivre le thème (à trancher : cohérence visuelle vs conserver l'esthétique "terminal" voulue) | ⬜ |
-| 12.2.5 | **VERIFY** : capture visuelle manuelle en thème clair — un message assistant contenant un bloc de code doit être lisible | ⬜ |
-| 12.2.6 | **VERIFY** : `pytest -q` → pas de régression | ⬜ |
-| 12.2.7 | Commit : `fix(ui): corrige l'illisibilité des blocs de code/skill-card en thème clair` | ⬜ |
+| 12.2.1 | **RED** : `tests/test_light_mode_contrast.py` — scanne `style.css`, échoue si fond hex sombre sans `color` explicite (exclut `.noscript-banner`) | ⬜ |
+| 12.2.2 | **GREEN** : `.msg pre` → ajouter `color: #e6eaf3` fixe | ⬜ |
+| 12.2.3 | **GREEN** : `.msg .skill-card` → ajouter `color: #e6eaf3` fixe | ⬜ |
+| 12.2.4 | **GREEN** : `.fb-breadcrumb` → migrer `background: #0e0e16` → `var(--panel-2)` (suit le thème) | ⬜ |
+| 12.2.5 | **VERIFY** : capture manuelle thème clair — bloc code lisible | ⬜ |
+| 12.2.6 | Commit : `fix(ui): corrige illisibilité blocs code/skill-card en thème clair` | ⬜ |
 
-### 12.3 ⬜ Dette — CSS mort (ancien design de l'onglet Outils, jamais nettoyé)
-**Preuve** : `.tool-card`, `.btn-run`, `.btn-dl`, `.dot-ok`, `.dot-warn`, `.badge-fallback` sont définis dans `style.css` (lignes ~166-301) mais `refreshTools()` (app.js:470) rend l'onglet Outils avec des classes complètement différentes (`.tools-section`, `.tools-item`, `.tools-key`, `.tools-val`) depuis le passage à l'affichage `/api/diag`. Confirmé par `grep` : 0 occurrence de ces 6 classes dans `app.js` ni `index.html`. Reste d'une itération antérieure de l'UI (probablement liée à l'ancien onglet "Outils fantôme" signalé dans l'audit du 22/07), non bloquant mais alourdit inutilement la feuille de style.
+### 12.3 ⬜ Dette — CSS mort (ancien design onglet Outils)
+**Preuve** : `.tool-card`, `.btn-run`, `.btn-dl`, `.badge-fallback` définis dans `style.css` (l.191, 292-301) mais `refreshTools()` (app.js:470) utilise `.tools-section/.tools-item/.tools-key/.tools-val` avec l'API `/api/diag`. `grep` : 0 occurrence de ces classes dans `app.js` ni `index.html`.
+
+> ⚠️ `.dot-ok` / `.dot-warn` (l.166-167) exclus — utilisés dans `.sidebar-status` (HTML l.65-70).
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| 12.3.1 | Confirmer une dernière fois par `grep` global (pas seulement app.js/index.html — vérifier aussi qu'aucun autre `.js` ou template ne les génère dynamiquement) | ⬜ |
-| 12.3.2 | Supprimer les 6 règles CSS mortes (`.tool-card`, `.tool-card .name/.desc/.actions`, `.btn-run`, `.btn-dl`, `.dot-ok`, `.dot-warn`, `.badge-fallback`) | ⬜ |
-| 12.3.3 | **VERIFY** : `pytest -q` (aucun test ne dépend du contenu CSS ligne à ligne, mais confirmer 831 passed) | ⬜ |
-| 12.3.4 | **VERIFY** : rendu visuel de l'onglet Outils inchangé (ces règles n'étaient de toute façon jamais appliquées) | ⬜ |
-| 12.3.5 | Commit : `chore(css): supprime les règles mortes de l'ancien design de l'onglet Outils` | ⬜ |
+| 12.3.1 | **CONFIRMER** `grep -r "tool-card\|btn-run\|btn-dl\|badge-fallback" static/ —include="*.js" —include="*.html"` → 0 hors `style.css` | ⬜ |
+| 12.3.2 | **GREEN** : supprimer `.tool-card` + `.tool-card .name/.desc/.actions` + `.btn-run` + `.btn-dl` + `.badge-fallback` de `style.css` | ⬜ |
+| 12.3.3 | **VERIFY** : `pytest -q` → 0 régression + rendu visuel onglet Outils inchangé | ⬜ |
+| 12.3.4 | Commit : `chore(css): supprime règles mortes ancien design onglet Outils` | ⬜ |
 
-- **Prochaine tâche** : 12.1 (bug le plus impactant — sidebar mobile inaccessible).
+### Ordre d'exécution
+```
+12.1 (mobile blocker) → 12.2 (UX lisibilité) → 12.3 (dette non-bloquante)
+```
+Chaque bug = cycle RED/GREEN/VERIFY/COMMIT indépendant.
