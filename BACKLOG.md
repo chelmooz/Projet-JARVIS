@@ -34,6 +34,33 @@ E2E: run_witr('explorer') → {'success': True, 'target_type': 'name', 'proc': '
 
 ---
 
+## 🔧 W2 — Not-found witr : erreur actionnable (06/08/2026)
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| W2.1 | **RED** : `test_not_found_texte_brut_remonte_cible_introuvable` — witr v0.3.3 sort le texte « no process found matching: X » sur **stderr** (exit 2, même avec `--json`) → `JsonResultFormatter` doit remonter `success: False`, `error: "Cible introuvable..."`, `data.not_found: true` (pas « Sortie JSON invalide ») ; `test_not_found_stdout_egalement_detecte` (compat rétro) | ✅ |
+| W2.2 | **GREEN** : `formatters.py` — `_NOT_FOUND_RE` + `_detect_not_found(stdout, stderr)` : recherche sur les deux flux (leçon E2E : binaire réel écrit sur stderr) ; branche avant `_detect_ambiguous_targets` ; réponse inclut `stderr` tronqué pour contexte | ✅ |
+| W2.3 | **VERIFY** : `pytest test_diagnostic_ext_charact + test_diagnostic_ext + test_toolbox` → **83 passed** (+1 W2) ; ruff 0 erreur | ✅ |
+| W2.4 | **E2E réel** : consentement temporaire + binaire réel — `run_witr("thisprocessdoesnotexist12345")` → `{success: false, error: "Cible introuvable...", data.not_found: true, returncode: 2, stderr: "no process found..."}` ; régression nom : `run_witr("explorer")` → `success: True` inchangé ; fichier consentement nettoyé | ✅ |
+
+**Preuve W2** :
+```
+pytest tests/test_diagnostic_ext_charact.py tests/test_diagnostic_ext.py tests/test_toolbox.py → 83 passed
+ruff check formatters.py test_diagnostic_ext_charact.py → All checks passed!
+E2E: run_witr('thisprocessdoesnotexist12345') → {'success': false, 'error': 'Cible introuvable...', 'not_found': true, 'returncode': 2}
+E2E: run_witr('explorer') → {'success': true}
+```
+
+**Leçons apprises (W2)** :
+- **witr v0.3.3 écrit le message « no process found » sur stderr**, pas stdout (contrairement à ce que l'audit initial avait supposé en lisant la sortie combinée). `_detect_not_found` doit scanner `stdout + "\n" + stderr` — leçon critique pour les futurs outils externes.
+- Inclusion de `stderr` dans le résultat JSON (tronqué) donne à l'agent le contexte exact du binaire sans polluer `stdout` (réservé au JSON valide).
+- Ordre de détection important : not-found (texte brut) AVANT ambiguïté (liste numérotée) — mutuellement exclusifs en pratique, mais not-found est plus fréquent.
+- Le pattern `(?i)no matching process or service found|no process found matching` couvre les deux phrasés witr (minuscules + majuscules).
+
+**Prochaine micro-tâche** : W3 — exit 1 (warnings witr) = succès avec ancestry complète, `success: True`, `data.warnings` conservé. Config-driven via `success_exit_codes: [0, 1]` par outil dans `diagnostic_tools.yaml`.
+
+---
+
 ## 🔬 Audit d'intégration witr — binaire réel en main (06/08/2026)
 > Relecture croisée README officiel `pranshuparmar/witr` (v0.3.3, 19.2k stars,
 > release 24/06/2026 = version déployée, licence Apache-2.0) + exécution réelle

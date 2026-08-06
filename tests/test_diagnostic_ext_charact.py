@@ -308,9 +308,9 @@ class TestJsonResultFormatter:
         "[3] svchost.exe (PID 2408)\n"
     )
 
-    def _proc(self, stdout="{}", returncode=0):
+    def _proc(self, stdout="{}", stderr="", returncode=0):
         return subprocess.CompletedProcess(
-            args=["witr"], returncode=returncode, stdout=stdout, stderr=""
+            args=["witr"], returncode=returncode, stdout=stdout, stderr=stderr
         )
 
     def test_json_valide_parce_en_data_non_tronque(self):
@@ -356,6 +356,36 @@ class TestJsonResultFormatter:
         assert "JSON invalide" not in result["error"]
         assert result["data"]["ambiguous"] is True
         assert len(result["data"]["candidates"]) == 3
+
+    def test_not_found_texte_brut_remonte_cible_introuvable(self):
+        """W2 — cible inexistante : witr v0.3.3 sort le texte « no process
+        found » sur **stderr** (exit 2, même avec --json) → erreur « cible
+        introuvable » actionnable, pas « Sortie JSON invalide »."""
+        stderr = (
+            "no process found matching: ghost\n\n"
+            "No matching process or service found. Please check your query "
+            "or try a different name/port/PID.\n"
+            "For usage and options, run: witr --help\n"
+        )
+        formatter = JsonResultFormatter()
+        result = formatter.format(
+            "witr", self._proc(stdout="", stderr=stderr, returncode=2)
+        )
+        assert result["success"] is False
+        assert result["data"]["not_found"] is True
+        assert "introuvable" in result["error"].lower()
+        assert "JSON invalide" not in result["error"]
+        assert result["returncode"] == 2
+
+    def test_not_found_stdout_egalement_detecte(self):
+        """W2 — certains cas sortent le texte sur stdout (convention
+        witr ≤ 0.3.2) : la détection couvre les deux flux."""
+        formatter = JsonResultFormatter()
+        result = formatter.format(
+            "witr",
+            self._proc(stdout="no process found matching: ghost\n", returncode=2),
+        )
+        assert result["data"]["not_found"] is True
 
     def test_get_formatter_json(self):
         assert isinstance(get_formatter("json"), JsonResultFormatter)

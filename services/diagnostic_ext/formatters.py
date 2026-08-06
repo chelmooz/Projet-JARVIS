@@ -20,6 +20,11 @@ _MAX_ERROR = 200
 # plusieurs cibles matchent → sortie texte brut "[1] …".."[n] …", pas de JSON.
 _NUMBERED_LIST_RE = re.compile(r"^\s*\[\d+\]\s*(.+)$")
 
+# Phrase witr quand aucune cible ne matche (texte brut même avec --json, exit 2) :
+#   no process found matching: X
+#   No matching process or service found. Please check your query ...
+_NOT_FOUND_RE = re.compile(r"(?i)no matching process or service found|no process found matching")
+
 
 class TextResultFormatter:
     """Comportement historique : stdout/stderr tronqués en texte brut."""
@@ -51,6 +56,16 @@ class JsonResultFormatter:
         try:
             data: Any = json.loads(proc.stdout)
         except json.JSONDecodeError as e:
+            if self._detect_not_found(proc.stdout, proc.stderr):
+                return {
+                    "success": False,
+                    "tool": tool_name,
+                    "error": "Cible introuvable : aucun process/service/port ne correspond",
+                    "data": {"not_found": True},
+                    "stdout": proc.stdout.strip()[:_MAX_STDOUT],
+                    "stderr": proc.stderr.strip()[:_MAX_STDERR],
+                    "returncode": proc.returncode,
+                }
             candidates = self._detect_ambiguous_targets(proc.stdout)
             if candidates:
                 return {
@@ -93,6 +108,15 @@ class JsonResultFormatter:
             if m
         ]
         return candidates if len(candidates) >= 2 else []
+
+    @staticmethod
+    def _detect_not_found(stdout: str, stderr: str) -> bool:
+        """Détecte le texte witr « cible introuvable ».
+
+        witr v0.3.3 écrit ce message sur **stderr** (leçon W2-E2E) : on
+        recherche sur les deux flux. Sortie texte, exit 2.
+        """
+        return _NOT_FOUND_RE.search(stdout + "\n" + stderr) is not None
 
 
 def get_formatter(output_format: str) -> TextResultFormatter | JsonResultFormatter:
