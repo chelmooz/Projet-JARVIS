@@ -387,6 +387,24 @@ class TestJsonResultFormatter:
         )
         assert result["data"]["not_found"] is True
 
+    def test_exit_code_succes_configurable_via_success_exit_codes(self):
+        """W3 — witr exit 1 = « trouvé avec warnings » (ex: listening on public
+        interface). Config `success_exit_codes: [0, 1]` → success True,
+        data JSON préservée (incl. warnings), pas d'erreur."""
+        stdout = '{"Ancestry": [{"Process": {"Command": "nginx"}}], "Warnings": ["listening on public interface"]}'
+        # Par défaut [0] → exit 1 = échec (success False, pas d'erreur car JSON valide)
+        formatter_default = JsonResultFormatter()
+        r0 = formatter_default.format("witr", self._proc(stdout=stdout, returncode=1))
+        assert r0["success"] is False
+        assert "error" not in r0  # JSON valide → pas d'erreur, juste success=False
+        # Avec success_exit_codes=[0, 1] → succès
+        formatter_w3 = JsonResultFormatter(success_exit_codes=[0, 1])
+        r1 = formatter_w3.format("witr", self._proc(stdout=stdout, returncode=1))
+        assert r1["success"] is True
+        assert r1["data"]["Ancestry"][0]["Process"]["Command"] == "nginx"
+        assert r1["data"]["Warnings"] == ["listening on public interface"]
+        assert r1["returncode"] == 1  # code original préservé
+
     def test_get_formatter_json(self):
         assert isinstance(get_formatter("json"), JsonResultFormatter)
 

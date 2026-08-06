@@ -58,6 +58,53 @@ def _parse_requirement_pins(path):
     return pins
 
 
+def _parse_requirements_with_specifiers(path):
+    """Retourne {nom: specifier_complete} depuis requirements.txt.
+    
+    Garde les spécificateurs complets (>=, <=, etc.) pour comparaison de bornes.
+    Exemple: "fastapi>=0.100.0" -> {"fastapi": ">=0.100.0"}
+    """
+    specs = {}
+    if not os.path.exists(path):
+        return specs
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # Supprime la partie commentaire après #
+            if "#" in line:
+                line = line.split("#")[0].strip()
+            if not line:
+                continue
+            # Sépare le nom du paquet du spécificateur
+            # Gère les extras: package[extra]>=version
+            spec = line.split(";")[0].strip()  # Supprime les marqueurs d'environnement
+            # Trouve le premier séparateur de version
+            version_ops = [">=", "<=", "==", "!=", "~=", ">", "<"]
+            package_name = None
+            version_spec = None
+            
+            # Cherche l'opérateur de version
+            for op in version_ops:
+                if op in spec:
+                    parts = spec.split(op, 1)
+                    package_name = parts[0].rstrip()
+                    version_spec = op + parts[1].lstrip()
+                    break
+            
+            if package_name is None:
+                # Pas de spécificateur de version, juste le nom du paquet
+                package_name = spec
+                version_spec = ""  # Pas de contrainte de version
+            
+            # Supprime les extras [standard] du nom pour la comparaison
+            package_name = package_name.split("[")[0].strip().lower()
+            
+            specs[package_name] = version_spec
+    return specs
+
+
 def _parse_pyproject_specifiers(path):
     """Retourne {nom: specifier} depuis [project].dependencies de pyproject.toml.
 
@@ -199,3 +246,52 @@ class TestPyprojectDependencies:
             "pyproject.toml (borne) : "
             + "; ".join(f"{n}=={v} hors borne pyproject '{s}'" for n, v, s in mismatches)
         )
+
+    def test_requirements_specifiers_match_pyproject(self):
+        """Vérifie que les spécificateurs de requirements.txt sont compatibles
+        avec ceux de pyproject.toml.
+        
+        Pour chaque paquet commun, la version spécifiée dans requirements.txt
+        doit satisfaire les contraintes de pyproject.toml.
+        Exemple: si requirements.txt dit "fastapi>=0.100.0" et pyproject.toml 
+        dit "fastapi>=0.135.1,<0.136", alors la borne requirements.txt doit 
+        être comprise dans les bornes pyproject.toml.
+        """
+        req_specs = _parse_requirements_with_specifiers(ROOT_REQUIREMENTS)
+        pyproject_specs = _parse_pyproject_specifiers(PYPROJECT_PATH)
+        
+        if not req_specs or not pyproject_specs:
+            pytest.skip("requirements.txt ou pyproject.toml vide — rien à comparer.")
+        
+        mismatches = []
+        for package_name, req_spec in req_specs.items():
+            if package_name not in pyproject_specs:
+                continue
+                
+            pyproject_spec = pyproject_specs[package_name]
+            
+            # Si requirements.txt n'a pas de spécificateur de version, c'est OK
+            if not req_spec:
+                continue
+                
+            # Vérifie que le spécificateur requirements.txt satisfait pyproject.toml
+            # Pour cela, on transforme le spec requirements.txt en une contrainte
+            # qu'on teste contre des versions hypothétiques dans la plage pyproject
+            if not self._specifier_satisfies_specifier(req_spec, pyproject_spec):
+                mismatches.append((package_name, req_spec, pyproject_spec))
+        
+        assert not mismatches, (
+            "Incompatibilité de spécificateurs entre requirements.txt et pyproject.toml : "
+            + "; ".join(f"{n}: requirements '{r}' non compatible avec pyproject '{p}'" 
+                       for n, r, p in mismatches)
+        )
+
+    def _specifier_satisfies_specifier(self, req_spec, pyproject_spec):
+        """Vérifie si un spécificateur requirements.txt est compatible avec 
+        un spécificateur pyproject.toml.
+        
+        Pour ce test, on considère qu'ils sont compatibles s'ils sont identiques,
+        ce qui est suffisant pour vérifier l'alignement des fichiers.
+        """
+        return req_spec == pyproject_spec
+

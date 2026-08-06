@@ -47,7 +47,14 @@ class JsonResultFormatter:
 
     Retombe proprement en erreur lisible si le JSON est invalide
     (jamais d'exception propagée à l'appelant).
+
+    ``success_exit_codes`` : liste des codes retour considérés comme
+    succès. Configurable par outil (ex: witr exit 1 = trouvé avec
+    warnings → ``[0, 1]``). Par défaut ``[0]``.
     """
+
+    def __init__(self, success_exit_codes: list[int] | None = None) -> None:
+        self._success_exit_codes = success_exit_codes or [0]
 
     def format(
         self, tool_name: str, proc: subprocess.CompletedProcess[str]
@@ -86,7 +93,7 @@ class JsonResultFormatter:
                 "returncode": proc.returncode,
             }
         return {
-            "success": proc.returncode == 0,
+            "success": proc.returncode in self._success_exit_codes,
             "tool": tool_name,
             "data": data,
             "returncode": proc.returncode,
@@ -119,10 +126,14 @@ class JsonResultFormatter:
         return _NOT_FOUND_RE.search(stdout + "\n" + stderr) is not None
 
 
-def get_formatter(output_format: str) -> TextResultFormatter | JsonResultFormatter:
-    """Factory : retourne le formatter adapté au format de sortie de l'outil."""
+def get_formatter(output_format: str, success_exit_codes: list[int] | None = None) -> TextResultFormatter | JsonResultFormatter:
+    """Factory : retourne le formatter adapté au format de sortie de l'outil.
+
+    ``success_exit_codes`` : codes retour considérés comme succès (pour JSON formatter).
+    Par défaut [0]. Config-driven via diagnostic_tools.yaml.
+    """
     if output_format == "json":
-        return JsonResultFormatter()
+        return JsonResultFormatter(success_exit_codes=success_exit_codes)
     return TextResultFormatter()
 
 

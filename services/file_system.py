@@ -11,7 +11,7 @@ import re
 import sys
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 from config.constants import JARVIS_DEV, MAX_FIND_FILES, PROJECT_DIR
 from config.paths import IS_WINDOWS
@@ -35,6 +35,20 @@ class FileSystemService:
     # Gestion des autorisations
     # ------------------------------------------------------------------
     @staticmethod
+    def _resolve_real_path(path: Union[str, Path]) -> str:
+        """Résout un chemin en suivant les liens symboliques et en normalisant
+        les séparateurs de chemin pour une comparaison cohérente cross-platform.
+        
+        Args:
+            path: Chemin à résoudre (string ou Path object)
+            
+        Returns:
+            Chemin réel avec séparateurs normalisés
+        """
+        path_str = str(path)
+        return os.path.realpath(path_str.replace("\\", "/"))
+
+    @staticmethod
     def _is_inside_sandbox(resolved: str) -> bool | None:
         """Vérifie si le chemin est dans le sandbox JARVIS_FILES_SANDBOX_ROOT.
         Retourne ``True``/``False``, ou ``None`` si le sandbox n'est pas
@@ -48,14 +62,9 @@ class FileSystemService:
             if JARVIS_DEV or is_testing:
                 return None
             sandbox = PROJECT_DIR
-        sandbox_resolved = os.path.abspath(sandbox)
+        sandbox_resolved = FileSystemService._resolve_real_path(sandbox)
         try:
-            # Normalisation cross-platform : '\' n'est un séparateur de chemin
-            # que sous Windows pour os.path — sur Linux/Mac un payload style
-            # '..\..\etc\passwd' reste littéralement un nom de fichier et
-            # semble donc "dans" le sandbox. On force la normalisation pour
-            # que le contrôle soit identique quel que soit l'OS d'exécution.
-            resolved = os.path.abspath(resolved.replace("\\", "/"))
+            resolved = FileSystemService._resolve_real_path(resolved)
             return Path(resolved).is_relative_to(Path(sandbox_resolved))
         except (AttributeError, ValueError):
             # Fallback pour Python < 3.9 ou chemins sur volumes différents
@@ -92,7 +101,7 @@ class FileSystemService:
             _logger.warning("Tentative de path traversal bloquée (séquence ..) : %s", path)
             return False
 
-        resolved = os.path.abspath(path)
+        resolved = self._resolve_real_path(path)
         if self._is_inside_sandbox(resolved) is False:
             return False
         with self._lock:
@@ -101,13 +110,13 @@ class FileSystemService:
 
     def is_authorized(self, path: str) -> bool:
         """Indique si un chemin est autorisé."""
-        resolved = os.path.abspath(path)
+        resolved = self._resolve_real_path(path)
         with self._lock:
             return resolved in self._authorized
 
     def revoke_path(self, path: str) -> bool:
         """Révoque l'autorisation d'un chemin."""
-        resolved = os.path.abspath(path)
+        resolved = self._resolve_real_path(path)
         with self._lock:
             if resolved not in self._authorized:
                 return False
@@ -126,7 +135,7 @@ class FileSystemService:
         """Vérifie que le chemin (ou un parent direct) est autorisé.
         Retourne le chemin résolu. Lève ``FileSystemError`` si non autorisé.
         """
-        resolved = os.path.abspath(path)
+        resolved = self._resolve_real_path(path)
         if self._is_inside_sandbox(resolved) is False:
             raise FileSystemError(f"Chemin non autorisé (hors sandbox) : {resolved}")
         with self._lock:
@@ -174,7 +183,7 @@ class FileSystemService:
     def read_file(self, path: str) -> dict[str, Any]:
         """Lit un fichier texte autorisé (max 10 Ko)."""
         try:
-            resolved = os.path.abspath(path)
+            resolved = self._resolve_real_path(path)
             parent = os.path.dirname(resolved)
             self._check_authorized(parent)
             if not os.path.isfile(resolved):
@@ -205,7 +214,7 @@ class FileSystemService:
         if max_results is None:
             max_results = MAX_FIND_FILES
         try:
-            resolved = os.path.abspath(os.path.dirname(pattern))
+            resolved = self._resolve_real_path(os.path.dirname(pattern))
             self._check_authorized(resolved)
             matches: list[str] = []
             for match in glob_mod.iglob(pattern, recursive=True):

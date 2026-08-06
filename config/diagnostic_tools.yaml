@@ -99,6 +99,9 @@ tools:
     linux_args: ["--json", "{target}"]
     darwin_args: ["--json", "{target}"]
     allowed_params: ["target", "port"]
+    # witr exit 1 = trouvé avec warnings (ex: listening on public interface) →
+    # considérer comme succès pour l'agent, warnings préservés dans data.
+    success_exit_codes: [0, 1]
     # SHA256 par plateforme (vérifiés contre SHA256SUMS officiel en T1.2).
     # darwin_sha256 = hash du witr déployé par défaut (arm64) ; le binaire
     # darwin-amd64 (39934f6a…) n'est pas référencé par la config.

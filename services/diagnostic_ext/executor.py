@@ -70,7 +70,7 @@ class CommandExecutor:
             return {"success": False, "tool": tool_name, "error": "Échec vérification SHA256"}
 
         cmd_args = self.build_args(cfg, args, extra_kwargs)
-        formatter = get_formatter(cfg.get("output_format", "text"))
+        formatter = get_formatter(cfg.get("output_format", "text"), cfg.get("success_exit_codes"))
         return self._execute(tool_name, path, cmd_args, cfg.get("timeout", 10), formatter)
 
     def build_args(

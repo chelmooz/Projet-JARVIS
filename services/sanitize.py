@@ -81,8 +81,22 @@ def safe_path_segment(segment: str) -> str:
         return ""
     # Supprime le caractère null et la séquence littérale "\\0"
     cleaned = segment.replace("\\0", "").replace("\0", "")
-    # Supprime les tentatives de traversée de répertoire
-    cleaned = re.sub(r"(\.\.[/\\])+", "", cleaned)
+    # Supprime les tentatives de traversée de répertoire.
+    # SÉCURITÉ : une passe unique de re.sub() sur "(\.\.[/\\])+" est
+    # contournable — retirer une occurrence peut en RECRÉER une nouvelle
+    # par concaténation des morceaux restants. Exemple concret :
+    # "....//" -> l'unique match interne "../" (chars 2-4) est supprimé,
+    # il reste "." + "." + "/" = "../" : la traversée réapparaît après
+    # sanitization. On boucle donc jusqu'à point fixe (plus aucune
+    # substitution possible), seule méthode sûre pour ce type de filtre.
+    previous = None
+    while previous != cleaned:
+        previous = cleaned
+        cleaned = re.sub(r"\.\.[/\\]", "", cleaned)
+    # Ceinture-bretelles : neutralise aussi un ".." final sans séparateur
+    # de fin (ex: segment == "..") et les backslashes bruts non couverts
+    # par la boucle ci-dessus sur les plateformes où '/' n'est pas testé.
+    cleaned = cleaned.replace("..", "")
     return cleaned[:MAX_PATH_LEN]
 
 

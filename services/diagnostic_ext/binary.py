@@ -8,6 +8,7 @@ binaire local (bin_dir), organisé en sous-dossier par OS.
 from __future__ import annotations
 
 import os
+import platform as _platform
 import shutil
 import sys
 from typing import Any
@@ -71,6 +72,10 @@ def resolve_expected_sha256(config: dict[str, Any], tool_name: str, platform: st
     ``linux_sha256``), avec repli documenté sur ``sha256`` si la clé
     spécifique est absente.
 
+    Pour Darwin, distingue arm64 vs amd64 via ``platform.machine()`` :
+    - ``darwin_sha256`` : arm64 (Apple Silicon)
+    - ``darwin_amd64_sha256`` : x86_64 (Intel)
+
     Args:
         config: Dictionnaire de configuration global (clé "tools").
         tool_name: Nom de l'outil tel qu'attendu dans la configuration.
@@ -84,6 +89,11 @@ def resolve_expected_sha256(config: dict[str, Any], tool_name: str, platform: st
         return ""
     if platform == "win32":
         return cfg.get("sha256", "")
+    if platform == "darwin":
+        machine = _platform.machine().lower()
+        if machine in ("amd64", "x86_64"):
+            return cfg.get("darwin_amd64_sha256") or cfg.get("darwin_sha256") or cfg.get("sha256", "")
+        return cfg.get("darwin_sha256") or cfg.get("darwin_amd64_sha256") or cfg.get("sha256", "")
     return cfg.get(f"{platform}_sha256", cfg.get("sha256", ""))
 
 

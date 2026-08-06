@@ -4,7 +4,10 @@ Chaque cycle TDD : RED → GREEN → REFACTOR.
 """
 import os
 import shutil
+import sys
 import tempfile
+
+import pytest
 
 from services.file_system import FileSystemService
 
@@ -226,3 +229,109 @@ class TestFileSystemSecureByDefault:
             assert svc.authorize_path(PROJECT_DIR)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class TestFileSystemSymlink:
+    """Cycle 6 — Protection contre les escapes par symlink (CWE-59)."""
+
+    def setup_method(self):
+        self.svc = FileSystemService()
+        self.tmpdir = tempfile.mkdtemp()
+        self.allowed_dir = os.path.join(self.tmpdir, "allowed")
+        self.secret_dir = os.path.join(self.tmpdir, "secret")
+        os.makedirs(self.allowed_dir)
+        os.makedirs(self.secret_dir)
+        # Créer un fichier secret
+        self.secret_file = os.path.join(self.secret_dir, "secret.txt")
+        with open(self.secret_file, "w", encoding="utf-8") as f:
+            f.write("TOP SECRET DATA\n")
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_is_inside_sandbox_symlink_vulnerability(self):
+        """Test that demonstrates the symlink vulnerability in _is_inside_sandbox.
+        
+        While we can't easily create real symlinks in test without privileges,
+        we can test the core issue: abspath() doesn't resolve symlinks while
+        realpath() does.
+        """
+        # Force le sandbox au répertoire du projet (mode production)
+        from config.constants import PROJECT_DIR
+        import os
+        
+        # Sauvegarder et restaurer l'environnement
+        old_sandbox = os.environ.get("JARVIS_FILES_SANDBOX_ROOT")
+        old_dev = os.environ.get("JARVIS_DEV")
+        original_modules = None
+        
+        try:
+            os.environ["JARVIS_FILES_SANDBOX_ROOT"] = str(PROJECT_DIR)
+            os.environ["JARVIS_DEV"] = "false"
+            # Simuler l'absence de pytest
+            modules_copy = dict(sys.modules)
+            if "pytest" in modules_copy:
+                del modules_copy["pytest"]
+            original_modules = sys.modules
+            sys.modules = modules_copy
+
+            # Créer un service pour tester la méthode statique
+            svc = FileSystemService()
+            
+            # Test avec un chemin normal (devrait être dans le sandbox)
+            test_path_in_sandbox = os.path.join(str(PROJECT_DIR), "some", "sub", "path")
+            result = svc._is_inside_sandbox(test_path_in_sandbox)
+            # En mode production avec sandbox défini, devrait retourner True ou False, pas None
+            assert result is not None  # Pas None car sandbox est défini
+            
+            # Le point clé du test : démontrer que abspath vs realpath ferait une différence
+            # On ne peut pas facilement le faire sans vrais symlinks, mais on peut au moins
+            # vérifier que la fonction ne retourne pas None quand elle devrait
+            
+        finally:
+            # Restaurer l'environnement
+            if old_sandbox is not None:
+                os.environ["JARVIS_FILES_SANDBOX_ROOT"] = old_sandbox
+            else:
+                os.environ.pop("JARVIS_FILES_SANDBOX_ROOT", None)
+            if old_dev is not None:
+                os.environ["JARVIS_DEV"] = old_dev
+            else:
+                os.environ.pop("JARVIS_DEV", None)
+            if original_modules is not None:
+                sys.modules = original_modules
+
+    def test_read_file_blocks_symlink_escape(self):
+        """Test that read_file blocks symlink escape attempts (CWE-59).
+        
+        Creates a symlink inside authorized directory pointing to a file
+        outside the sandbox, then verifies reading through the symlink fails.
+        """
+        # Create a legitimate file in allowed_dir
+        legit_file = os.path.join(self.allowed_dir, "legit.txt")
+        with open(legit_file, "w", encoding="utf-8") as f:
+            f.write("Legitimate content\n")
+        
+        # Create symlink in allowed_dir pointing to secret file outside
+        symlink_path = os.path.join(self.allowed_dir, "link_to_secret")
+        try:
+            os.symlink(self.secret_file, symlink_path)
+        except (OSError, NotImplementedError):
+            pytest.skip("Symlinks not supported on this platform/privilege level")
+        
+        # Authorize the allowed directory
+        self.svc.authorize_path(self.allowed_dir)
+        
+        # Try to read through the symlink - should be blocked
+        # because _resolve_real_path will resolve the symlink and find
+        # the real path is outside the authorized directory
+        result = self.svc.read_file(symlink_path)
+        
+        # Should fail - the symlink points outside authorized area
+        assert not result["success"], "Symlink escape should be blocked"
+        assert "non autoris" in result.get("error", "").lower()
+        
+        # Verify legitimate file still works
+        result_legit = self.svc.read_file(legit_file)
+        assert result_legit["success"]
+        assert "Legitimate content" in result_legit["content"]

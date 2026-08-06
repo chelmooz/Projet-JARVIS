@@ -59,6 +59,23 @@ class TestSafePathSegment:
         result = sanitize.safe_path_segment("a" * 2000)
         assert len(result) == MAX_PATH_SEGMENT
 
+    @pytest.mark.parametrize("segment,expected", [
+        ("....//....//etc/passwd", "etc/passwd"),
+        ("....\\\\....\\\\windows\\\\system32", "windows\\\\system32"),
+        ("....//....//", ""),
+        (".....//.....//etc/passwd", "etc/passwd"),  # All traversal attempts removed
+        ("....//....//....//bin/bash", "bin/bash")
+    ])
+    def test_safe_path_segment_nested_bypass(self, segment, expected):
+        """Test that nested bypass attempts are properly handled.
+        
+        The old implementation used a single pass of re.sub(r"(\.\.[/\\])+", "", cleaned)
+        which could be bypassed by nesting: "....//" -> after removing the inner "../",
+        it becomes "../" again which represents a traversal.
+        """
+        result = sanitize.safe_path_segment(segment)
+        assert result == expected, f"For input '{segment}': expected '{expected}', got '{result}'"
+
 
 class TestValidateBase64Image:
     def test_valid_returns_true(self):
