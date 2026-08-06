@@ -59,3 +59,14 @@ class TestRateLimit:
         for i in range(5):
             _, rem = check_rate_limit(key)
             assert rem == MAX_REQUESTS - (i + 1)
+
+    def test_stale_ips_purged_on_check(self, monkeypatch):
+        """R1 — les IPs mortes sont purgées automatiquement au check suivant."""
+        ratelimit_mod._last_purge = 0.0
+        monkeypatch.setattr("services.ratelimit.time.time", lambda: 1000.0)
+        ratelimit_mod._hits["dead_ip"] = [100.0]
+        ratelimit_mod._hits["live_ip"] = []
+        allowed, remaining = check_rate_limit("live_ip")
+        assert allowed
+        assert "dead_ip" not in ratelimit_mod._hits
+        assert "live_ip" in ratelimit_mod._hits

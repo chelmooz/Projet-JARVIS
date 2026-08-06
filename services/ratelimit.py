@@ -16,21 +16,27 @@ from collections import defaultdict
 _lock = threading.Lock()
 _hits: dict[str, list[float]] = defaultdict(list)
 
+# Horodatage de la dernière purge : la purge est throttlée à 1/WINDOW pour
+# éviter un scan complet du dict à chaque requête.
+_last_purge: float = 0.0
+
 MAX_REQUESTS = 500
 WINDOW = 60  # Fenêtre glissante en secondes
 
 
-def _purge_stale() -> int:
+def _purge_stale(cutoff: float | None = None) -> int:
     """Nettoie les IPs sans activité depuis plus de WINDOW secondes.
 
     Retourne le nombre d'IPs purgées. Appel possible depuis un thread
-    d'arrière-plan ou entre deux requêtes.
+    d'arrière-plan ou entre deux requêtes. ``cutoff`` est optionnel :
+    s'il est fourni, il évite un second appel à ``time.time()`` (cas
+    check_rate_limit → purge).
     """
-    now = time.time()
-    cutoff = now - WINDOW
+    if cutoff is None:
+        cutoff = time.time() - WINDOW
     purged = 0
     with _lock:
-        stale = [ip for ip, ts in _hits.items() if not any(t > cutoff for t in ts)]
+        stale = [ip for ip, ts in _hits.items() if ts and not any(t > cutoff for t in ts)]
         for ip in stale:
             del _hits[ip]
             purged += 1
@@ -43,8 +49,15 @@ def check_rate_limit(client_ip: str) -> tuple[bool, int]:
     Retourne (allowed, remaining) où remaining est le nombre de requêtes
     restantes dans la fenêtre courante (après déduction de celle-ci).
     """
+    global _last_purge
     now = time.time()
     cutoff = now - WINDOW
+
+    # Purge périodique des IPs mortes (au plus 1 fois par WINDOW) — évite la
+    # fuite mémoire lente sur les IPs qui ne reviennent jamais.
+    if now - _last_purge >= WINDOW:
+        _purge_stale(cutoff)
+        _last_purge = now
 
     with _lock:
         # Filtrage des timestamps expirés (fenêtre glissante)
