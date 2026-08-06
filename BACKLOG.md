@@ -2,6 +2,86 @@
 
 ---
 
+## 🔧 W1 — witr : requêtes port via `--port` (bug P1 de l'audit binaire) — 06/08/2026
+
+> P1 vérifié binaire en main : `witr --json 8000` traite « 8000 » comme un **nom**
+> (substring) → *no process found* (exit 2). Bon appel : `witr --json --port 8000`.
+> `run_witr` passait tout target en positionnel `{target}` — les ports (promis par
+> le prompt agent T10) étaient cassés en production.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| W1.1 | **RED** : `test_cle_port_utilise_port_args_witr` (TestBuildArgs — cfg witr `port_args`, kwargs `{"port": "8080"}` → `["--json", "--port", "8080"]`) → échoue (template port_args ignoré) ; `test_run_witr_passe_le_target_port` mis à jour (contrat cible : target numérique → clé `port`) → échoue (passait `{"target": "8080"}`) | ✅ |
+| W1.2 | **GREEN** : `executor.py::build_args` — si `"port" in extra_kwargs` → template `port_args` (indépendant plateforme, repli `args`) sinon template plateforme existant ; `service.py::run_witr` — `target.isdigit()` → `{"port": target}`, sinon `{"target": target}` ; `config/diagnostic_tools.yaml` — witr `port_args: ["--json", "--port", "{port}"]` + `allowed_params: [target, port]` | ✅ |
+| W1.3 | **VERIFY** : `pytest test_diagnostic_ext_charact + test_diagnostic_ext + test_toolbox` → **81 passed** ; `test_config_files` → 44 passed ; ruff 0 erreur | ✅ |
+| W1.4 | **E2E réel** : consentement temporaire + binaire réel — `run_witr("47001")` → `data.Target.Type="port"`, `Target.Value="47001"`, `Process.Command="System"`, ancestry 1 (avant W1 : « no process found matching ») ; régression nom : `run_witr("explorer")` → `success: True` inchangé ; fichier consentement nettoyé | ✅ |
+
+**Preuve W1** :
+```
+pytest tests/test_diagnostic_ext_charact.py tests/test_diagnostic_ext.py tests/test_toolbox.py → 81 passed
+pytest tests/test_config_files.py tests/test_diagnostic_ext_charact.py → 44 passed
+ruff check executor.py service.py test_diagnostic_ext_charact.py → All checks passed!
+E2E: run_witr('47001') → {'target_type': 'port', 'target_val': '47001', 'proc': 'System', 'ancestry_n': 1, 'returncode': 1}
+E2E: run_witr('explorer') → {'success': True, 'target_type': 'name', 'proc': 'Explorer.EXE'}
+```
+
+**Leçons apprises (W1)** :
+- Le contrat de `build_args` évolue : le choix du template dépend désormais de la **clé** présente dans `extra_kwargs` (port vs nom), pas seulement de la plateforme. `port_args` est volontairement unique (flags witr identiques sur win32/linux/darwin) — pas de duplication linux_port_args/darwin_port_args (YAGNI).
+- `target.isdigit()` est délibérément simple : un target numérique = port. Le cas « PID » reste non traité (prompt T10 : demander PID ou port — un numéro nu sera résolu en port ; acceptable, witr renvoie alors proprement « not found »).
+- **P3 confirmé en E2E** : `run_witr('47001')` → exit 1 (warnings witr, ex: *listening on public interface*) → `success: False` malgré une ancestry complète. À traiter en micro-tâche séparée (W3 proposée).
+
+**Prochaine micro-tâche** : W2 (not-found → erreur « cible introuvable » au lieu de « Sortie JSON invalide ») ou W3 (exit 1 = succès avec warnings).
+
+---
+
+## 🔬 Audit d'intégration witr — binaire réel en main (06/08/2026)
+> Relecture croisée README officiel `pranshuparmar/witr` (v0.3.3, 19.2k stars,
+> release 24/06/2026 = version déployée, licence Apache-2.0) + exécution réelle
+> de `bin\diagnostic\win\witr.exe` + lecture de la chaîne config → executor →
+> formatter → toolbox → agent.
+
+| Constat | Preuve binaire réelle | Sévérité |
+|---|---|---|
+| **P1 — Requêtes port cassées** : `run_witr("8080")` → `witr --json 8080`. witr traite les positionnels comme des **noms** (substring), pas des ports → *no process found matching: 8000* (exit 2). Bon appel : `witr --json --port 8080`. Le prompt agent (T10) invite explicitement l'utilisateur à donner « un port précis » → chemin en production cassé. Aucun E2E réel avec un vrai port (T5.2/T5.3 mockaient ou utilisaient un nom). | `witr --json 8000` → `no process found matching: 8000` ; `witr --json --port 47001` → JSON complet `{Target:{Type:"port",...}}` | 🔴 HIGH |
+| **P2 — « Not found » remonte comme « Sortie JSON invalide »** : witr sort du **texte brut** (pas de JSON) même avec `--json` quand la cible n'existe pas (exit 2). `JsonResultFormatter` échoue alors sur `json.loads` → l'agent reçoit `Sortie JSON invalide: Expecting value...` au lieu de « processus introuvable ». | `witr --json thisprocessdoesnotexist12345` → texte `no process found matching: ...` exit 2 | 🟠 MEDIUM |
+| **P3 — `success: False` sur une recherche réussie avec warnings** : exit code witr 1 = « trouvé avec warnings » (ex: *listening on public interface*). `JsonResultFormatter` calcule `success = returncode == 0` → une ancestry complète remonte comme échec à l'agent. | `witr --json --port 47001` → JSON valide `{Ancestry:[...], Source:{...}, Warnings:[...]}` mais exit 1 | 🟠 MEDIUM |
+| P4 — `bin/VERSION.json` : entrée win witr = `sha256_zip` du zip uniquement ; le sha256 du `witr.exe` **exécuté** (`1500DC0E…`, celui de la config) n'est pas documenté → provenance incomplète | lecture VERSION.json | ⚪ LOW |
+| ✅ Point de non-régression : mode ambigu vérifié réel — `witr --json svchost` → liste numérotée texte `[1]..[n]` **même avec `--json`** (exit 0) → la détection T9.2 (`_NUMBERED_LIST_RE`) est le bon mécanisme, le fixture fige un comportement réel. | `witr --json svchost` → 88 candidats `[n] svchost.exe (pid …)` | — |
+| ✅ Binaire authentique : `witr --version` → `witr v0.3.3 (commit 86831e80…, built 2026-06-24T06:47:19Z)` conforme BACKLOG T1.5 ; hashes YAML/VERSION.json cohérents avec SHA256SUMS | `--version` + certutil T1.2 | — |
+
+**Verdict** : l'intégration est **réelle et fonctionnelle pour les noms de process** (E2E T5.3) mais **incomplète** : la promesse du produit (process, port, service) n'est honorée que sur les noms. P1 est le seul bug bloquant (chemin utilisateur promis par le prompt T10), P2/P3 sont des dégradations d'UX agent.
+
+**Prochaine micro-tâche** : W1 — requêtes port witr via `--port` (config-driven) — proposée, pas encore exécutée.
+
+---
+
+## 🔒 R1 — Rate limiter : purge des IPs mortes (audit interne, score 50% → fuite mémoire lente) — 06/08/2026
+
+> Audit interne (24/07) : `services/ratelimit.py` — `_purge_stale()` existait mais **jamais appelé** → le dict `_hits` ne nettoyait jamais les IPs mortes. Fuite mémoire lente si l'API tourne longtemps / est exposée.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| R1.1 | **RED** : `test_stale_ips_purged_on_check` (tests/test_ratelimit.py) — IP morte (`[100.0]` vs now=1000.0) purgée automatiquement au check suivant ; IP vivante conservée → échoue (`dead_ip` encore dans `_hits`) | ✅ |
+| R1.2 | **GREEN** : `check_rate_limit()` purge les IPs mortes en début de requête, **throttlée à 1 purge/WINDOW** (`_last_purge`) pour ne pas scanner le dict à chaque requête ; `_purge_stale(cutoff=None)` accepte un cutoff optionnel (évite un 2e appel `time.time()` → préserve le fake-time du test `test_window_expires` isolé) ; entrées à liste vide (`[]`) exclues de la purge (aucun risque mémoire, contract tests préservé) | ✅ |
+| R1.3 | **VERIFY** : `pytest tests/test_ratelimit.py` → **6 passed** ; `test_window_expires` isolé → 1 passed (pas de dépendance d'ordre) ; `pytest test_ratelimit + test_api + test_security_headers` → **51 passed / 0 failed** ; `ruff check services/ratelimit.py tests/test_ratelimit.py` → All checks passed! | ✅ |
+
+**Preuve R1** :
+```
+pytest tests/test_ratelimit.py → 6 passed
+pytest tests/test_ratelimit.py tests/test_api.py tests/test_security_headers.py → 51 passed
+ruff check services/ratelimit.py tests/test_ratelimit.py → All checks passed!
+```
+
+**Leçons apprises (R1)** :
+- `_purge_stale()` existait déjà (audit §7.7) mais personne ne l'appelait — la fonction seule ne suffit pas, il faut la **câbler** au point d'entrée.
+- `_purge_stale` prend le même `_lock` que `check_rate_limit` → l'appeler depuis `check_rate_limit` **sous** le lock = deadlock ; la purge doit se faire **avant** l'acquisition du lock.
+- Un IP initialisé à `[]` (pattern des tests existants) est "stale" selon `not any(...)` → il faut exclure les listes vides, sinon les clés pré-seedées des tests sont purgées (KeyError).
+- Le `cutoff` optionnel évite un second appel `time.time()` : indispensable pour ne pas casser `test_window_expires` qui simule le temps avec un itérateur de valeurs finies.
+
+**Prochaine micro-tâche** : R2 (requirements-lock avec hashes SHA256) — optionnelle, usage local uniquement.
+
+---
+
 ## 🧪 Intégration `witr` — Phase 0 (tests de caractérisation) — 06/08/2026
 
 > Contexte : roadmap witr (process/port/service ancestry, JSON) validée. Refactos planifiés : `resolve_binary` OS-aware (Phase 2), `CommandExecutor` texte vs JSON (Phase 4), Toolbox dédup (Phase 6). La Phase 0 fige le comportement actuel AVANT tout refacto.
@@ -218,6 +298,26 @@ ruff check . → All checks passed!
 **Leçons apprises (T10)** :
 - Le test T10.1 est un test de prompt statique (`_domain_prompt` figé par `create_agents`) : le contexte `tool_results.ambiguous` injecté est documentaire — l'assertion porte sur le texte du prompt, pas sur le flux (le flux est déjà couvert par T9.4).
 - La variable `context` du test ne servait à rien côté assertion → supprimée (F841), et l'import `platform` du fichier charact était un reliquat de la Phase 0 (jamais utilisé).
+
+### Audit go/nogo witr rejoué — P1/P2 déjà closes, verdict invalide (06/08/2026)
+
+> L'audit go/nogo « Intégration witr » (verdict NO-GO sur Linux/Darwin) a été relu
+> après l'exécution des Phases 8-10 : il figeait l'état AVANT ces phases. Rejeu
+> réel (grep + lecture code + tests) :
+
+| Point audit | Réalité code | Preuve |
+|---|---|---|
+| P1 : hash unique bloque `run()` hors Windows | **Clos** — `resolve_expected_sha256` (binary.py:66), consommé par executor.py:67 ET service.py:135 ; `linux_sha256`/`darwin_sha256` actifs (yaml L103-104) | test_check_tool_witr_linux_utilise_hash_linux (charact:536) |
+| P2 : mode interactif dégradé non caractérisé | **Clos** — `_detect_ambiguous_targets` (formatters.py:80) → `data.ambiguous True` + `candidates`, erreur « Cible ambiguë » | charact:345,435 (T9.3) |
+| Prompt agent disambiguation | **Clos** — agents/factory.py:77-79 demande PID/port si `ambiguous` | test_agents.py:375 (T10.1) |
+
+**Preuve rejeu complet** : `pytest tests/` → **866 passed / 40 skipped / 1 xfailed**
+(identique à T10.3) ; `ruff check .` → **All checks passed!**
+
+**Conclusion** : les conditions de GO de l'audit (1. P1, 2. P2, 3. zéro régression)
+sont toutes satisfaites. Pas de nouvelle micro-tâche requise.
+
+---
 
 ### Fin de l'intégration witr — Phase 8-10 closes (06/08/2026)
 

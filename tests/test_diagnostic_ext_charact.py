@@ -217,6 +217,18 @@ class TestBuildArgs:
         args = self.executor.build_args(cfg, None, {"device": "a; rm -rf /"})
         assert args == ["-a", "{device}"]
 
+    def test_cle_port_utilise_port_args_witr(self):
+        """W1 — une requête port (clé 'port') bascule sur le template port_args."""
+        cfg = {
+            "binary": "witr.exe",
+            "args": ["--json", "{target}"],
+            "port_args": ["--json", "--port", "{port}"],
+            "allowed_params": ["target", "port"],
+            "sha256": "",
+        }
+        args = self.executor.build_args(cfg, None, {"port": "8080"})
+        assert args == ["--json", "--port", "8080"]
+
 
 class TestResolveBinary:
     """Caractérise `resolve_binary` (contrat actuel : bin_dir flat)."""
@@ -423,9 +435,10 @@ class TestRunWitr:
         assert result == {"success": True, "tool": "witr"}
 
     def test_run_witr_passe_le_target_port(self):
+        """W1 — un target purement numérique est traité comme un port (clé 'port')."""
         with mock.patch.object(self.svc, "_run_tool", return_value={}) as mocked:
             self.svc.run_witr("8080")
-        mocked.assert_called_once_with("witr", extra_kwargs={"target": "8080"})
+        mocked.assert_called_once_with("witr", extra_kwargs={"port": "8080"})
 
     def test_run_witr_sans_consentement_court_circuite(self):
         result = self.svc.run_witr("nginx")

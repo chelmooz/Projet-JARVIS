@@ -84,13 +84,21 @@ class CommandExecutor:
         de clés autorisées (cfg["allowed_params"]) et validation de valeur
         par regex stricte. Élimine les vulnérabilités de substitution chaînée
         et d'injection de format string.
+
+        Si les kwargs contiennent une clé ``port``, le template ``port_args``
+        (indépendant de la plateforme, ex: witr ``--port``) remplace les args
+        nommés — les positionnels witr sont des noms, pas des ports.
         """
+        uses_port = bool(extra_kwargs) and "port" in extra_kwargs
         if args is None:
-            args = (
-                list(cfg.get("args", []))
-                if sys.platform == "win32"
-                else list(cfg.get("linux_args", cfg.get("args", [])))
-            )
+            if uses_port:
+                args = list(cfg.get("port_args", cfg.get("args", [])))
+            else:
+                args = (
+                    list(cfg.get("args", []))
+                    if sys.platform == "win32"
+                    else list(cfg.get("linux_args", cfg.get("args", [])))
+                )
 
         # Si pas de kwargs extra, retour direct (pas de régression)
         if not extra_kwargs:

@@ -93,9 +93,12 @@ tools:
     platforms: [win32, linux, darwin]
     output_format: json
     args: ["--json", "{target}"]
+    # Template port : witr traite les positionnels comme des noms → --port
+    # obligatoire pour une requête numérique (flags identiques toutes plateformes).
+    port_args: ["--json", "--port", "{port}"]
     linux_args: ["--json", "{target}"]
     darwin_args: ["--json", "{target}"]
-    allowed_params: ["target"]
+    allowed_params: ["target", "port"]
     # SHA256 par plateforme (vérifiés contre SHA256SUMS officiel en T1.2).
     # darwin_sha256 = hash du witr déployé par défaut (arm64) ; le binaire
     # darwin-amd64 (39934f6a…) n'est pas référencé par la config.

@@ -121,12 +121,15 @@ class DiagnosticExtService:
         return self._run_tool("psservice", extra_kwargs={"service_name": service_name})
 
     def run_witr(self, target: str) -> dict:
-        """Explique pourquoi un processus/port/service `target` tourne (via witr --json).
+        """Explique pourquoi un process/port/service `target` tourne (via witr --json).
 
-        `target` peut être un nom de process, un port ou un nom de conteneur ;
-        la normalisation éventuelle se fait côté appelant, pas ici.
+        Un target purement numérique est traité comme un **port** (witr exige
+        ``--port`` pour une requête port ; les positionnels witr sont des noms
+        de process). Tout autre target est un nom de process / service /
+        conteneur (positionnel).
         """
-        return self._run_tool("witr", extra_kwargs={"target": target})
+        kwargs = {"port": target} if target.isdigit() else {"target": target}
+        return self._run_tool("witr", extra_kwargs=kwargs)
 
     def _check_tool(self, name: str) -> dict[str, Any]:
         """Vérifie la disponibilité et l'intégrité d'un outil unique."""
