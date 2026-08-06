@@ -8,7 +8,6 @@ Responsabilité unique :
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from agents.factory import create_agents
 from agents.supervisor import AgentSupervisor
@@ -22,35 +21,12 @@ from services.memory import MemoryService
 from services.metrics import MetricsService
 from services.orchestrator import OrchestratorService
 from services.pipeline import PipelineService
+from services.router import AgentRouter
 from services.selector import select_model, select_vision_model
+from services.toolbox import Toolbox
 from services.vector import VectorService
 
 _logger = logging.getLogger("jarvis.di")
-
-
-class _RouterService:
-    """Routeur d'agents (sélectionne l'agent cible selon la tâche)."""
-
-    def select_agent(self, task: str) -> str:
-        """Sélectionne l'agent cible (logique simplifiée : toujours 'dev' par défaut)."""
-        # TODO: implémenter la vraie logique de routing (keywords, regex, etc.)
-        return "dev"
-
-
-class _Toolbox:
-    """Toolbox (diagnostics + fichiers) — injectée dans les agents."""
-
-    def describe_tools(self) -> str:
-        """Description textuelle des outils disponibles pour le LLM."""
-        return "Aucun outil externe configuré."
-
-    def is_enabled(self) -> bool:
-        """True si la toolbox est active."""
-        return False
-
-    def auto_execute(self, task: str) -> dict[str, Any]:
-        """Exécution automatique d'outils (retourne {} si désactivé)."""
-        return {}
 
 
 class AppContext:
@@ -68,8 +44,8 @@ class AppContext:
         self.status_cache = {"ts": 0.0, "data": {}}
         self.profiles_path = str(CONFIG_DIR / "agent_profiles.json")
         self.orchestrator: OrchestratorService | None = None
-        self.toolbox: _Toolbox | None = None
-        self.router_svc: _RouterService | None = None
+        self.toolbox: Toolbox | None = None
+        self.router_svc: AgentRouter | None = None
         self.conversations: ConversationService | None = None
         self.pipeline: PipelineService | None = None
         self.metrics: MetricsService | None = None
@@ -102,11 +78,11 @@ class AppContext:
         # 3. Vector store (dépend de inference)
         self.vector = VectorService(inference_service=self.inference)
 
-        # 4. Toolbox (stateless)
-        self.toolbox = _Toolbox()
+        # 4. Toolbox (stateless — triggers chargés depuis toolbox_triggers.yaml)
+        self.toolbox = Toolbox()
 
-        # 5. Routeur (stateless)
-        self.router_svc = _RouterService()
+        # 5. Routeur (stateless — sélection d'agent par mots-clés/@mention)
+        self.router_svc = AgentRouter()
 
         # 6. Agents (dépendent de inference, memory)
         self.agents = create_agents(

@@ -61,6 +61,23 @@ class TestToolbox:
             assert "disk" in results  # les diagnostics tournent toujours (mono-user)
             assert not results["disk"]["success"]  # echec car binaire absent
 
+    def test_auto_execute_why_running_trigger_loaded_from_yaml(self):
+        # Le trigger witr doit venir du YAML (source de vérité unique)
+        results = self.toolbox.auto_execute("pourquoi le processus explorer tourne")
+        assert "why_running" in results
+        assert results["why_running"]["tool"] == "witr"
+        assert not results["why_running"]["success"]  # echec propre sans consentement
+
+    def test_extract_target_witr(self):
+        cases = {
+            "pourquoi nginx tourne": "nginx",
+            "pourquoi le port 8080 est occupe": "8080",
+            "pourquoi ce processus explorer": "explorer",
+            "qui utilise le service mysql": "mysql",
+        }
+        for phrase, expected in cases.items():
+            assert self.toolbox._extract_target(phrase) == expected
+
     def test_describe_tools_show_files_when_authorized(self):
         self.fs.authorize_path(tempfile.gettempdir())
         desc = self.toolbox.describe_tools()
@@ -130,6 +147,24 @@ class TestToolbox:
         assert "ls" in user
         assert "read" in user
         assert "find" in user
+
+    def test_describe_tools_exposes_why_running_witr(self):
+        """Le trigger witr (why_running) est visible dans describe_tools()."""
+        out = self.toolbox.describe_tools()
+        assert "why_running" in out
+        assert "witr" in out
+
+    def test_why_running_trigger_routes_to_run_witr_with_target(self):
+        """'pourquoi X tourne' → run_witr(X) (mocked sur la classe, avant init)."""
+        import unittest.mock as mock
+
+        with mock.patch.object(DiagnosticExtService, "run_witr", return_value={
+            "success": True, "tool": "witr", "data": {"Target": "explorer"},
+        }) as run_witr:
+            toolbox = Toolbox(self.toolbox._diagnostic, file_service=self.fs)
+            results = toolbox.auto_execute("pourquoi le processus explorer tourne")
+            run_witr.assert_called_once_with("explorer")
+            assert results["why_running"]["success"] is True
 
 
 class _MinimalAgent(BaseAgent):

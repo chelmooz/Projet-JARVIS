@@ -1,5 +1,233 @@
 # 📋 BACKLOG.md — Plan de Micro-Tâches TDD (audit du 25/07/2026)
 
+---
+
+## 🧪 Intégration `witr` — Phase 0 (tests de caractérisation) — 06/08/2026
+
+> Contexte : roadmap witr (process/port/service ancestry, JSON) validée. Refactos planifiés : `resolve_binary` OS-aware (Phase 2), `CommandExecutor` texte vs JSON (Phase 4), Toolbox dédup (Phase 6). La Phase 0 fige le comportement actuel AVANT tout refacto.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T0.1 | Créer `tests/test_diagnostic_ext_charact.py` — figer `format_result` (structure dict, troncatures 2000/500, sortie texte brut non parsée), `CommandExecutor.run` (court-circuits consentement/outil inconnu/binaire absent, exécution normalisée), `build_args` (plateforme win32/linux, whitelist, valeurs invalides), `resolve_binary` (win32 flat, linux PATH-first + repli bin_dir), `check_all_tools`/`list_available`/`is_ready` (structure par outil, exigence SHA256) | ✅ |
+| T0.2 | `pytest tests/test_diagnostic_ext_charact.py` → **27 passed** (baseline verte) ; `ruff check` → 0 erreur | ✅ |
+| T0.3 | Baseline caractérisée — prêt pour refacto Phase 1/2 | ✅ |
+
+**Preuve T0.2** :
+```
+47 passed (27 caractérisation + 20 test_diagnostic_ext.py existants)
+ruff check tests/test_diagnostic_ext_charact.py → All checks passed!
+```
+
+**Leçons apprises (T0.1)** :
+- `run()` passe par la vérif SHA256 → pour isoler l'exécution, config `sha256: ""` (pattern des tests existants).
+- `resolve_binary` Linux exige `os.path.isfile` : mocker `shutil.which` avec un vrai fichier temporaire, pas un path fictif.
+
+**Prochaine micro-tâche** : T1.1 — Télécharger binaires witr (3 OS) → `bin/diagnostic/{win,linux,darwin}/`
+
+### Phase 1 — Provisionnement binaires witr (3 OS) — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T1.1 | Télécharger binaires witr v0.3.3 (release officielle 24/06/2026) : `witr-linux-amd64` → `bin/diagnostic/linux/witr` ; `witr-darwin-arm64` → `bin/diagnostic/darwin/witr` ; `witr-darwin-amd64` → `bin/diagnostic/darwin/witr-amd64` ; `witr-windows-amd64.zip` → extrait → `bin/diagnostic/win/witr.exe` | ✅ |
+| T1.2 | SHA256 vérifiés contre `SHA256SUMS` officiel (certutil) : linux `08fc46e3…` ✓, darwin-arm64 `d05b5182…` ✓, darwin-amd64 `39934f6a…` ✓, zip win `1ae95a35…` ✓ — 4/4 identiques | ✅ |
+| T1.3 | Migrer `.exe` Sysinternals existants → `bin/diagnostic/win/` — **SANS OBJET** : le dossier `bin/diagnostic/` était vide avant ce provisionnement (aucun binaire Sysinternals présent en pré-déploiement, `config/diagnostic_tools.yaml` les déclare mais ils ne sont pas encore téléchargés) | ✅ N/A |
+| T1.4 | `bin/VERSION.json` : entrée `"witr"` (v0.3.3, hashes par plateforme/arch, date) + `bin/README.md` : structure `diagnostic/{win,linux,darwin}/`, table witr, notes Gatekeeper + limitations OS | ✅ |
+| T1.5 | Test rapide : `bin\diagnostic\win\witr.exe --version` → `witr v0.3.3 (commit 86831e80…)` fonctionne | ✅ |
+
+**Preuves T1** :
+```
+certutil SHA256 4/4 identiques au SHA256SUMS officiel
+witr.exe --version → witr v0.3.3 (commit 86831e80c59c54e19c74cdbd126ed7ff6bcad756, built 2026-06-24)
+python -c json.load(VERSION.json) → JSON valide
+```
+
+**Leçons apprises (T1)** :
+- Le dossier `bin/diagnostic` flat n'existait pas → la migration T1.3 est devenue inutile (rien à migrer). La structure par OS est créée proprement dès le départ.
+- Le zip Windows contient `LICENSE` + `README.md` (conservés dans `bin/diagnostic/win/` pour l'audit de provenance).
+
+**Prochaine micro-tâche** : T2.1 — Refactor `resolve_binary` OS-aware (`services/diagnostic_ext/binary.py`)
+
+### Phase 2 — Refactor `resolve_binary` (OS-aware) — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T2.1 | `services/diagnostic_ext/binary.py` : ajout `_PLATFORM_SUBDIR = {"win32": "win", "linux": "linux", "darwin": "darwin"}` ; `platform_bin_dir = os.path.join(bin_dir, subdir)` ; Windows → `cfg["binary"]` dans le sous-dossier win ; Unix → `shutil.which()` PATH-first puis repli `darwin_binary or linux_binary or binary` sur le sous-dossier local | ✅ |
+| T2.2 | Tests mis à jour flat → par-OS (`_platform_subdir` helper) : 2 tests win32/linux renommés (sous-dossier), +1 nouveau `test_darwin_resout_dans_sous_dossier_darwin` ; suite complète **828 passed / 40 skipped / 1 xfailed** (zéro régression) ; ruff 0 erreur | ✅ |
+| T2.3 | Vérification manuelle : `resolve_binary({'witr': {...}}, 'witr', bin/diagnostic)` → `H:\Projet-JARVIS\bin\diagnostic\win\witr.exe` (résolution réelle win32) | ✅ |
+
+**Preuve T2.2** :
+```
+pytest tests/ → 828 passed, 40 skipped, 1 xfailed
+ruff check services/diagnostic_ext/binary.py + tests → All checks passed!
+```
+
+**Leçons apprises (T2)** :
+- Le refactor a volontairement changé le contrat (flat → par-OS) : les tests de caractérisation Phase 0 ont été mis à jour pour refléter la **cible**, pas l'ancien comportement (c'est le but du refactor). Le comportement flat était un bug latent, pas un contrat à préserver.
+- `PROJECT_DIR` vit dans `config.constants` (pas `config.paths`).
+
+**Prochaine micro-tâche** : T3.1 — Déclaration config YAML witr (`config/diagnostic_tools.yaml`)
+
+### Phase 3 — Déclaration config YAML (extension pure) — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T3.1 | Entrée `witr` ajoutée dans `config/diagnostic_tools.yaml` : `binary: witr.exe`, `linux_binary: witr`, `darwin_binary: witr`, `timeout: 10`, `platforms: [win32, linux, darwin]`, `output_format: json`, `args/linux_args/darwin_args: ["--json", "{target}"]`, `allowed_params: ["target"]`, `sha256: 1500DC0E…` (hash du witr.exe exécuté) — hashes Linux/darwin documentés en commentaire (support sha256 par plateforme : **fait en Phase 8**, schéma `{plateforme}_sha256` actif) | ✅ |
+| T3.2 | Validation : `yaml.safe_load` OK ; `resolve_binary` trouve `bin\diagnostic\win\witr.exe` ; `check_all_tools()` → `{'available': True, 'sha256_ok': True, 'platforms': [win32, linux, darwin]}` (hash réel validé) ; 50 tests diagnostic/config passés ; ruff 0 erreur (Python) | ✅ |
+
+**Preuve T3** :
+```
+check_all_tools()['witr'] → {'available': True, 'path': '...bin\\diagnostic\\win\\witr.exe', 'sha256_ok': True}
+pytest test_diagnostic_ext* + test_config_files → 50 passed
+```
+
+**Leçons apprises (T3)** :
+- `verify_sha256` vérifie le hash du fichier **exécuté** (witr.exe extrait, `1500DC0E…`), PAS celui du zip (`1ae95A…`) — confusion à éviter.
+- Ruff ne doit PAS être lancé sur les `.yaml` (faux positifs massifs : il le traite comme du Python).
+- `output_format: json` est déjà lu par la config mais pas encore consommé → Phase 4.
+
+**Prochaine micro-tâche** : T4.1 — Refactor `CommandExecutor` : `services/diagnostic_ext/formatters.py` (Text/JSON)
+
+### Phase 4 — Refactor `CommandExecutor` : sortie texte vs JSON — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T4.1 | `services/diagnostic_ext/formatters.py` créé : `TextResultFormatter` (comportement historique, troncatures 2000/500), `JsonResultFormatter` (parse `data`, **ne tronque pas**, erreur lisible si JSON invalide, jamais d'exception), factory `get_formatter(output_format)` avec défaut `text` | ✅ |
+| T4.2 | `CommandExecutor` lit `cfg.get("output_format", "text")` dans `run()` → `get_formatter()` ; `_execute()` reçoit le formatter | ✅ |
+| T4.3 | `format_result` static conservé comme wrapper délégant au formatter (défaut `text`) — compatibilité tests caractérisation Phase 0 préservée | ✅ |
+| T4.4 | Tests Phase 0 → verts : 55 passed diagnostic_ext (+charact), suite complète **835 passed / 40 skipped / 1 xfailed** (828 → 835, zéro régression) | ✅ |
+| T4.5 | +8 tests `TestJsonResultFormatter` : JSON valide 3000 items **non tronqué**, returncode≠0, JSON invalide → erreur lisible, stdout vide → erreur, `get_formatter` (json/text/inconnu/vide), `run()` E2E avec `output_format: json` → `data` parsé, `stdout` absent | ✅ |
+
+**Preuve T4** :
+```
+pytest tests/ → 835 passed, 40 skipped, 1 xfailed (835 = 828 + 8 nouveaux - 1 renommage fusion)
+ruff check services/diagnostic_ext tests/test_diagnostic_ext_charact.py → All checks passed!
+```
+
+**Leçons apprises (T4)** :
+- `format_result` static conservé comme wrapper évite de casser les tests de caractérisation Phase 0 qui l'utilisent — la délégation passe par `get_formatter`, la staticmethod reste un pont de compatibilité.
+- Le JSON est stocké sous `data` (pas `stdout`) : la clé `stdout` disparaît du dict JSON — contrat clair pour le frontend/agents.
+
+**Prochaine micro-tâche** : T5.1 — `DiagnosticExtService.run_witr()`
+
+### Phase 5 — Service `run_witr()` — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T5.1 | `DiagnosticExtService.run_witr(target)` ajouté (`service.py`) : délègue à `_run_tool("witr", extra_kwargs={"target": target})`, docstring documente que la normalisation reste côté appelant ; en-tête du module mis à jour (liste d'outils inclut witr) | ✅ |
+| T5.2 | +3 tests `TestRunWitr` (caractérisation) : délégation `_run_tool("witr", extra_kwargs={"target": "nginx"})`, target port `"8080"` passé tel quel, court-circuit sans consentement ; 38 passed diagnostic_ext_charact + ruff 0 erreur | ✅ |
+| T5.3 | **E2E réel** : `run_witr("explorer")` → `success: True`, `data` dict JSON avec ancestry (`ResolvedTarget`, `Process.PID/PPID/User/CPUPercent`, …) ; fichier consentement de test nettoyé | ✅ |
+
+**Preuve T5** :
+```
+pytest tests/test_diagnostic_ext_charact.py → 38 passed
+E2E: run_witr('explorer') → {"Target": {...}, "ResolvedTarget": "Explorer.EXE", "Process": {...}}
+```
+
+**Leçons apprises (T5)** :
+- witr passe en **mode interactif (texte, pas JSON)** quand plusieurs process matchent le target (ex: `svchost` → liste numérotée [1]..[n]). Le `--json` ne s'applique qu'à un match unique. → À refléter dans le prompt agent (Phase 7) : cibler un nom/port précis, pas un préfixe ambigu.
+- `--container` renverra plusieurs conteneurs → la non-troncature JSON (Phase 4) est essentielle.
+
+**Prochaine micro-tâche** : T6.1 — Toolbox : charger triggers depuis `config/toolbox_triggers.yaml` (dédup) + trigger `why_running`
+
+### Phase 6 — Toolbox : dédup triggers YAML + witr — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T6.1 | `services/toolbox.py` réécrit : triggers chargés depuis `config/toolbox_triggers.yaml` (source de vérité unique) au lieu de la liste hardcodée. Mapping `tool_name -> méthode` (`_DIAGNOSTIC_TOOLS`, `_FILE_TOOLS`) ; dispatch des arguments par `key` (`_invoke_diagnostic`/`_invoke_file`) ; `describe_tools()` généré depuis le YAML ; les autres triggers YAML (kill_*, code_review_*, quality_audit) **non gérés par Toolbox sont ignorés** (code mort vérifié par grep : rien ne les consomme) ; `TRIGGERS_CONFIG` (`config/paths.py`, déjà présent mais inutilisé) est désormais consommé | ✅ |
+| T6.2 | Trigger witr ajouté au YAML : `key: why_running`, `tool: witr`, keywords [pourquoi, why, running, tourne, ancestry, port occupe…], description "explique pourquoi un processus/port/service tourne (witr)" | ✅ |
+| T6.3 | Non-régression : keyword YAML identiques à l'ancienne liste hardcodée (vérifié via `git show HEAD`), tests Toolbox passent ; +2 tests (`test_auto_execute_why_running_trigger_loaded_from_yaml`, `test_extract_target_witr`), `_extract_target` avec filtre stopwords FR/EN (pourquoi nginx → nginx ; port 8080 → 8080 ; explorer → explorer ; mysql → mysql) | ✅ |
+| T6.4 | Liste hardcodée `self._diagnostic_triggers` supprimée du code (`describe_tools`/`auto_execute`/`_format_stdout` réécrits génériquement) ; E2E réel : trigger `why_running` déclenché → routé vers `run_witr` (échoue proprement sans consentement, par design) | ✅ |
+
+**Preuve T6** :
+```
+pytest tests/test_toolbox.py → 17 passed (suite complète : 838 passed, 40 skipped, 1 xfailed)
+ruff check services/toolbox.py tests/test_toolbox.py → All checks passed!
+E2E: Toolbox().auto_execute("pourquoi le processus explorer tourne") → {'why_running': {'tool': 'witr', 'success': False, 'error': 'Consentement non donné'}}
+```
+
+**Leçons apprises (T6)** :
+- Le YAML contenait des triggers (kill_*, code_review_*, quality_audit) jamais consommés par aucun service (vérifié par grep) — code mort historique, désormais explicitement documenté comme "hors Toolbox" dans le module.
+- `_extract_target` naïve (dernière token) échouait sur les stopwords → filtre stopwords FR/EN nécessaire ; "why is this running" sans target → mode global witr (fallback acceptable, documenté pour Phase 7).
+- Le consentement (.diagnostic_consent) restreint aussi witr : l'échauffement est propre ("Consentement non donné"), pas de crash.
+
+**Prochaine micro-tâche** : T7.1 — Agents : intégrer witr dans agent @hardware (API `run_witr` + trigger `why_running` déjà routé côté Toolbox)
+
+### Phase 7 — Agents : routage YAML (KISS/SOLID) + wiring witr — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T7.1 | Refacto `services/router.py` : config YAML = **source de vérité unique** (`config/agent_routing.yaml`, désormais lu via `ROUTING_CONFIG`). `AgentRoutingConfig` frozen dataclass (thread-safe), `load_routing_config()` avec dégradation gracieuse (YAML absent/corrompu → fallback `dev`, warning loggé), dicts hardcodés supprimés (DRY). Mots-clés hardware witr ajoutés au YAML (`processus, tourne, running, pourquoi, why`) | ✅ |
+| T7.2 | Fix bug T1 (audit Claude) : `services/pipeline_steps.py` lisait `state.get("context", {})` **2×** (L65,L84) → dicts différents si la clé manque, `tool_results` witr perdu silencieusement hors du chemin `agent_graph` (qui pré-remplit `context`). Fix : `state.setdefault("context", {})` + passage de la même variable à `agent.run()` | ✅ |
+| T7.3 | Contrat agent `@hardware` figé : `create_agents()` → `_domain_prompt` contient `why_running`/`witr` (factory déjà enrichie en T6 worktree) + test E2E prompt LLM | ✅ |
+| T7.4 | **E2E réel** sans consentement : `AgentGraph.run("pourquoi le processus explorer tourne")` → `agent_key=hardware` (YAML), `tool_results.why_running` présent dans le context de l'agent, witr court-circuite proprement (« Consentement non donné »), aucun artefact créé | ✅ |
+
+**Preuve Phase 7** :
+```
+pytest tests/ → 858 passed, 40 skipped, 1 xfailed  (840 → 858 = +11 router_config +7 pipeline_steps)
+ruff check . → All checks passed!
+pytest test_router*.py → 27 passed (contract préservé) ; test_pipeline_steps.py → 7 passed ; test_toolbox.py → 19 passed ; test_agents.py → 34 passed
+E2E: AgentGraph.run('pourquoi le processus explorer tourne') → agent_key=hardware, tool_results['why_running']={'success': False, 'error': 'Consentement non donné'}
+```
+
+**Leçons apprises (T7)** :
+- Pletcher Toolbox : le déclencheur `fn` est capturé **à l'init** (`_load_*_triggers`), pas à l'éxécution → pour tester witr routé, patcher la **classe** `DiagnosticExtService.run_witr` puis reconstruire le Toolbox (patcher l'instance après init ne fait rien).
+- `AgentRouter` est instancié sans argument partout (`di.py`, tests) → le constructeur doit charger le YAML par défaut ; injection de config réservée aux tests (DIP).
+- La dégradation gracieuse du loader impose un garde sur `max(scores)` **(keyword_map vide → ValueError)** : `if scores else None`.
+
+**Prochaine micro-tâche** : Phases 8-10 ci-dessous (sha256 par plateforme, mode interactif witr, prompt agent finalisé) — `bin/README.md`/`VERSION.json` déjà à jour.
+
+### Phase 8 — SHA256 par plateforme (Gap 1, bug silencieux) — 06/08/2026
+
+> Audit préalable : `config/diagnostic_tools.yaml` ne déclare qu'une seule clé `sha256` (hash Windows, commentaires L88-92 documentant les hashes linux/darwin jamais exploités) ; `service.py::_check_tool` fait `cfg.get("sha256", "")` sans branchement plateforme → `sha256_ok` toujours `False` hors Windows. `executor.py:67` porte le même bug (échec SHA256 en run sous Linux). Aucun test ne caractérisait ce cas.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T0.4 | Fix baseline : import cassé `resolve_sha256` (fonction jamais écrite) dans `tests/test_diagnostic_ext_charact.py:26` → rejeu 129 passed (109 annoncés + 20) | ✅ |
+| T8.1 | **RED** : `test_check_tool_witr_linux_utilise_hash_linux` (patch global `sys.platform` — couvre binary.py ET service.py) → échoue : `sha256_ok is False` car comparaison au hash win32 (bug exact) | ✅ |
+| T8.2 | `config/diagnostic_tools.yaml` : schéma `{plateforme}_sha256` appliqué à **toutes** les entrées — witr : `linux_sha256` `08fc46e3…` + `darwin_sha256` `d05b5182…` (arm64 déployé, hashes réels vérifiés T1.2) ; autres outils : clés vides documentées (aucun hash linux/darwin connu) ; commentaire « Phase 10 » obsolète supprimé | ✅ |
+| T8.3 | `resolve_expected_sha256(config, tool_name, platform)` ajouté dans `binary.py` (signature alignée sur `resolve_binary`, même responsabilité) : win32 → `sha256`, sinon → `{platform}_sha256` avec repli `sha256`. Consommé par `service.py::_check_tool` ET `executor.py::run` (même bug silencieux — échec SHA256 au run hors Windows) | ✅ |
+| T8.4 | **GREEN** : rejeu complet `pytest tests/` → **863 passed / 40 skipped / 1 xfailed** (zéro régression) | ✅ |
+| T8.5 | **E2E réel** : `check_all_tools()` mock `sys.platform="linux"` → `witr.sha256_ok True` (hash linux réel `08fc46e3…` vs binaire `bin/diagnostic/linux/witr`) ; win32 inchangé `True/True` | ✅ |
+| T8.6 | `BACKLOG.md` (L74/L177) + `bin/README.md` : note « Phase 10 » obsolète retirée, schéma `{plateforme}_sha256` documenté | ✅ |
+
+### Phase 9 — Mode interactif witr (Gap 2, cible ambiguë) — 06/08/2026
+
+> Leçon T5 jamais traitée : witr bascule en **texte brut** (liste numérotée `[1]..[n]`, pas JSON) quand plusieurs process matchent le target (ex: `svchost`). `JsonResultFormatter` le confondait avec une erreur JSON générique → texte brut non parsé remonté à l'agent LLM. Aucun extrait réel archivé : le fixture de test fige le pattern documenté par la leçon T5.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T9.1 | **RED** : `test_mode_interactif_liste_numerotee_distinguce_d_erreur_json` (fixture `WITR_AMBIGUOUS_STDOUT`, 3 lignes `[n] …`) → échoue : le formatter renvoie « Sortie JSON invalide » | ✅ |
+| T9.2 | `JsonResultFormatter` : détection du pattern liste numérotée witr (regex `\[\d+\]`, ≥ 2 entrées) → retourne `success: False` + `data={"ambiguous": True, "candidates": [...]}` + erreur explicite « Cible ambiguë : N processus correspondent » ; repli inchangé sur « JSON invalide » sinon (contrat Phase 4 préservé) | ✅ |
+| T9.3 | **GREEN** : `test_run_witr_cible_ambigue_remonte_data_ambiguous` (service complet, subprocess mocké) → `data.ambiguous True`, `candidates` peuplé ; cas nominal single-match toujours vert ; 60 passed (charact 41 + toolbox 19) | ✅ |
+| T9.4 | **E2E réel** : `AgentGraph.run("pourquoi svchost tourne")` (AgentRouter + create_agents + Toolbox, `run_witr` mocké en classe — leçon T7) → `agent_key=hardware`, `tool_results.why_running.data.ambiguous True`, `candidates` 3, aucun crash | ✅ |
+
+### Phase 10 — Prompt agent : disambiguation (Gap 3, dépend de T9.2) — 06/08/2026
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T10.1 | **RED** : `test_hardware_domain_prompt_geres_cible_ambigue` (extension pattern T7.3) → échoue : le prompt `@hardware` ne contient ni « ambig » ni « PID » | ✅ |
+| T10.2 | `agents/factory.py` : une phrase ajoutée au `domain_prompt` hardware — si `ambiguous` (plusieurs process), demander un PID ou un port précis avant de conclure | ✅ |
+| T10.3 | **GREEN** : `pytest tests/` → **866 passed / 40 skipped / 1 xfailed** (zéro régression) ; `ruff check .` → **All checks passed!** (2 fixes : variable `context` inutilisée test_agents, import `platform` inutilisé charact) | ✅ |
+
+**Preuve T10** :
+```
+pytest tests/ → 866 passed, 40 skipped, 1 xfailed
+ruff check . → All checks passed!
+```
+
+**Leçons apprises (T10)** :
+- Le test T10.1 est un test de prompt statique (`_domain_prompt` figé par `create_agents`) : le contexte `tool_results.ambiguous` injecté est documentaire — l'assertion porte sur le texte du prompt, pas sur le flux (le flux est déjà couvert par T9.4).
+- La variable `context` du test ne servait à rien côté assertion → supprimée (F841), et l'import `platform` du fichier charact était un reliquat de la Phase 0 (jamais utilisé).
+
+### Fin de l'intégration witr — Phase 8-10 closes (06/08/2026)
+
+- **Gap 1 (sha256 par plateforme)** : bug silencieux corrigé — `resolve_expected_sha256()` suit le même schéma que `resolve_binary` (win32 → `sha256`, sinon `{platform}_sha256` avec repli), appliqué à `_check_tool` ET `executor.run` (le bug existait aux deux endroits). Hashes réels witr linux/darwin déclarés (vérifiés T1.2).
+- **Gap 2 (mode interactif witr)** : la sortie liste numérotée `[1]..[n]` est désormais caractérisée — `data={"ambiguous": True, "candidates": [...]}` + erreur explicite, remontée proprement au contexte agent (E2E AgentGraph vérifié).
+- **Gap 3 (prompt agent)** : l'agent `@hardware` demande un PID/port précis en cas de cible ambiguë.
+- **Compteur de tests** : 863 → 866 (T8.1, T9.1, T9.3, T10.1 = +4 tests depuis la baseline 862 ; T0.4 a réparé l'import cassé qui empêchait la collection du fichier charact).
+
+---
+
 **Projet** : JARVIS Portable Edition v5.5
 **État réel vérifié** : 900+ tests passed / 0 failed / 40 skipped / 1 xfailed (819 + new tests : 4 security headers + 3 roadmap + 5 changelog)
 **Méthode d'audit** : relecture du BACKLOG.md précédent + grep/lecture du code réel derrière chaque item + relance de la suite de tests + `git log`/`git status`

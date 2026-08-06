@@ -1,14 +1,22 @@
 """Toolbox — Boîte à outils pour les agents JARVIS.
 
 Chaque agent peut invoquer :
-  - des diagnostics externes (smartctl, Sysinternals)
+  - des diagnostics externes (smartctl, Sysinternals, witr)
   - des opérations fichiers (list_dir, read_file, find_files)
 Les résultats sont formatés pour être injectés dans le prompt LLM.
+
+La liste des triggers provient de ``config/toolbox_triggers.yaml`` (source
+de vérité unique) : les mots-clés et descriptions sont déclaratifs, le
+mapping ``tool_name -> méthode`` est l'unique responsabilité de ce module.
 """
+import json
 import os
 import re
+from pathlib import Path
 
-from config.paths import ROOT
+import yaml
+
+from config.paths import ROOT, TRIGGERS_CONFIG
 from services.diagnostic_ext import DiagnosticExtService
 from services.file_system import FileSystemService
 
@@ -18,6 +26,26 @@ MAX_MATCHES = 30
 MAX_ENTRIES = 50
 FALLBACK_DIR = ROOT
 
+# Outils gérés par Toolbox. Les autres entrées du YAML (kill_*, code_review_*,
+# quality_audit) sont censées être traitées par d'autres services ; Toolbox les
+# ignore pour ne pas les exécuter par erreur.
+_DIAGNOSTIC_TOOLS = {
+    "smartctl": "run_smartctl",
+    "psinfo": "run_psinfo",
+    "psloglist": "run_psloglist",
+    "handle": "run_handle",
+    "psping": "run_psping",
+    "psservice": "run_psservice",
+    "witr": "run_witr",
+}
+
+_FILE_TOOLS = {
+    "list_dir": "list_dir",
+    "read_file": "read_file",
+    "find_files": "find_files",
+}
+
+
 class Toolbox:
     """Gère les triggers, l'exécution et le formatage des résultats."""
 
@@ -26,35 +54,47 @@ class Toolbox:
         self._diagnostic = diagnostic_service or DiagnosticExtService()
         self._file_system = file_service or FileSystemService()
 
-        # ------------------------------------------------------------------
-        # Triggers diagnostics (nécessitent consentement)
-        # ------------------------------------------------------------------
-        self._diagnostic_triggers = [
-            (["disque", "disk", "smart", "hdd", "ssd", "stockage"],
-             "disk", lambda _: self._diagnostic.run_smartctl()),
-            (["info", "systeme", "system", "configuration"],
-             "system", lambda _: self._diagnostic.run_psinfo()),
-            (["log", "journal", "evenement", "event"],
-             "log", lambda _: self._diagnostic.run_psloglist("System")),
-            (["handle", "processus", "process", "fichier ouvert"],
-             "process", lambda _: self._diagnostic.run_handle()),
-            (["ping", "latence", "connectivite", "connectivity", "reseau", "network"],
-             "network", lambda _: self._diagnostic.run_psping("127.0.0.1", "4")),
-            (["service", "windows", "demarrage", "startup"],
-             "service", lambda _: self._diagnostic.run_psservice()),
-        ]
+        self._diagnostic_triggers = self._load_diagnostic_triggers()
+        self._file_triggers = self._load_file_triggers()
 
-        # ------------------------------------------------------------------
-        # Triggers fichiers (toujours actifs)
-        # ------------------------------------------------------------------
-        self._file_triggers = [
-            (["liste", "dossier", "ls", "dir", "repertoire", "contenu du dossier"],
-             "ls", lambda t: self._file_system.list_dir(self._extract_path(t))),
-            (["cat", "ouvre", "read", "lecture", "lit", "fichier", "contenu du fichier", "texte"],
-             "read", lambda t: self._file_system.read_file(self._extract_path(t))),
-            (["cherche", "trouve", "find", "grep", "recherche"],
-             "find", lambda t: self._file_system.find_files(self._extract_pattern(t))),
-        ]
+    # ------------------------------------------------------------------
+    # Chargement des triggers depuis le YAML (source de vérité unique)
+    # ------------------------------------------------------------------
+
+    def _load_all_triggers(self) -> list[dict]:
+        """Charge la liste des triggers depuis `toolbox_triggers.yaml`."""
+        path: Path = TRIGGERS_CONFIG
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        except (OSError, yaml.YAMLError):
+            return []
+        triggers = data.get("triggers", [])
+        return triggers if isinstance(triggers, list) else []
+
+    def _load_diagnostic_triggers(self) -> list:
+        """Construit les triggers de diagnostic depuis le YAML."""
+        triggers = []
+        for entry in self._load_all_triggers():
+            tool = entry.get("tool")
+            if tool not in _DIAGNOSTIC_TOOLS:
+                continue
+            method = _DIAGNOSTIC_TOOLS[tool]
+            fn = getattr(self._diagnostic, method)
+            triggers.append((list(entry.get("keywords", [])), entry, fn))
+        return triggers
+
+    def _load_file_triggers(self) -> list:
+        """Build list of file triggers from the YAML."""
+        triggers = []
+        for entry in self._load_all_triggers():
+            tool = entry.get("tool")
+            if tool not in _FILE_TOOLS:
+                continue
+            method = _FILE_TOOLS[tool]
+            fn = getattr(self._file_system, method)
+            triggers.append((list(entry.get("keywords", [])), entry, fn))
+        return triggers
 
     def is_enabled(self) -> bool:
         return bool(self._diagnostic_triggers or self._file_triggers)
@@ -94,21 +134,12 @@ class Toolbox:
     # ------------------------------------------------------------------
 
     def describe_tools(self) -> str:
-        lines = [
-            "Outils disponibles :",
-            "  - disk    : SMART disk health (smartctl)",
-            "  - system  : system information (PsInfo)",
-            "  - log     : Windows Event Log (psloglist)",
-            "  - process : open file handles (handle)",
-            "  - network : ping & latency (psping)",
-            "  - service : service status (PsService)",
-        ]
-        if self._file_system.list_authorized():
-            lines.extend([
-                "  - ls      : lister un dossier autorise",
-                "  - read    : lire un fichier texte (max 10 Ko)",
-                "  - find    : chercher fichiers par pattern glob",
-            ])
+        lines = ["Outils disponibles :"]
+        show_files = self._file_system.list_authorized()
+        for entry in self._load_all_triggers():
+            tool = entry.get("tool")
+            if tool in _DIAGNOSTIC_TOOLS or (show_files and tool in _FILE_TOOLS):
+                lines.append(f"  - {entry.get('key')} : {entry.get('description')}")
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
@@ -118,13 +149,64 @@ class Toolbox:
     def auto_execute(self, task: str) -> dict[str, dict]:
         results = {}
         lower = task.lower()
-        for keywords, key, fn in self._diagnostic_triggers + self._file_triggers:
+        for keywords, entry, fn in self._diagnostic_triggers + self._file_triggers:
             if any(kw in lower for kw in keywords):
+                key = entry["key"]
+                tool_name = entry["tool"]
                 try:
-                    results[key] = fn(task)
+                    results[key] = self._invoke(fn, tool_name, entry, task)
                 except Exception as e:
-                    results[key] = {"success": False, "tool": key, "error": str(e)}
+                    results[key] = {"success": False, "tool": tool_name, "error": str(e)}
         return results
+
+    def _invoke(self, fn, tool_name: str, entry: dict, task: str) -> dict:
+        """Appelle la méthode de l'outil avec les bons arguments (par tool)."""
+        key = entry.get("key")
+        if tool_name in _FILE_TOOLS:
+            return self._invoke_file(fn, key, task)
+        return self._invoke_diagnostic(fn, key, task)
+
+    def _invoke_file(self, fn, key: str, task: str) -> dict:
+        if key == "ls":
+            return fn(self._extract_path(task))
+        if key == "read":
+            return fn(self._extract_path(task))
+        if key == "find":
+            return fn(self._extract_pattern(task))
+        return fn(task)
+
+    def _invoke_diagnostic(self, fn, key: str, task: str) -> dict:
+        if key == "disk":
+            return fn()
+        if key == "system":
+            return fn()
+        if key == "log":
+            return fn("System")
+        if key == "network":
+            return fn("127.0.0.1", "4")
+        if key == "process":
+            return fn()
+        if key == "service":
+            return fn()
+        if key == "why_running":
+            target = self._extract_target(task)
+            return fn(target)
+        return fn()
+
+    @staticmethod
+    def _extract_target(task: str) -> str:
+        """Extrait un target witr probable (nom de process, port, service)."""
+        tokens = re.findall(r'[A-Za-z0-9_.\-:]{2,}', task)
+        # Mots-clés witr + stopwords FR/EN courants à exclure du target
+        excluded = {
+            "pourquoi", "why", "running", "tourne", "sur", "le", "la", "les",
+            "ce", "cette", "qui", "que", "est", "ce", "est", "a", "en",
+            "processus", "process", "service", "port", "occupe", "utilise",
+            "utiliser", "est-ce", "demarre", "started", "running", "is", "this",
+            "ancestry", "quel", "quelle", "explique", "explain",
+        }
+        candidates = [t for t in tokens if t.lower() not in excluded]
+        return candidates[0] if candidates else ""
 
     # ------------------------------------------------------------------
     # Formatage des résultats pour le prompt LLM
@@ -134,6 +216,9 @@ class Toolbox:
         stdout = r.get("stdout", "")
         if stdout:
             lines.append(f"    {stdout[:MAX_STDOUT_LENGTH]}")
+        data = r.get("data")
+        if data is not None:
+            lines.append(f"    {json.dumps(data, ensure_ascii=False)[:MAX_STDOUT_LENGTH]}")
 
     def _format_list_dir(self, lines: list[str], r: dict):
         entries = r.get("entries")

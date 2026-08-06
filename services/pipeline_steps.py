@@ -62,7 +62,7 @@ def query_model(state: dict[str, Any], provider: Any, agents: dict[str, object],
         return state
     model = model_selector(agent_key, state.get("model"), provider)
     task = state.get("task", "")
-    context = state.get("context", {})
+    context = state.setdefault("context", {})
     if not task:
         state["error"] = "Tâche vide — rien à exécuter"
         state["response"] = "Je n'ai pas reçu de tâche à exécuter."
@@ -71,9 +71,17 @@ def query_model(state: dict[str, Any], provider: Any, agents: dict[str, object],
     if context:
         context_str = "\n".join(f"- {k}: {v}" for k, v in context.items())
         prompt = f"Contexte:\n{context_str}\n\nTâche: {task}"
+    if toolbox is not None:
+        auto = getattr(toolbox, "auto_execute", None)
+        if auto is not None:
+            try:
+                context["tool_results"] = auto(task) or {}
+            except Exception as e:
+                _logger.warning("Toolbox indisponible : %s", e)
+                context["tool_results"] = {}
     try:
         if hasattr(agent, "run"):
-            result = agent.run(prompt, model=model, context=state.get("context", {}))
+            result = agent.run(prompt, model=model, context=context)
         elif hasattr(agent, "query"):
             result = agent.query(prompt, model=model)
         else:

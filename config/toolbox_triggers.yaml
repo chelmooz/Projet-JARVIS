@@ -24,6 +24,10 @@ triggers:
     key: service
     tool: psservice
     description: "service status (PsService)"
+  - keywords: [pourquoi, why, running, tourne, ancestry, port occupe, "pourquoi ce processus", "why is this running"]
+    key: why_running
+    tool: witr
+    description: "explique pourquoi un processus/port/service tourne (witr)"
   - keywords: [liste, dossier, ls, dir, repertoire, contenu du dossier]
     key: ls
     tool: list_dir

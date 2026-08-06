@@ -93,7 +93,6 @@ class TestBaseAgent:
 # ─── GenericAgent ──────────────────────────────────────────────────────────────
 
 class TestGenericAgent:
-
     def test_init_defaults(self):
         model = MagicMock()
         memory = MagicMock()
@@ -333,3 +332,54 @@ class TestDefaultPromptRealRun:
             system = agent._profile_prompt("techlead", "t", {},
                                            default_prompt="prompt par defaut")
         assert "prompt par defaut" in system
+
+
+# ─── Factory — contrat witr de l'agent @hardware (Phase 7) ─────────────────────
+
+class TestFactoryHardwareWitr:
+
+    def test_hardware_domain_prompt_mentions_witr(self):
+        from agents.factory import create_agents
+        model = MagicMock()
+        model.query.return_value = "ok"
+        model.get_active_backend.return_value = "ollama"
+        agents = create_agents(model, None)
+        prompt = agents["hardware"]._domain_prompt
+        assert "why_running" in prompt
+        assert "witr" in prompt
+
+    def test_hardware_why_running_prompt_reaches_model(self):
+        """E2E : tâche why_running → le prompt LLM contient witr + tool_results."""
+        from agents.factory import create_agents
+        model = MagicMock()
+        model.query.return_value = "ok"
+        model.get_active_backend.return_value = "ollama"
+        agent = create_agents(model, None)["hardware"]
+
+        class FakeToolbox:
+            def describe_tools(self):
+                return "Outils disponibles:\n  - why_running : explique pourquoi un processus tourne (witr)"
+
+            def tool_results_to_prompt(self, results):
+                return "\n[Resultats diagnostics]\n  [OK] why_running: witr"
+
+        agent.inject_toolbox(FakeToolbox())
+        context = {"tool_results": {"why_running": {"success": True}}}
+        result = agent.run("pourquoi le processus explorer tourne", "model-x", context)
+        assert result["response"] == "ok"
+        call = model.query.call_args[0][0]
+        assert "why_running" in call
+        assert "witr" in call
+
+    def test_hardware_domain_prompt_geres_cible_ambigue(self):
+        """T9.2 crée le contrat `data.ambiguous` — le prompt @hardware doit
+        couvrir ce cas : reformulation (PID/port précis), pas de conclusion
+        hasardeuse sur une cible ambiguë."""
+        from agents.factory import create_agents
+        model = MagicMock()
+        model.query.return_value = "ok"
+        model.get_active_backend.return_value = "ollama"
+        agents = create_agents(model, None)
+        prompt = agents["hardware"]._domain_prompt
+        assert "ambig" in prompt.lower()
+        assert "PID" in prompt

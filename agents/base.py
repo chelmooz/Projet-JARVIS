@@ -188,6 +188,14 @@ class BaseAgent(ABC):
         toolbox_desc = self.toolbox.describe_tools()
         return f"\n{toolbox_desc}" if toolbox_desc else ""
 
+    def _tool_results_section(self, context: dict[str, Any]) -> str:
+        """Section ``tool_results`` de la toolbox, défensive (méthode optionnelle)."""
+        tool_results = context.get("tool_results", {})
+        render = getattr(self.toolbox, "tool_results_to_prompt", None)
+        if not tool_results or render is None:
+            return ""
+        return render(tool_results) or ""
+
     def _compose_parts(
         self,
         profile_key: str,
@@ -238,7 +246,7 @@ class BaseAgent(ABC):
             profile_key, context, default_prompt,
         )
         history = context.get("recent_tasks", [])
-        user = f"{tools_desc}{toolbox_desc}\nContexte récent : {history}{similar_text}\nTâche : {task}"
+        user = f"{tools_desc}{toolbox_desc}\nContexte récent : {history}{similar_text}{self._tool_results_section(context)}\nTâche : {task}"
         return system.strip(), user.strip()
 
     @staticmethod

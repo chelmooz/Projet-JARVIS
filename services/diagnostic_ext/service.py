@@ -4,7 +4,7 @@ Responsabilités :
 - Gestion du consentement utilisateur (fichier CONSENT_FILE).
 - Résolution et vérification SHA256 des binaires externes.
 - Délégation de l'exécution à CommandExecutor (SRP).
-- Orchestration des outils : smartctl, psinfo, psloglist, handle, psping, psservice.
+- Orchestration des outils : smartctl, psinfo, psloglist, handle, psping, psservice, witr.
 
 Dettes signalées (non corrigées ici) :
 - ``list_available()`` et ``is_ready()`` appellent ``check_all_tools()`` à chaque
@@ -16,11 +16,12 @@ Dettes signalées (non corrigées ici) :
 from __future__ import annotations
 
 import os
+import sys
 import time
 from typing import Any
 
 from services.diagnostic_ext.audit import audit_log
-from services.diagnostic_ext.binary import resolve_binary
+from services.diagnostic_ext.binary import resolve_binary, resolve_expected_sha256
 from services.diagnostic_ext.config import (
     BIN_DIR,
     CONFIG_PATH,
@@ -119,11 +120,19 @@ class DiagnosticExtService:
         """Exécute psservice pour gérer les services Windows."""
         return self._run_tool("psservice", extra_kwargs={"service_name": service_name})
 
+    def run_witr(self, target: str) -> dict:
+        """Explique pourquoi un processus/port/service `target` tourne (via witr --json).
+
+        `target` peut être un nom de process, un port ou un nom de conteneur ;
+        la normalisation éventuelle se fait côté appelant, pas ici.
+        """
+        return self._run_tool("witr", extra_kwargs={"target": target})
+
     def _check_tool(self, name: str) -> dict[str, Any]:
         """Vérifie la disponibilité et l'intégrité d'un outil unique."""
         path = resolve_binary(self._config, name, self._bin_dir)
         cfg = self._config["tools"][name]
-        sha = cfg.get("sha256", "")
+        sha = resolve_expected_sha256(self._config, name, sys.platform)
         sha_ok = False
         if path and sha:
             sha_ok = verify_sha256(

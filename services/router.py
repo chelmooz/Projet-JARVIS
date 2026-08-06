@@ -1,5 +1,54 @@
-"""Service de routage — Selection de l'agent JARVIS par analyse de mots-clés."""
+"""Service de routage — Selection de l'agent JARVIS par analyse de mots-clés.
+
+La configuration (préfixes, mots-clés, fallback) vit dans
+``config/agent_routing.yaml`` (ROUTING_CONFIG) : source de vérité unique,
+plus aucun mapping hardcodé. Ajouter un agent ou un mot-clé = éditer le YAML.
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+from config.paths import ROUTING_CONFIG
 from models import Task
+
+_logger = logging.getLogger("jarvis.router")
+
+DEFAULT_FALLBACK = "dev"
+
+
+@dataclass(frozen=True)
+class AgentRoutingConfig:
+    """Configuration de routage (immutable, partage multi-thread safe)."""
+
+    prefix_map: dict[str, str]
+    keyword_map: dict[str, list[str]]
+    fallback: str = DEFAULT_FALLBACK
+
+
+def load_routing_config(path: str | Path = ROUTING_CONFIG) -> AgentRoutingConfig:
+    """Charge la configuration de routage depuis le YAML.
+
+    Dégradation gracieuse : YAML absent ou corrompu → config vide avec
+    fallback par défaut (loggé en warning, jamais de crash au démarrage).
+    """
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.safe_load(handle) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        _logger.warning("Config routage indisponible (%s): %s", path, exc)
+        return AgentRoutingConfig(prefix_map={}, keyword_map={})
+    return AgentRoutingConfig(
+        prefix_map=dict(data.get("prefix_map", {})),
+        keyword_map={
+            agent: list(keywords)
+            for agent, keywords in data.get("keyword_map", {}).items()
+        },
+        fallback=data.get("fallback", DEFAULT_FALLBACK),
+    )
 
 
 class AgentRouter:
@@ -12,28 +61,8 @@ class AgentRouter:
       3. Agent par défaut : "dev"
     """
 
-    def __init__(self):
-        # Cartographie préfixe -> agent (priorité max)
-        self._prefix_map = {
-            "@cyber": "cyber", "@dev": "dev", "@network": "network",
-            "@hardware": "hardware", "@vision": "vision",
-            # Alias depuis les profils de l'onglet Agents
-            "@orchestrateur": "dev", "@techlead": "dev",
-            "@devops": "dev", "@designer": "dev", "@datasecu": "cyber",
-        }
-        # Mots-clés par agent (analyse par score cumulé)
-        self._keyword_map = {
-            "cyber":    ["securite", "security", "log", "audit", "firewall", "forensic",
-                         "vulnerabilite", "malware", "virus", "hack", "attaque", "intrusion"],
-            "dev":      ["script", "code", "debug", "python", "bash", "powershell",
-                         "fonction", "programme", "algorithme", "developpement"],
-            "network":  ["reseau", "network", "ip", "vlan", "tcp", "ping", "dns",
-                         "routeur", "port", "connectivite", "wifi", "latence"],
-            "hardware": ["driver", "bios", "ram", "cpu", "disque", "materiel",
-                         "temperature", "panne", "ecran bleu", "ventilo"],
-            "vision":   ["image", "screenshot", "capture", "photo", "visuel", "ecran"],
-        }
-        self._fallback = "dev"
+    def __init__(self, config: AgentRoutingConfig | None = None) -> None:
+        self._config = config or load_routing_config()
 
     def select_agent(self, task_text: str | Task) -> str:
         """Retourne la clé agent la plus pertinente pour la tâche donnée."""
@@ -41,19 +70,24 @@ class AgentRouter:
             task_text = task_text.text
         lower = task_text.lower().strip()
         if not lower:
-            return self._fallback
+            return self._config.fallback
 
         # Priorité 1 : préfixe explicite @agent
-        for prefix, agent in self._prefix_map.items():
+        for prefix, agent in self._config.prefix_map.items():
             if lower.startswith(prefix):
                 return agent
 
         # Priorité 2 : score de mots-clés (agent avec le plus de hits)
-        scores = {}
-        for agent, keywords in self._keyword_map.items():
-            scores[agent] = sum(1 for k in keywords if k in lower)
-        if scores and max(scores.values()) > 0:
-            return max(scores, key=scores.get)
+        scores = {
+            agent: sum(1 for keyword in keywords if keyword in lower)
+            for agent, keywords in self._config.keyword_map.items()
+        }
+        best_agent = max(scores, key=scores.get) if scores else None
+        if best_agent is not None and scores[best_agent] > 0:
+            return best_agent
 
         # Priorité 3 : fallback par défaut
-        return self._fallback
+        return self._config.fallback
+
+
+__all__ = ["AgentRouter", "AgentRoutingConfig", "load_routing_config"]

@@ -11,11 +11,10 @@ import sys
 from typing import Any
 
 from services.diagnostic_ext.audit import audit_log
-from services.diagnostic_ext.binary import resolve_binary
+from services.diagnostic_ext.binary import resolve_binary, resolve_expected_sha256
+from services.diagnostic_ext.formatters import get_formatter
 from services.diagnostic_ext.security import verify_sha256
 
-_MAX_STDOUT = 2000
-_MAX_STDERR = 500
 _MAX_ERROR = 200
 
 # Regex pour détecter les placeholders {key} dans les templates
@@ -65,13 +64,14 @@ class CommandExecutor:
             audit_log(self._log, "WARN", f"AUDIT tool={tool_name}: binaire introuvable")
             return {"success": False, "tool": tool_name, "error": f"Binaire introuvable pour {tool_name}"}
 
-        sha = cfg.get("sha256", "")
+        sha = resolve_expected_sha256(self._config, tool_name, sys.platform)
         if sha and not self._verify(tool_name, path, sha):
             audit_log(self._log, "WARN", f"AUDIT tool={tool_name}: échec SHA256")
             return {"success": False, "tool": tool_name, "error": "Échec vérification SHA256"}
 
         cmd_args = self.build_args(cfg, args, extra_kwargs)
-        return self._execute(tool_name, path, cmd_args, cfg.get("timeout", 10))
+        formatter = get_formatter(cfg.get("output_format", "text"))
+        return self._execute(tool_name, path, cmd_args, cfg.get("timeout", 10), formatter)
 
     def build_args(
         self,
@@ -133,15 +133,15 @@ class CommandExecutor:
         return [_PLACEHOLDER_RE.sub(callback, a) for a in args]
 
     @staticmethod
-    def format_result(tool_name: str, proc: subprocess.CompletedProcess[str]) -> dict[str, Any]:
-        """Normalise un subprocess réussi en dict de résultat."""
-        return {
-            "success": proc.returncode == 0,
-            "tool": tool_name,
-            "stdout": proc.stdout.strip()[:_MAX_STDOUT],
-            "stderr": proc.stderr.strip()[:_MAX_STDERR],
-            "returncode": proc.returncode,
-        }
+    def format_result(
+        tool_name: str, proc: subprocess.CompletedProcess[str], output_format: str = "text"
+    ) -> dict[str, Any]:
+        """Normalise un subprocess réussi en dict de résultat (délègue au formatter).
+
+        Conserve la signature historique avec ``output_format`` par défaut
+        ``text`` pour compatibilité (retirée lors du refacto stratégie).
+        """
+        return get_formatter(output_format).format(tool_name, proc)
 
     def _verify(self, tool_name: str, path: str, sha: str) -> bool:
         """Vérifie le hash SHA256 du binaire."""
@@ -159,6 +159,7 @@ class CommandExecutor:
         path: str,
         args: list[str],
         timeout: int,
+        formatter: Any,
     ) -> dict[str, Any]:
         """Exécute le subprocess et gère les erreurs (timeout, fichier introuvable)."""
         audit_log(self._log, "INFO", f"AUDIT tool={tool_name} args={args}")
@@ -169,7 +170,7 @@ class CommandExecutor:
                 text=True,
                 timeout=timeout,
             )
-            return self.format_result(tool_name, result)
+            return formatter.format(tool_name, result)
         except subprocess.TimeoutExpired:
             audit_log(self._log, "WARN", f"Timeout {tool_name} après {timeout}s")
             return {"success": False, "tool": tool_name, "error": f"Timeout ({timeout}s)"}

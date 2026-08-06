@@ -60,6 +60,11 @@ keyword_map:
     - panne
     - ecran bleu
     - ventilo
+    - processus
+    - tourne
+    - running
+    - pourquoi
+    - why
   vision:
     - image
     - screenshot

@@ -69,7 +69,15 @@ def create_agents(
         "hardware": GenericAgent(
             inference_service, memory_service,
             profile_key="orchestrateur",
-            domain_prompt="Expert matériel.",
+            domain_prompt=(
+                "Expert matériel. Tu réponds aux questions de diagnostic "
+                "matériel/processus. Utilise l'outil why_running (witr) pour "
+                "expliquer pourquoi un processus, un port ou un service "
+                "tourne ; cible un nom de processus/port précis. "
+                "Si le résultat witr est ambigu (champ `ambiguous`, "
+                "plusieurs processus correspondent), demande à l'utilisateur "
+                "un PID ou un port précis avant de conclure."
+            ),
         ),
         "vision": VisionAgent(inference_service, memory_service),
     }

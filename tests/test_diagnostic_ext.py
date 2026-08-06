@@ -52,6 +52,21 @@ class FakeLog:
         self.entries.append({"level": level, "message": message})
 
 
+def _platform_subdir() -> str:
+    """Sous-dossier de bin_dir par plateforme (Phase 2)."""
+    return {"win32": "win", "linux": "linux", "darwin": "darwin"}.get(
+        sys.platform, sys.platform
+    )
+
+
+def _binary_path(bin_dir: str, bin_name: str) -> str:
+    """Place un binaire dans le sous-dossier de l'OS et retourne son chemin."""
+    subdir = _platform_subdir()
+    bin_path = os.path.join(bin_dir, subdir, bin_name)
+    os.makedirs(os.path.dirname(bin_path), exist_ok=True)
+    return bin_path
+
+
 class TestDiagnosticExtService:
 
     def setup_method(self):
@@ -109,7 +124,7 @@ class TestDiagnosticExtService:
         self.svc.grant_consent()
         tool_name = "smartctl"
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
-        binary_path = os.path.join(self.bin_dir, bin_name)
+        binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
             f.write(b"fake binary content")
         result = self.svc._run_tool(tool_name)
@@ -130,7 +145,7 @@ class TestDiagnosticExtService:
         )
         svc.grant_consent()
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
-        binary_path = os.path.join(self.bin_dir, bin_name)
+        binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
             f.write(b"fake")
         result = svc._run_tool("smartctl")
@@ -165,7 +180,7 @@ class TestDiagnosticExtService:
     def test_check_all_tools_with_binary_available_true(self):
         self.svc.grant_consent()
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
-        binary_path = os.path.join(self.bin_dir, bin_name)
+        binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
             f.write(b"\x00" * 100)
         results = self.svc.check_all_tools()
@@ -174,7 +189,7 @@ class TestDiagnosticExtService:
     def test_check_all_tools_with_binary_sha256_not_ok(self):
         self.svc.grant_consent()
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
-        binary_path = os.path.join(self.bin_dir, bin_name)
+        binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
             f.write(b"\x00" * 100)
         results = self.svc.check_all_tools()
@@ -214,7 +229,7 @@ class TestDiagnosticExtService:
             consent_file=self.consent_file,
             log_service=self.log,
         )
-        binary_path = os.path.join(self.bin_dir, "smartctl.exe")
+        binary_path = _binary_path(self.bin_dir, "smartctl.exe")
         with open(binary_path, "wb") as f:
             f.write(b"\x00" * 100)
         # SHA256 will fail first, so skip it
