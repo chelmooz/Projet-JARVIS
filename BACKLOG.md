@@ -850,3 +850,56 @@ lors de la copie manuelle. Re-livré avec cette session, à committer.
 relancer `launchers\JARVIS.bat` et vérifier `curl /api/status` + `/api/agents` +
 `/api/agents/assign` pour confirmer que JARVIS résout bien les modèles sous leurs
 nouveaux noms auprès d'Ollama en conditions réelles.
+
+---
+
+## 🔧 W-DEPLOY-4 — `jarvis.py` : ModuleNotFoundError uvicorn au premier lancement réel — 07/08/2026
+
+> Suite directe de W-DEPLOY-3 : premier lancement réel de `launchers\JARVIS.bat`
+> sur H:\Projet-JARVIS avec toutes les corrections précédentes en place (binaire
+> Ollama présent, 7 modèles pull, imports OK annoncé par le .bat). Crash immédiat
+> malgré tout. Refacto SOLID (SRP) plutôt qu'un patch inline dans jarvis.py.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| D4.1 | **Bug réel #1 (E2E)** : `launchers\JARVIS.bat` → `[ERREUR] JARVIS s'est arrêté avec le code 1`. `logs\jarvis_core.log` → `ModuleNotFoundError: No module named 'uvicorn'` sur `jarvis.py:13`. Cause : `import uvicorn` en tête de module, avant que `ensure_venv()` (qui installe les dépendances manquantes) n'ait la moindre chance de s'exécuter | ✅ reproduit en réel (log collé par Michel) |
+| D4.2 | **Bug réel #2 (audit, non bloquant pour ce déploiement)** : `preflight_check()` passe le `logging.Logger` brut à `ensure_ollama_binary()`, qui attend un callable `log(step, message, success)` → `TypeError: 'Logger' object is not callable` si le binaire Ollama est absent. Sans impact ici (`bin\ollama.exe` déjà présent sur la clé → retour anticipé avant l'appel fautif), mais bloquerait un premier déploiement sans binaire pré-livré | ✅ identifié, non exercé en réel (branche non atteinte sur cette clé) |
+| D4.3 | **RED** : reproduction fidèle en sandbox — `import jarvis` avec `uvicorn` absent de l'interpréteur → `ModuleNotFoundError` confirmé au niveau module (même mécanisme que le crash réel) | ✅ |
+| D4.4 | **GREEN — refacto SRP** (3 fichiers) : `services/log_adapter.py` (nouveau, responsabilité unique : adapter `logging.Logger` → callback `(step, message, success)`) ; `services/dependency_bootstrap.py` (nouveau, responsabilité unique : `bootstrap_dependencies(logger)` — délègue à `ensure_venv()` puis relance via `os.execv` si l'interpréteur choisi diffère du courant, comparaison en `abspath` et non `realpath` pour ne pas confondre un venv symlinké avec l'interpréteur système) ; `jarvis.py` redevient un composition root pur — `import uvicorn` / `from dotenv import load_dotenv` déplacés dans `main()`, après l'appel à `bootstrap_dependencies()` | ✅ |
+| D4.5 | **VERIFY** : `import jarvis` sans `uvicorn` installé → OK, aucun `ModuleNotFoundError`, aucun provisioning déclenché au simple import (non-régression sur `test_jarvis_shutdown.py` / `test_ollama_port_single_source.py`) ; tests ciblés `bootstrap_dependencies` (mêmes interpréteur → pas de relance / interpréteur différent → relance `os.execv`) et `to_step_logger` (callable `(step, message, success)`) → passent ; suite complète → **882 passed / 1 failed (faux positif préexistant `test_model_tags_consistency.py`, non lié) / 40 skipped / 1 xfailed**, ruff clean | ✅ |
+
+**Preuve D4** :
+```
+RED  : import jarvis (uvicorn absent)      → ModuleNotFoundError: No module named 'uvicorn'
+GREEN: import jarvis (uvicorn absent)      → OK, aucune exception, aucun bootstrap déclenché
+GREEN: bootstrap_dependencies (même py)    → os.execv non appelé
+GREEN: bootstrap_dependencies (autre py)   → os.execv appelé avec le bon interpréteur
+GREEN: to_step_logger(logger)(step,msg,ok) → callable, délègue correctement à logger.info/error
+Suite complète : 882 passed, 40 skipped, 1 xfailed, 1 failed (préexistant, hors périmètre)
+```
+
+**Leçons apprises (W-DEPLOY-4)** :
+- Le fix appliqué lors d'une session précédente n'avait **jamais été committé/poussé**
+  (resté dans un bac à sable local disparu entre deux conversations) — le dépôt
+  GitHub était toujours dans l'état buggé au moment du clonage pour cette session.
+  Rappel : un correctif n'existe que s'il est committé ; « ça marchait dans une
+  session précédente » n'est pas une preuve de livraison.
+- `jarvis.py` porte le titre « Composition Root » dans son propre docstring — le
+  premier patch (non retenu) violait ce principe en logeant la logique de bootstrap
+  directement dedans. Le refacto final respecte SRP : `log_adapter.py` (adaptation),
+  `dependency_bootstrap.py` (orchestration provisioning + relance), `jarvis.py`
+  (assemblage pur, zéro logique propre au-delà du séquencement des appels).
+- Bug D4.2 illustre l'intérêt de centraliser l'adaptation logger→callback en un seul
+  module (`log_adapter.py`) plutôt que de la dupliquer à chaque site d'appel :
+  un seul endroit à corriger pour les deux call-sites (`ensure_venv`,
+  `ensure_ollama_binary`).
+
+**Fichiers livrés (session, non encore commités)** : `jarvis.py` (modifié),
+`services/log_adapter.py` (nouveau), `services/dependency_bootstrap.py` (nouveau).
+
+**Prochaine micro-tâche** : `git add` + commit + push, puis relancer
+`launchers\JARVIS.bat` sur H:\Projet-JARVIS pour confirmer en conditions réelles
+que `bootstrap_dependencies()` installe bien fastapi/uvicorn/etc. dans
+`portable_python\win\` et que JARVIS démarre jusqu'à `http://localhost:8000`.
+Corriger ensuite D4.2 (`Logger` non-callable dans `ensure_ollama_binary`) si un
+déploiement sans binaire Ollama pré-livré est un scénario à couvrir.

@@ -10,18 +10,20 @@ import logging
 import os
 import sys
 
-import uvicorn
-from dotenv import load_dotenv
-
 from config.bootstrap import ensure_project_root
 from config.constants import DEFAULT_MODEL, JARVIS_PORT, VERSION
 from config.paths import OLLAMA_PORT
+from services.dependency_bootstrap import bootstrap_dependencies
 from services.launcher import ProcessManager
+from services.log_adapter import to_step_logger
 from services.ollama_installer import ensure_ollama_binary
 from services.system import BASE_DIR, SYSTEM
 
 _PROJECT_ROOT = ensure_project_root()
-load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
+
+# "uvicorn" et "dotenv" sont des dépendances tierces : leur import est différé
+# dans main(), après bootstrap_dependencies(), pour rester import-safe tant
+# qu'elles ne sont pas garanties installées (cf. services/dependency_bootstrap.py).
 
 
 def setup_logging() -> logging.Logger:
@@ -49,7 +51,7 @@ def print_banner(logger: logging.Logger) -> None:
 def preflight_check(logger: logging.Logger) -> bool:
     """Vérifie et provisionne les dépendances critiques. Fail-Fast."""
     logger.info("Vérification du binaire Ollama portable...")
-    ollama_bin = ensure_ollama_binary(logger)
+    ollama_bin = ensure_ollama_binary(to_step_logger(logger))
 
     if not ollama_bin or not os.path.exists(ollama_bin):
         logger.critical(
@@ -86,6 +88,14 @@ def main() -> None:
     logger.info("=== Démarrage de JARVIS Portable ===")
     logger.info("Système : %s | Python : %s", SYSTEM, sys.version.split()[0])
     logger.info("Répertoire de travail : %s", BASE_DIR)
+
+    bootstrap_dependencies(logger)
+
+    # Imports différés : sûrs uniquement après bootstrap_dependencies().
+    import uvicorn
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
     if not preflight_check(logger):
         sys.exit(1)
