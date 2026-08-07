@@ -378,6 +378,10 @@ curl http://localhost:8000/api/agents    # liste des agents JARVIS
 > 💡 On utilise `.\bin\ollama.exe` (pas la commande `ollama` globale) pour éviter de
 > retomber sur le port système 11434 si `$env:OLLAMA_HOST` n'est plus défini dans ce terminal.
 
+Dans le navigateur (`http://localhost:8000`), l'onglet **🔧 Outils** affiche un diagnostic
+matériel en direct (CPU, RAM, GPU, disque, réseau) — pratique pour confirmer que JARVIS voit
+bien votre configuration réelle.
+
 ---
 
 <details>

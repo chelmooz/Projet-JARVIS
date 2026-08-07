@@ -241,6 +241,36 @@ class TestAgents:
         assert resp.status_code == 200
         assert "response" in resp.json()
 
+    def test_vision_strips_data_uri_prefix_before_agent(self):
+        """RED -> GREEN (bug réel signalé 07/08/2026, déploiement Windows réel) :
+
+        handle_vision transmettait l'image brute (préfixe
+        'data:image/png;base64,...' inclus) à l'agent, qui la passe telle
+        quelle à Ollama /api/generate -> base64 invalide -> exception ->
+        500 'Erreur interne de l'agent vision'. `services/sanitize.py`
+        expose déjà `strip_data_uri` mais n'était jamais appelé dans
+        controllers/routes/agents.py::handle_vision.
+        """
+        captured = {}
+
+        class SpyVisionAgent:
+            def run(self, task, model, context):
+                captured["image"] = context.get("image")
+                return {"response": "ok", "agent": "vision", "model": model}
+
+        original = app.state.context.agents["vision"]
+        app.state.context.agents["vision"] = SpyVisionAgent()
+        try:
+            resp = client.post(
+                "/api/vision",
+                json={"image": "data:image/png;base64,iVBORw0KGgo=", "task": "analyse"},
+            )
+        finally:
+            app.state.context.agents["vision"] = original
+        assert resp.status_code == 200
+        assert captured["image"] == "iVBORw0KGgo="
+        assert not captured["image"].startswith("data:")
+
 
 class TestSecurityHeaders:
     def test_csp_no_cdn_dependency(self):

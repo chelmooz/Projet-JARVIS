@@ -1035,3 +1035,21 @@ et reposer une question via l'UI web. Attendu : la question est traitée par le
 modèle configuré pour l'agent (Qwen2.5 pour techlead/orchestrateur/etc.), plus
 d'erreur 400. Nettoyer D6.3 (`get_agent_profiles()` dead code buggé) dans une
 session ultérieure si cette fonction doit un jour être utilisée.
+
+---
+
+## 🔧 POST-DEPLOY-AUDIT — Clé USB (07/08/2026)
+
+> Audit rapide post-déploiement clé USB : fix vision OK, consentement décoratif, fixture coûteuse, mémoire hypothétique.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| AUDIT.1 | **Consentement diagnostic_ext — endpoint réel** : ajouter `POST /api/diagnostic/consent` → `DiagnosticExtService.grant_consent()` (services/diagnostic_ext/service.py:72). Le fichier `.diagnostic_consent` devient mécanisme d'urgence seulement. Documenter que `ensure_consent()` n'est pas un vrai contrôle d'accès (gate décoratif : `os.path.exists` contournable en 1 ligne). | ⏳ TODO |
+| AUDIT.2 | **Fixture `_restore_ctx` — teardown sans side-effects réseau** : `tests/test_api.py:121-125` appelle `ctx._ctx.initialize()` qui instancie `InferenceService` (tente Ollama 11436), `VectorService`, etc. Remplacer par `AppContext()` vierge sans `_do_initialize()` ou supprimer le rappel (mocks réappliqués au setup suivant via `autouse`). Objectif : tests rapides, déterministes, sans dépendance machine. | ⏳ TODO |
+| AUDIT.3 | **Mémoire vectorielle polluée — documentation hypothèse** : taille 39 KB `vector_index.json` corrélée à "réponse d'hier" = hypothèse sans test de régression (contaminé → nettoyé → non contaminé). Noter comme "nettoyage empirique acceptable en dépannage" — **ne pas classer root cause confirmée** sans repro. Si récurrence → ajouter test d'intégration `test_vector_index_isolation`. | 📝 NOTÉ |
+
+**Preuve vision** (déjà livré) :
+```
+controllers/routes/agents.py:142 → strip_data_uri(image) appelé avant vision_agent.run()
+tests/test_api.py:244-272 → test_vision_strips_data_uri_prefix_before_agent (spy valide)
+```

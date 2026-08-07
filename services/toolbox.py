@@ -12,6 +12,7 @@ mapping ``tool_name -> méthode`` est l'unique responsabilité de ce module.
 import json
 import os
 import re
+import unicodedata
 from pathlib import Path
 
 import yaml
@@ -146,11 +147,24 @@ class Toolbox:
     # Exécution automatique : matche les mots-clés de la tâche
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _fold_accents(text: str) -> str:
+        """Retire les diacritiques (é->e, è->e, ...) pour un matching robuste.
+
+        Bug réel (déploiement clé USB, 07/08/2026) : une tâche naturelle en
+        français ("état système", "événements récents") ne déclenchait
+        jamais les triggers YAML ("systeme", "evenement" sans accent),
+        laissant l'agent halluciner un rapport système complet faute de
+        vraies données outil.
+        """
+        decomposed = unicodedata.normalize("NFKD", text)
+        return "".join(c for c in decomposed if not unicodedata.combining(c))
+
     def auto_execute(self, task: str) -> dict[str, dict]:
         results = {}
-        lower = task.lower()
+        lower = self._fold_accents(task.lower())
         for keywords, entry, fn in self._diagnostic_triggers + self._file_triggers:
-            if any(kw in lower for kw in keywords):
+            if any(self._fold_accents(kw) in lower for kw in keywords):
                 key = entry["key"]
                 tool_name = entry["tool"]
                 try:

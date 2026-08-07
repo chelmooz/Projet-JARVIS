@@ -61,6 +61,23 @@ class TestToolbox:
             assert "disk" in results  # les diagnostics tournent toujours (mono-user)
             assert not results["disk"]["success"]  # echec car binaire absent
 
+    def test_auto_execute_matches_accented_french_system_keyword(self):
+        """RED -> GREEN (bug déploiement réel 07/08/2026, clé USB Windows) :
+
+        Une tâche naturelle en français ("état système") ne déclenchait
+        jamais le trigger "system" car auto_execute() comparait le texte
+        en minuscule brut ("système") contre le mot-clé YAML sans accent
+        ("systeme"). L'agent, privé de vraies données, hallucinait un
+        rapport système complet et crédible (CPU/RAM/SSD inventés).
+        """
+        results = self.toolbox.auto_execute("état détaillé du système")
+        assert "system" in results
+
+    def test_auto_execute_matches_accented_french_log_keyword(self):
+        """Même bug pour 'journaux'/'événements' vs 'journal'/'evenement'."""
+        results = self.toolbox.auto_execute("événements récents des journaux Windows")
+        assert "log" in results
+
     def test_auto_execute_why_running_trigger_loaded_from_yaml(self):
         # Le trigger witr doit venir du YAML (source de vérité unique)
         results = self.toolbox.auto_execute("pourquoi le processus explorer tourne")

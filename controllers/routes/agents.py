@@ -24,7 +24,7 @@ from controllers.context import _ctx, get_app_context
 from controllers.di import AppContext
 from controllers.responses import fail, ok
 from models.schemas import AssignRequest, VisionRequest
-from services.sanitize import safe_model_name
+from services.sanitize import safe_model_name, strip_data_uri
 from services.selector import select_vision_model
 
 _logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ def handle_vision(body: VisionRequest, context: AppContext = Depends(get_app_con
              "solution": "Vérifiez que LLaVA est dans models/", "agent": "vision"},
             status_code=503,
         )
-    vision_context = {"image": image}
+    vision_context = {"image": strip_data_uri(image)}
     try:
         result = vision_agent.run(task, model_name, vision_context)
     except Exception:
