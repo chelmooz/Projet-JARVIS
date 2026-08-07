@@ -250,22 +250,30 @@ Rien n'est installé sur l'ordinateur : tout reste sur la clef USB.
 
 ---
 
-### Étape 3 — Installer les dépendances et Ollama
+### Étape 3 — Installer les dépendances Python et Ollama portable (sur la clé)
 
 ```bash
 python scripts/install.py
 ```
 
-Un assistant vous guide et vous propose d'installer **Ollama** (le moteur d'IA) et, en option, **OpenWebUI** (une interface web supplémentaire sur `:3000`). Répondez simplement aux questions à l'écran.
+L'assistant installe les dépendances Python, télécharge le **binaire Ollama portable
+directement sur la clé** (`bin\ollama.exe` + `lib\ollama\`) et propose **OpenWebUI**
+en option (interface web supplémentaire sur `:3000`).
 
-> Si l'installation d'Ollama ne se fait pas automatiquement sous Windows, ouvrez **PowerShell en administrateur** et tapez :
-> `irm https://ollama.com/install.ps1 | iex`
+> 🟢 **Ollama : 100 % portable — rien n'est installé sur l'ordinateur.** Le moteur d'IA
+> est posé **par `scripts\install.py` sur la clé** (`bin\ollama.exe` + `lib\ollama\` :
+> llama-server.exe, DLL GPU). Aucune commande d'installation système n'est exécutée
+> (ni `irm https://ollama.com/install.ps1`, ni `sh`) : l'ordinateur sur lequel vous
+> branchez la clé n'est **jamais** modifié — important, car les machines à auditer ne
+> seront pas celles du déploiement sur la clé. Le serveur portable tourne
+> exclusivement sur le port **11436**.
 
 ---
 
 ### Étape 4 — Démarrer le serveur Ollama portable
 
-Le projet utilise le port **11436** (pas le 11434 par défaut) pour éviter tout conflit avec une installation système d'Ollama.
+Le projet utilise le port **11436** (pas le 11434 par défaut) pour rester indépendant
+de toute installation système d'Ollama.
 
 D'abord, copier le fichier de configuration (utilisé par JARVIS au lancement) :
 
@@ -287,14 +295,11 @@ $env:OLLAMA_MODELS="H:\Projet-JARVIS\models\ollama"
 > 💡 Ces variables ne sont valables que dans ce terminal. Fermer la fenêtre = à redéfinir au prochain pull.
 
 > ⚠️ **`bin\ollama.exe` absent ?** Le binaire Ollama Windows **n'est pas dans le dépôt**
-> (gitignoré) : il est installé à l'étape 3, ou **téléchargé automatiquement au 1er
-> lancement de `JARVIS.bat`** (`jarvis.py` → `ensure_ollama_binary`). Si vous avez
-> sauté l'install Ollama (étape 3) et que l'étape 4 ci-dessous échoue avec
-> « fichier introuvable », **passez directement à l'étape 6** (`JARVIS.bat` le
-> téléchargera), ou pré-téléchargez-le maintenant :
-> ```powershell
-> python scripts\install.py   # choisissez "y" pour Ollama à l'invite
-> ```
+> (gitignoré), mais il est installé sur la clé par l'étape 3 (`scripts\install.py`
+> répondre **y** à la question « Installer Ollama portable sur la cle ? »). S'il manque
+> encore, `JARVIS.bat` le téléchargera automatiquement au premier lancement
+> (`jarvis.py` → `ensure_ollama_binary`) : en cas d'échec, vérifiez la connexion
+> Internet (nécessaire uniquement à ce moment) et relancez `JARVIS.bat`.
 
 Démarrer le serveur Ollama portable (en arrière-plan) :
 
@@ -307,7 +312,7 @@ Start-Sleep 3
 
 ---
 
-### Étape 5 — Télécharger les 6 modèles d'IA
+### Étape 5 — Télécharger les 7 modèles d'IA
 
 ```bash
 .\bin\ollama.exe pull hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
@@ -333,8 +338,19 @@ Start-Sleep 3
 > (bartowski, 5,5 Go), `DeepHat-V1-7B` (GGUF-A-Lot, 5,3 Go),
 > `Foundation-Sec-8B-Reasoning` (fdtn-ai, en **Q8_0** — pas de Q4_K_M disponible
 > pour cette variante, d'où le poids plus élevé, 8,5 Go), `phi-4-mini-instruct-abliterated`
-> (Melvin56, 2,5 Go), `Llama-3.2-11B-Vision-Instruct` (leafspark, 6,0 Go + 1,9 Go
-> mmproj) et `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
+> pour cette variante, d'où le poids plus élevé, 8,5 Go), `phi-4-mini-instruct-abliterated`
+> (Melvin56, 2,5 Go), `moondream` (1,4 Go, remplace `Llama-3.2-11B-Vision-Instruct` de
+> leafspark devenu incompatible avec Ollama — voir note ci-dessous) et
+> `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
+
+> 🪄 **Vision (08/08/2026)** : le modèle vision historique
+> `Llama-3.2-11B-Vision-Instruct` (leafspark) est devenu **incompatible avec la
+> version d'Ollama embarquée** (`'llama3.2-vision' is no longer compatible...` à
+> chaque pull/génération). Remplacé par **`moondream`** (1,8B, ~1,4 Go, CPU-only) :
+> ```bash
+> .\bin\ollama.exe pull moondream
+> .\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
+> ```
 
 | Modèle | Ce qu'il fait le mieux | Poids |
 |---|---|---:|
@@ -356,6 +372,12 @@ Start-Sleep 3
 
 Double-cliquez sur `launchers\JARVIS.bat`.
 
+> 📥 **Premier lancement** : JARVIS télécharge lui-même le **binaire Ollama portable**
+> (`bin\ollama.exe` + `lib\ollama\`) depuis le site officiel — Internet nécessaire à ce
+> moment précis, uniquement la première fois. Le serveur Ollama portable démarre ensuite
+> automatiquement sur **`127.0.0.1:11436`** (port JARVIS, distinct du 11434 système —
+> et inutilisé ici : aucun Ollama système n'est installé).
+
 Patientez ~5 secondes, puis ouvrez votre navigateur sur **http://localhost:8000** 🎉
 
 | Adresse | À quoi ça sert |
@@ -375,8 +397,11 @@ curl http://localhost:8000/api/status    # état des services JARVIS
 curl http://localhost:8000/api/agents    # liste des agents JARVIS
 ```
 
-> 💡 On utilise `.\bin\ollama.exe` (pas la commande `ollama` globale) pour éviter de
-> retomber sur le port système 11434 si `$env:OLLAMA_HOST` n'est plus défini dans ce terminal.
+> 💡 On utilise systématiquement `.\bin\ollama.exe` (le binaire **portable**) et jamais
+> la commande `ollama` globale : celle-ci n'existe pas sur cette machine (aucun Ollama
+> système) et chercherait de toute façon sur le port 11434 par défaut. Les variables
+> `$env:OLLAMA_HOST` / `$env:OLLAMA_MODELS` définies à l'étape 4 doivent rester actives
+> dans le terminal qui lance les `pull`.
 
 Dans le navigateur (`http://localhost:8000`), l'onglet **🔧 Outils** affiche un diagnostic
 matériel en direct (CPU, RAM, GPU, disque, réseau) — pratique pour confirmer que JARVIS voit
@@ -427,8 +452,8 @@ Il n'y a pas un seul script magique, mais **trois briques** à des moments diff�
 | Script | Quand | Rôle |
 |---|---|---|
 | `scripts/install_portable_python.py` | une fois, **Windows** | installe un Python portable (3.12.10) + le venv + les dépendances |
-| `scripts/install.py` | une fois, tous OS | installe les dépendances Python, propose Ollama et OpenWebUI |
-| `launchers/JARVIS.bat` / `.sh` | à **chaque lancement** | détecte Python, réinstalle une dépendance manquante si besoin, lance `jarvis.py` |
+| `scripts/install.py` | une fois, tous OS | installe les dépendances Python, télécharge **Ollama portable sur la clé** (`bin\`) et propose OpenWebUI |
+| `launchers/JARVIS.bat` / `.sh` | à **chaque lancement** | détecte Python, télécharge Ollama portable s'il manque, réinstalle une dépendance manquante si besoin, lance `jarvis.py` |
 
 Les launchers rattrapent une dépendance oubliée, mais ce n'est **pas** une vraie installation : pour un premier démarrage propre, passez bien par les étapes 2 et 3.
 </details>

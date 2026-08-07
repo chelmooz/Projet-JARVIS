@@ -1,11 +1,15 @@
-"""TDD — print_final() ne doit pas afficher `bin\\ollama.exe serve` quand seul un
-Ollama système (PATH) a été détecté par setup_ollama() (pas de binaire portable
-copié dans bin\\).
+"""TDD — print_final() ne doit pas afficher `bin\\ollama.exe serve` quand aucun
+binaire portable n'est présent sur la clé (installation système interdite).
 
 Bug réel constaté sur déploiement Windows réel (H:\\Projet-JARVIS) : PC avec Ollama
-système installé -> setup_ollama() dit "deja installe" et s'arrête -> print_final()
-affichait quand même "1. Lancer Ollama : bin\\ollama.exe serve" -> Start-Process
-échouait ("fichier introuvable") car bin\\ollama.exe n'existait pas.
+système installé -> setup_ollama() disait "deja installe" et s'arrêtait ->
+print_final() affichait quand même "1. Lancer Ollama : bin\\ollama.exe serve" ->
+Start-Process échouait ("fichier introuvable") car bin\\ollama.exe n'existait pas.
+
+Depuis le 08/08/2026 : 100 % portable. setup_ollama() pose le binaire portable
+SUR la clé (bin\\) et n'invite plus jamais à une installation système
+(irm/install.sh supprimés). print_final() renvoie au 1er lancement de JARVIS.bat
+(qui télécharge via ensure_ollama_binary) — et ne mentionne plus "ollama serve".
 """
 import importlib.util
 import os
@@ -32,7 +36,11 @@ def test_print_final_no_portable_binary_does_not_reference_bin_ollama(capsys, mo
 
     out = capsys.readouterr().out
     assert "bin\\ollama.exe serve" not in out
-    assert "ollama serve" in out
+    # 100 % portable : plus aucune référence à un Ollama système.
+    assert "ollama serve" not in out
+    # On renvoie au filet de sécurité : JARVIS.bat télécharge au 1er lancement.
+    assert "JARVIS.bat" in out
+    assert "jamais sur l'ordi" in out
 
 
 def test_print_final_with_portable_binary_references_bin_ollama(capsys, monkeypatch):
@@ -43,3 +51,4 @@ def test_print_final_with_portable_binary_references_bin_ollama(capsys, monkeypa
 
     out = capsys.readouterr().out
     assert "bin\\ollama.exe serve" in out
+    assert "portable, sur la cle" in out

@@ -274,6 +274,31 @@
 
 ---
 
+## PHASE 11 — 100% PORTABLE : install.py pose Ollama SUR LA CLÉ (08/08/2026) 🟠
+
+> Contexte : l'Ollama système a été **désinstallé** du PC de déploiement. Le README
+> et `scripts/install.py` renvoyaient encore vers des installations **système**
+> (`irm https://ollama.com/install.ps1 | iex`, `curl install.sh | sh`). Or les machines
+> à auditer ne sont jamais la machine de déploiement : installer Ollama sur le poste
+> client n'a aucun intérêt. Décision : install.py pose le binaire **portable** dans
+> `bin\` sur la clé (réutilise `services/ollama_installer._install_windows_zip` /
+> `_install_linux_tar`) ; `JARVIS.bat` reste le filet de sécurité (télécharge au 1er
+> lancement via `ensure_ollama_binary`).
+
+### 11.1 `scripts/install.py` — `setup_ollama()` portable pur
+- [x] **RED** : `test_install_final_message.py` conservé (print_final ne référence plus `ollama serve` système)
+- [x] **GREEN** : `setup_ollama()` réécrit — binaire déjà présent sur la clé → OK ; sinon invitation « Installer Ollama portable sur la cle ? » → `_install_windows_zip` (Windows) / `_install_linux_tar` (Linux) / brew+script (macOS, non-packagé) ; plus aucun `shutil.which("ollama")` système, plus aucun `irm`/`install.sh`
+- [x] **GREEN** : `print_final()` — si pas de binaire portable : « (auto — téléchargé au 1er lancement de JARVIS.bat, jamais sur l'ordi) » au lieu de « ollama serve (installation système) » ; si présent : « bin\ollama.exe serve (portable, sur la clé) »
+- [x] **PREUVE** : `pytest tests/test_install_final_message.py -q` → vert ; `ruff check scripts/install.py`
+- [x] **COMMIT** : `fix(install): setup_ollama 100% portable — binaire posé sur la clé, jamais d'install système (irm/install.sh supprimés)`
+
+### 11.2 README — installation clairement sur la clé
+- [x] **GREEN** : Étape 3 renommée « Installer les dépendances Python et Ollama portable (sur la clé) » — l'assistant télécharge `bin\ollama.exe` + `lib\ollama\` **sur la clé** ; note 🟢 « rien n'est installé sur l'ordinateur — les machines à auditer ne seront pas celles du déploiement » ; Étape 4 note `bin\ollama.exe absent ?` → relancée sur l'étape 3 ; tableau « pour les curieux » → install.py télécharge Ollama portable
+- [x] **PREUVE** : lecture humanisée du README Installation (étapes 2→6)
+- [x] **COMMIT** : inclus dans le commit 11.1
+
+---
+
 ## RÈGLES DE VALIDATION (ne pas violer)
 
 1. **UNE micro-tâche = UN fichier = UN cycle RED/GREEN.**

@@ -1095,3 +1095,28 @@ tests/test_api.py:244-272 → test_vision_strips_data_uri_prefix_before_agent (s
 .\bin\ollama.exe pull moondream
 .\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
 ```
+
+---
+
+## 🧰 P-PORTABLE — Ollama 100 % portable : install.py pose le binaire SUR LA CLÉ (08/08/2026)
+
+> Contexte : l'Ollama **système** a été désinstallé du PC de déploiement
+> (`shutil.which("ollama")` ne retourne plus rien). Le README et `scripts/install.py`
+> renvoyaient encore vers des installations **système** (PowerShell administrateur
+> `irm https://ollama.com/install.ps1 | iex` sous Windows, `curl ... | sh` sous
+> Linux/macOS). Or les machines à auditer ne sont jamais le poste de déploiement de
+> la clé : installer Ollama sur le poste client n'a aucun intérêt. Décision :
+> `scripts/install.py` pose le binaire **portable** dans `bin\` (+ `lib\ollama\`),
+> réutilisant les installers déjà validés de `services/ollama_installer.py` ;
+> `JARVIS.bat` garde le filet de sécurité (re-téléchargement au 1er lancement via
+> `ensure_ollama_binary`).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| P1.1 | **RED** : `test_install_final_message.py` conservé (2 tests `print_final` — pas de `bin\ollama.exe serve` quand aucun binaire portable, présent quand binaire fourni) | ✅ |
+| P1.2 | **GREEN** : `scripts/install.py::setup_ollama()` réécrit — binaire portable déjà présent sur la clé → OK ; sinon invitation « Installer Ollama portable sur la cle ? [y/N] » → branche Windows `_install_windows_zip()` / Linux `_install_linux_tar()` / macOS brew+script (non-packagé) ; plus aucun `shutil.which("ollama")` système, plus aucun `irm`/`install.sh` ; aucun échec si utilisateur répond N (JARVIS.bat téléchargera) | ✅ |
+| P1.3 | **GREEN** : `print_final()` — sans binaire portable : « (auto — téléchargé au 1er lancement de launchers\JARVIS.bat, jamais sur l'ordi) » au lieu de « ollama serve (installation système détectée) » ; avec binaire : « bin\ollama.exe serve (portable, sur la cle) » | ✅ |
+| P1.4 | **GREEN** : `import shutil` retiré de install.py (devenu inutile) | ✅ |
+| P2.1 | **README** : Étape 3 renommée « Installer les dépendances Python et Ollama portable (sur la clé) » + note 🟢 « rien n'est installé sur l'ordinateur — machines à auditer ≠ poste de déploiement » ; Étape 4 : note `bin\ollama.exe absent ?` → renvoie à l'étape 3 (et JARVIS.bat en filet) ; tableau « pour les curieux » : install.py télécharge Ollama portable, launchers le re-téléchargent s'il manque | ✅ |
+| P3.1 | **VERIFY** : `pytest tests/test_install_final_message.py -q` → 2 passed ; `pytest tests/test_api.py -q` → 48 passed ; `ruff check scripts/install.py tests/test_install_final_message.py` → clean | ✅ |
+| P3.2 | **Commit + push** : `fix(install): setup_ollama 100% portable — binaire posé sur la clé, jamais d'install système (irm/install.sh supprimés)` | ✅ |

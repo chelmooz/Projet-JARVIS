@@ -7,7 +7,6 @@ Installe les dependances Python, Ollama et OpenWebUI.
 
 import os
 import platform
-import shutil
 import subprocess
 import sys
 
@@ -83,46 +82,64 @@ def install_python_deps():
 
 
 def setup_ollama():
-    """Detecte l'OS et propose l'installation d'Ollama."""
-    print(yellow("\n[2/3] Ollama (moteur d'inference)..."))
+    """Installe le binaire Ollama **portable** SUR LA CLÉ (jamais sur l'ordi client).
 
-    if shutil.which("ollama"):
-        print(f"  {green('[OK]')} Ollama deja installe")
+    Les machines à auditer ne sont PAS la machine de déploiement : une installation
+    système (Ollama installé via irm/apt/brew sur le poste client) est inutile et
+    interdite. Le binaire portable est posé dans bin/ (sur la clé) ; s'il manque,
+    JARVIS.bat le téléchargera au premier lancement (ensure_ollama_binary).
+    """
+    print(yellow("\n[2/3] Ollama (moteur d'inference — portable SUR LA CLE)..."))
+
+    existing = _portable_ollama_path()
+    if existing:
+        print(f"  {green('[OK]')} Binaire portable deja present sur la cle : {existing}")
         return True
 
-    print(gray("  Necessite ~680 Mo sur le disque."))
+    print(gray("  Aucun binaire portable trouve dans bin/ — il sera telecharge"))
+    print(gray("  directement sur la cle USB (jamais sur l'ordi client)."))
 
     try:
         if sys.stdin.isatty():
-            resp = input(gray("  Installer Ollama ? [y/N] ")).strip().lower()
+            resp = input(gray("  Installer Ollama portable sur la cle ? [y/N] ")).strip().lower()
             if resp != "y":
-                print(gray("  Ignore. Installation manuelle :"))
-                if SYSTEM in ("linux", "darwin"):
-                    print(cyan("    curl -fsSL https://ollama.com/install.sh | sh"))
-                else:
-                    print(cyan("    irm https://ollama.com/install.ps1 | iex"))
+                print(gray("  Ignore. JARVIS.bat le telechargera automatiquement au 1er lancement."))
                 return False
     except (EOFError, KeyboardInterrupt):
         return False
 
-    print(f"  Detection : {SYSTEM}")
-    if SYSTEM == "windows":
-        print(cyan("    irm https://ollama.com/install.ps1 | iex"))
-        print(gray("  Lancez cette commande dans PowerShell en administrateur."))
+    sys.path.insert(0, BASE_DIR)
+    from services.ollama_installer import (
+        _install_linux_tar,
+        _install_mac_brew,
+        _install_mac_script,
+        _install_windows_zip,
+    )
+
+    def log(step, message, success):
+        mark = green("[OK]") if success else (red("[FAIL]") if success is False else gray("..."))
+        print(f"      {mark} {step} : {message}")
+
+    try:
+        if SYSTEM == "windows":
+            result = _install_windows_zip(log)
+        elif SYSTEM == "linux":
+            result = _install_linux_tar(log)
+        else:
+            # macOS : pas de binaire portable packagé dans le dépôt — on tente
+            # brew/script, mais JARVIS reste utilisable sinon.
+            result = _install_mac_brew(log) or _install_mac_script(log)
+    except Exception as e:
+        print(red(f"  Erreur: {e}"))
+        print(gray("  JARVIS.bat retentera automatiquement au 1er lancement."))
         return False
-    elif SYSTEM in ("linux", "darwin"):
-        print(cyan("    curl -fsSL https://ollama.com/install.sh | sh"))
-        try:
-            subprocess.run(
-                ["sh", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
-                check=True, timeout=120
-            )
-            print(f"  {green('[OK]')} Ollama installe")
-            return True
-        except Exception as e:
-            print(red(f"  Erreur: {e}"))
-            print(gray("  Installez manuellement : curl -fsSL https://ollama.com/install.sh | sh"))
-            return False
+
+    if result:
+        print(f"  {green('[OK]')} Binaire portable installe : {result}")
+        return True
+
+    print(red("  Echec du telechargement portable."))
+    print(gray("  JARVIS.bat retentera automatiquement au 1er lancement."))
     return False
 
 
@@ -184,16 +201,17 @@ def print_final(ollama_portable_path=None):
     print()
     if SYSTEM == "windows":
         if ollama_portable_path:
-            print(yellow("  1. Lancer Ollama :  bin\\ollama.exe serve"))
+            print(yellow("  1. Lancer Ollama :  bin\\ollama.exe serve   (portable, sur la cle)"))
         else:
-            print(yellow("  1. Lancer Ollama :  ollama serve   (installation systeme detectee,"))
-            print(yellow("                       pas de binaire portable dans bin\\)"))
+            print(yellow("  1. Lancer Ollama :  (auto — telecharge au 1er lancement de"))
+            print(yellow("                       launchers\\JARVIS.bat, jamais sur l'ordi)"))
         print(yellow("  2. JARVIS Core   :  launchers\\JARVIS.bat"))
     else:
         if ollama_portable_path:
-            print(yellow(f"  1. Lancer Ollama :  {ollama_portable_path} serve"))
+            print(yellow(f"  1. Lancer Ollama :  {ollama_portable_path} serve   (portable)"))
         else:
-            print(yellow("  1. Lancer Ollama :  ollama serve   (installation systeme detectee)"))
+            print(yellow("  1. Lancer Ollama :  (auto — telecharge au 1er lancement,"))
+            print(yellow("                       jamais installe sur le systeme)"))
         print(yellow("  2. JARVIS Core   :  ./launchers/jarvis.sh"))
     print()
 
