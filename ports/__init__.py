@@ -48,7 +48,7 @@ class ChatPort(Protocol):
 
 @runtime_checkable
 class MultimodalPort(Protocol):
-    """Analyse d'images (Llama-3.2-11B-Vision, etc.)."""
+    """Analyse d'images (moondream, etc.)."""
     def query_multimodal(self, model: str, prompt: str, image_base64: str) -> dict[str, Any]: ...
 
 

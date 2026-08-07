@@ -18,7 +18,7 @@ PREFERENCES_PATH = os.path.join(PROJECT_DIR, "config", "model_preferences.json")
 MODEL_SIZES_PATH = os.path.join(PROJECT_DIR, "config", "model_sizes.json")
 
 VISION_KEY = "vision"
-VISION_MODELS = ["hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M"]
+VISION_MODELS = ["moondream"]
 DEFAULT_FALLBACK_MODEL = "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 RAM_HEADROOM_RATIO = 0.8  # 20% de marge de sécurité pour éviter les OOM
 

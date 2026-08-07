@@ -41,7 +41,7 @@ réassignation explicite via l'onglet **Agents** de l'interface web ou l'API
 | `@dev` | `hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M` | ~4,9 Go |
 | `@network` | `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` | ~4,9 Go |
 | `@hardware` | `hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` | ~4,7 Go |
-| `@vision` | `hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | ~7,0 Go |
+| `@vision` | `moondream` | ~1,4 Go |
 
 > `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` (embeddings, ~0,6 Go) équipe la recherche vectorielle (RAG), pas un agent de chat.
 

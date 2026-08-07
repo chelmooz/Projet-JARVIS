@@ -33,7 +33,7 @@ Le projet est aussi un terrain d'apprentissage et d'expérimentation autour de l
 | 🔌 **100% offline** | Pas besoin d'Internet — tout tourne en local |
 | 💾 **Portable** | Sur clef USB, zéro installation système |
 | 🌐 **Interface web** | UI dark moderne accessible sur `localhost:8000` |
-| 👁️ **Vision IA** | Analyse d'images via Llama-3.2-11B-Vision-Instruct |
+| 👁️ **Vision IA** | Analyse d'images via moondream (léger, tourne en CPU) |
 | 🛡️ **Cyber workflows** | NVISO security workflows intégrés |
 | 🔧 **Système de Skills** | Règles injectées dynamiquement dans le contexte |
 | 🧩 **Mémoire vectorielle** | Recherche sémantique via embeddings Ollama |
@@ -138,7 +138,7 @@ Détail architectural complet : [docs/adr/ADR-008-rag-diagnostic-amelioration-co
 | `@dev` | Développement, scripting | techlead | `Granite-4.1-8B` |
 | `@network` | Réseaux, connectivité | devops | `Foundation-Sec-8B-Reasoning` |
 | `@hardware` | Matériel, diagnostics | orchestrateur | `Qwen2.5-7B` |
-| `@vision` | Analyse d'images | VisionAgent dédié | `Llama-3.2-11B-Vision-Instruct` |
+| `@vision` | Analyse d'images | VisionAgent dédié | `moondream` |
 
 Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script python`.
 
@@ -158,7 +158,7 @@ Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script pyt
 | `DeepHat-V1-7B` | Offensive/Défensive, analyse de vulnérabilités, scripts de test d'intrusion | `@cyber` (sécurité offensive & défensive) | ~4,7 Go |
 | `Foundation-Sec-8B-Reasoning` | Analyse réseau, tri de logs SOC, modélisation de menaces et conformité | `@network` (infrastructure, analyse trafic & sécurité réseau) | ~8,5 Go ⚠️ |
 | `phi-4-mini-instruct-abliterated` | **Léger & rapide**, tourne en CPU pur (0 VRAM), sans filtre (*abliterated*) | Profils **devops** (automatisation, parsing, scripts rapides) | ~2,6 Go |
-| `Llama-3.2-11B-Vision-Instruct` | **Multimodal** : analyse, compréhension et description d'images / schémas | `@vision` (analyse d'images et diagrammes) | ~7,0 Go |
+| `moondream` | **Multimodal léger** : description et analyse d'images, OCR basique — tourne en CPU | `@vision` (analyse d'images et diagrammes) | ~1,4 Go |
 | `nomic-embed-text-v2-moe` | Transforme le texte en **vecteurs sémantiques** (768 dim.) | Recherche vectorielle / mémoire (RAG) — pas un agent de chat | ~0,6 Go |
 
 > ⚠️ **Modèles « abliterated » :** `phi-4-mini-instruct-abliterated` est fourni **sans
@@ -315,7 +315,7 @@ Start-Sleep 3
 .\bin\ollama.exe pull hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0
 .\bin\ollama.exe pull hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
+.\bin\ollama.exe pull moondream
 .\bin\ollama.exe pull hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
 ```
 
@@ -343,7 +343,7 @@ Start-Sleep 3
 | `DeepHat-V1-7B` | Sécurité offensive & défensive — @cyber | ~4,7 Go |
 | `Foundation-Sec-8B-Reasoning` | Analyse réseau & conformité — @network | ~8,5 Go ⚠️ |
 | `phi-4-mini-instruct-abliterated` | Léger, tourne en CPU pur — profils devops | ~2,6 Go |
-| `Llama-3.2-11B-Vision-Instruct` | Analyse d'images (multimodal) — @vision | ~7,0 Go |
+| `moondream` | Analyse d'images (multimodal) — @vision | ~1,4 Go |
 | `nomic-embed-text-v2-moe` | Embeddings — recherche dans vos documents (RAG) | ~0,6 Go |
 
 > 📖 Détail de ce que chaque modèle sait faire le mieux : voir la section [🧠 Les 7 modèles](#-les-7-modèles--100-huggingface--ollama-portable).
@@ -467,7 +467,7 @@ for m in hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
   hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M \
   hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0 \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
+  moondream \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/linux/ollama pull "$m"
 done
@@ -520,7 +520,7 @@ for m in hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
   hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M \
   hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0 \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
+  moondream \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/mac/ollama pull "$m"
 done

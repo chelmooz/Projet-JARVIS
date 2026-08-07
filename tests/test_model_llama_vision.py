@@ -17,7 +17,7 @@ def test_llama_vision_describe_image():
     response = client.post(
         "/api/vision/describe",
         json={
-            "model": "hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M",
+            "model": "moondream",
             "image_url": "https://example.com/image.jpg", # URL d'image fictive
             "prompt": "Décris cette image en détail."
         }

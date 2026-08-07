@@ -55,7 +55,7 @@ class FakeInferenceService:
             "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M",
             "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0",
             "hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M",
-            "hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M",
+            "moondream",
             "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M",
         ]
 

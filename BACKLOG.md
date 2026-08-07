@@ -1072,3 +1072,26 @@ tests/test_api.py:244-272 → test_vision_strips_data_uri_prefix_before_agent (s
 | F3.1 | **CSS** : `.tools-actions`, `.tool-action-btn`, `.tools-actions-hint`, `.consent-status`/`.consent-ok`/`.consent-warn` (style.css, cohérent avec design system existant) | ✅ |
 | F3.2 | **README** : section « Outils de diagnostic étendu » (tableau outils/déclencheurs, prérequis consentement + binaires, distinction onglet Outils vs chat) + note sur l'onglet Outils | ✅ |
 | F3.3 | **VERIFY** : `pytest tests/test_api.py` → vert (consent + suite) ; `ruff check` ; suite complète sans régression | ✅ |
+
+---
+
+## 🔧 V-SWITCH — Vision : bascule Llama-3.2-11B-Vision → moondream (08/08/2026)
+
+> Bug réel (déploiement clé USB) : `ollama pull` + `/api/vision` →
+> `"'llama3.2-vision' is no longer compatible with your version of Ollama...` (500
+> côté API). Le HF import leafspark était devenu incompatible avec la version
+> d'Ollama embarquée. Décision : bascule sur **moondream** (1,8B, ~1,4 Go, CPU-only,
+> suffisant pour description d'image / OCR basique).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| V1.1 | `services/selector.py` : `VISION_MODELS = ["moondream"]` (fallback `fallback_models()` mis à jour par dérivation) | ✅ |
+| V1.2 | `config/model_sizes.json` : entrée `moondream` (ram 2 Go, vram 0, disk 1.4 Go, cpu_only, vision) — leafspark retiré | ✅ |
+| V1.3 | `README.md` (3 blocs, tableaux modèles, feature vision) + `AGENTS.md` + `.opencode/AGENTS.md` + `models/ollama/MODELS.md` + `ports/__init__.py` + `static/assets/js/app.js` (message erreur) → moondream | ✅ |
+| V1.4 | Tests : `tests/conftest.py` FakeInferenceService + `tests/test_model_llama_vision.py` → `moondream` ; `pytest test_selector + test_model_tags_consistency + test_api` → 58 passed / 1 skipped (live) ; ruff clean | ✅ |
+
+**Commande utilisateur (pull le modèle)** :
+```
+.\bin\ollama.exe pull moondream
+.\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
+```

@@ -9,7 +9,7 @@ Table ci‑dessous : état des modèles stockés dans J:\Projet JARVIS\models\ol
 | `hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M` | hf.co | À pull | Sécurité offensive & défensive — @cyber
 | `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` | hf.co | À pull | Analyse réseau & SOC — @network
 | `hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M` | hf.co | À pull | Petit modèle CPU, sans filtre
-| `hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | hf.co | À pull | Vision multimodale — @vision
+| `moondream` | ollama | À pull | Vision multimodale légère — @vision
 | `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` | hf.co | À pull | Embeddings RAG (768d)
 
 ## Notes

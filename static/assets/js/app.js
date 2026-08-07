@@ -295,7 +295,7 @@ function handleVisionFile(inputEl) {
                 return;
             }
             if (!data.response) {
-                result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que le modele Llama-3.2-11B-Vision est bien installe.';
+                result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que le modele moondream est bien installe.';
                 return;
             }
 
