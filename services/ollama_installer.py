@@ -213,6 +213,16 @@ def _install_windows_zip(log: _LogFn) -> str | None:
         if os.path.exists(src):
             shutil.copy(src, os.path.join(BIN_DIR, "ollama.exe"))
 
+        # CORRECTION : l'archive Windows contient aussi lib/ollama/ (llama-server.exe,
+        # DLL GPU) — sans cette copie, ollama.exe démarre mais ne trouve jamais le
+        # moteur d'inférence ("failure during llama-server GPU discovery"). On
+        # reproduit ici la même logique que _install_linux_tar (lib/ollama copié
+        # sous BASE_DIR/lib/ollama, un des chemins qu'Ollama sonde nativement).
+        lib_src = os.path.join(dl_bin, "lib", "ollama")
+        if os.path.exists(lib_src):
+            lib_dest = os.path.join(BASE_DIR, "lib", "ollama")
+            shutil.copytree(lib_src, lib_dest, dirs_exist_ok=True)
+
         return os.path.join(BIN_DIR, "ollama.exe")
     finally:
         if os.path.exists(dl):

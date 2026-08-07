@@ -702,3 +702,96 @@ Chaque bug = cycle RED/GREEN/VERIFY/COMMIT indépendant.
 
 - **Fichiers modifiés** : 24 fichiers
 - **Nouveau bloc pull** : 7 modèles 100% HuggingFace
+
+---
+
+## 🔧 W-DEPLOY — Déploiement Windows réel (H:\Projet-JARVIS) : 2 bugs bloquants trouvés et corrigés — 07/08/2026
+
+> Contexte : test de déploiement guidé pas-à-pas sur PC Windows réel, clé USB
+> H:\Projet-JARVIS déjà clonée (pas de git clone/format). Suivi strict du guide
+> README section Installation. Deux blocages réels rencontrés, reproduits, corrigés
+> en RED/GREEN, avec preuve empirique sur zip réel avant correctif.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| D.1 | **Bug réel #1** : `scripts\install.py` → `setup_ollama()` détecte un Ollama système (`shutil.which("ollama")`) et s'arrête sans jamais préparer `bin\ollama.exe` — mais `print_final()` affiche quand même sans condition « 1. Lancer Ollama : bin\ollama.exe serve » → `Start-Process` échoue en réel (« fichier introuvable ») | ✅ reproduit en réel |
+| D.2 | **RED** : `test_install_final_message.py` (`print_final(ollama_portable_path=None)` ne doit pas contenir `bin\ollama.exe serve`) → confirmé en échec sur l'ancien code (rejoué à l'identique pour preuve) | ✅ |
+| D.3 | **GREEN** : `_portable_ollama_path()` ajoutée (détecte le binaire portable réel sur la clé) ; `print_final()` accepte `ollama_portable_path` et n'affiche `bin\ollama.exe serve` que si le binaire existe réellement, sinon `ollama serve` + mention installation système | ✅ |
+| D.4 | Contournement manuel en session réelle pendant l'attente du fix : `python -c "from services.ollama_installer import _install_windows_zip; print(_install_windows_zip(lambda *a: None))"` → a débloqué `bin\ollama.exe`, mais a révélé le bug D.5 | ✅ |
+| D.5 | **Bug réel #2** : `_install_windows_zip` extrait toute l'archive Windows dans un dossier temp, ne copie que `ollama.exe` vers `bin\`, puis supprime le dossier temp dans le `finally` → perte définitive de `lib\ollama\llama-server.exe` + DLL GPU → serveur Ollama démarre mais log `"failure during llama-server GPU discovery"`, aucune inférence possible | ✅ reproduit en réel (logs Ollama collés par Michel) |
+| D.6 | **RED** : `test_windows_zip_lib_extraction.py` — zip factice imitant la structure réelle (`ollama.exe` + `lib/ollama/llama-server.exe` + DLL), assert que `llama-server.exe` survit à `_install_windows_zip` → confirmé en échec avant correctif | ✅ |
+| D.7 | **GREEN** : `_install_windows_zip` copie désormais aussi `lib/ollama/` vers `BASE_DIR/lib/ollama/` (`shutil.copytree(dirs_exist_ok=True)`), en miroir de ce que fait déjà `_install_linux_tar` pour Linux (candidat déjà sondé nativement par Ollama : `H:\Projet-JARVIS\lib\ollama\llama-server.exe`) | ✅ |
+| D.8 | **VERIFY** : suite complète `pytest tests/` → **882 passed / 0 failed / 40 skipped / 1 xfailed** (vs 879 avant, +3 tests), ruff clean sur les 4 fichiers touchés | ✅ |
+
+**Preuve D** :
+```
+RED  (ancien code) : test_print_final_no_portable_binary_does_not_reference_bin_ollama → FAILED
+                      (assert 'bin\\ollama.exe serve' not in out → False)
+GREEN (corrigé)     : 2 passed (test_install_final_message.py)
+RED  (ancien code) : test_install_windows_zip_preserves_llama_server → FAILED
+                      (llama-server.exe absent après installation)
+GREEN (corrigé)     : 1 passed (test_windows_zip_lib_extraction.py)
+Suite complète      : 882 passed, 40 skipped, 1 xfailed, ruff All checks passed!
+```
+
+**Leçons apprises (W-DEPLOY)** :
+- Aucun des deux bugs n'était couvert par la suite existante (0 test sur `setup_ollama`/`print_final`, 0 test sur le contenu copié par `_install_windows_zip`) — les audits go/nogo précédents (754→879 passed) portaient sur l'app FastAPI/tests unitaires, jamais sur un déploiement Windows réel de bout en bout. Un simulateur pytest ne peut pas attraper un bug qui ne se manifeste qu'au téléchargement réel d'une archive tierce.
+- Le pattern `_install_linux_tar` gérait déjà correctement `lib/ollama/` — le portage Windows (`_install_windows_zip`) avait été fait en copiant seulement l'exécutable, sans reprendre cette partie. Dette de cohérence entre les deux implémentations, jamais testée en miroir.
+- `get_ollama_path()` retombe silencieusement sur `shutil.which()` (PATH système) si rien n'est trouvé en portable — comportement voulu pour permettre l'usage d'un Ollama système, mais qui rend `setup_ollama()` "silencieusement non-portable" par défaut dès qu'un Ollama global existe sur le PC. Non corrigé ici (hors périmètre du blocage immédiat) : à surveiller si l'objectif "100% portable, zéro dépendance système" doit être strict.
+
+**Fichiers livrés (session, non encore commités)** : `services/ollama_installer.py`, `scripts/install.py`, `tests/test_windows_zip_lib_extraction.py`, `tests/test_install_final_message.py`
+
+**Prochaine micro-tâche** : rejouer le guide README de bout en bout sur le même PC avec les fichiers corrigés (téléchargement des 7 modèles restant à faire au moment de la rédaction), puis vérifier `curl /api/status` + `/api/agents` en conditions réelles.
+
+---
+
+## 🔧 W-DEPLOY-2 — README : 5 des 7 repos HF de pull modèles cassés — 07/08/2026
+
+> Suite directe de W-DEPLOY. Pendant le pull réel des 7 modèles sur le déploiement
+> Windows en cours, 3 échecs consécutifs sur 4 tentatives (voir preuves ci-dessous).
+> Décision de Michel : arrêter le debug live modèle par modèle, corriger le README
+> une bonne fois pour toutes en recherchant chaque repo avant de le publier.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| D2.1 | **Bug réel #1 (E2E)** : `hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` → `400 sharded GGUF, Ollama does not support this yet` (issue ollama/ollama#5245, toujours ouverte) | ✅ reproduit en réel |
+| D2.2 | **Bug réel #2 (E2E)** : `hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M` → `realm host "huggingface.co" does not match original host "hf.co"` (repo inexistant sous ce nom — le repo IBM officiel est `granite-4.1-8b-GGUF`, sans `-instruct`) | ✅ reproduit en réel |
+| D2.3 | **Bug réel #3 (E2E)** : `hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M` → même erreur `realm host` (repo existe mais tag/nommage incompatible avec le pull Ollama) | ✅ reproduit en réel |
+| D2.4 | **Recherche + correction des 7 repos** : chaque repo HF vérifié individuellement (fichier unique non-sharded, existence confirmée) avant remplacement dans le README | ✅ |
+| D2.5 | **RED** : `test_readme_hf_repos_no_longer_reference_broken_sources` + `test_readme_hf_repos_reference_verified_replacements` (`tests/test_readme_install_consistency.py`) → échouent sur l'ancien README | ✅ |
+| D2.6 | **GREEN** : README corrigé sur les 3 blocs (Windows §Étape 5, Linux, macOS) + tableaux de poids (2×) + note de traçabilité historique inline | ✅ |
+| D2.7 | **VERIFY** : suite complète → **884 passed / 0 failed / 40 skipped / 1 xfailed** (vs 882 avant, +2 tests), ruff clean | ✅ |
+
+**Repos corrigés (7)** :
+
+| Modèle | Repo cassé (README v5.6) | Repo corrigé | Vérification |
+|---|---|---|---|
+| Qwen2.5-7B-Instruct | `Qwen/Qwen2.5-7B-Instruct-GGUF` (sharded) | `bartowski/Qwen2.5-7B-Instruct-GGUF` | ✅ **pull réel réussi** (4,7 Go) |
+| Granite-4.1-8B | `ibm-granite/granite-4.1-8b-instruct-GGUF` (404) | `bartowski/ibm-granite_granite-4.1-8b-GGUF` | ✅ **pull réel réussi** (5,5 Go) |
+| DeepHat-V1-7B | `mradermacher/DeepHat-V1-7B-i1-GGUF` (tag invalide) | `GGUF-A-Lot/DeepHat-V1-7B-GGUF` | ✅ **pull réel réussi** (5,3 Go) |
+| Foundation-Sec-8B-Reasoning | `fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M` (repo par-quant, pas de tag générique ; pas de variante Q4_K_M publiée pour "Reasoning") | `fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` | ✅ **pull réel réussi** (8,5 Go) — poids révisé ~4,9→~8,5 Go |
+| Phi-4-mini-abliterated | `Melvin56/Phi-4-mini-instruct-abliterated-GGUF` | inchangé | ✅ **pull réel réussi** (2,5 Go) |
+| Llama-3.2-11B-Vision-Instruct | `bartowski/Llama-3.2-11B-Vision-Instruct-GGUF` (bartowski n'a jamais publié ce modèle vision — confirmé par son propre commentaire HF de 2024 : *"Llama.CPP can't run those vision models yet"*) | `leafspark/Llama-3.2-11B-Vision-Instruct-GGUF` | ✅ **pull réel réussi** (6,0 Go + 1,9 Go mmproj) |
+| nomic-embed-text-v2-moe | `nomic-ai/nomic-embed-text-v2-moe-GGUF` | inchangé | ✅ **pull réel réussi** (344 Mo) |
+
+**Leçons apprises (W-DEPLOY-2)** :
+- Les échecs de pull HF via Ollama se répartissent en 2 familles distinctes, à diagnostiquer différemment : (a) `sharded GGUF` = fichier multi-parties, incompatible par design avec `ollama pull hf.co/...` (limitation Ollama elle-même, pas corrigible côté JARVIS) ; (b) `realm host does not match` = repo/tag inexistant côté HF (faute de frappe ou repo jamais publié sous ce nom), corrigible en changeant de repo miroir (bartowski, GGUF-A-Lot, leafspark... republient couramment les mêmes poids en fichier unique).
+- Certains éditeurs (fdtn-ai) publient **un repo HF par niveau de quantization** au lieu d'un repo unique multi-tags — le pattern `hf.co/<repo>:<QUANT>` du reste du README ne s'applique pas tel quel, il faut alors viser directement le repo du quant voulu avec `:latest` ou le nom du quant en tag si le repo n'a qu'un seul fichier.
+- Écart assumé initialement pour 2 des 7 corrections (vérification "repo existe" par
+  recherche web, pas encore de pull réel) — **clos le jour même** : les 7 modèles ont
+  été pull réel avec succès sur le déploiement Windows en cours (H:\Projet-JARVIS),
+  y compris les 2 restants (`Foundation-Sec-8B-Reasoning-Q8_0`, `Llama-3.2-11B-Vision-Instruct`).
+
+**VERIFY final (E2E, 07/08/2026)** : 7/7 modèles téléchargés avec succès sur déploiement
+Windows réel — `Qwen2.5-7B-Instruct` (4,7 Go), `granite-4.1-8b` (5,5 Go), `DeepHat-V1-7B`
+(5,3 Go), `Foundation-Sec-8B-Reasoning-Q8_0` (8,5 Go), `phi-4-mini-instruct-abliterated`
+(2,5 Go), `Llama-3.2-11B-Vision-Instruct` (6,0 Go + 1,9 Go mmproj), `nomic-embed-text-v2-moe`
+(344 Mo) — digest SHA256 vérifié à chaque pull, aucun échec.
+
+**Fichiers livrés (session, non encore commités)** : `README.md`, `tests/test_readme_install_consistency.py` (2 tests ajoutés)
+
+**Prochaine micro-tâche** : lancer `launchers\JARVIS.bat`, vérifier `curl /api/status` +
+`/api/agents` en conditions réelles, puis contrôler que `config/model_sizes.json` /
+`services/selector.py` référencent bien les noms de modèles Ollama réellement présents
+(`ollama list`) et pas les anciens tags cassés — point de vigilance signalé en fin de
+W-DEPLOY-2, non encore vérifié.

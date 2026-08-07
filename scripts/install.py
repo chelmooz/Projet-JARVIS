@@ -148,8 +148,29 @@ def install_openwebui():
         return False
 
 
-def print_final():
-    """Print final."""
+def _portable_ollama_path():
+    """Retourne le chemin du binaire Ollama portable s'il existe sur la clé, sinon None."""
+    name = "ollama.exe" if SYSTEM == "windows" else "ollama"
+    subdirs = {"windows": [""], "linux": ["linux"], "darwin": ["mac"]}
+    for sub in subdirs.get(SYSTEM, [""]):
+        candidate = os.path.join(BASE_DIR, "bin", sub, name) if sub else os.path.join(BASE_DIR, "bin", name)
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def print_final(ollama_portable_path=None):
+    """Print final.
+
+    ollama_portable_path : chemin du binaire Ollama portable détecté sur la clé
+    (bin\\ollama.exe / bin/linux/ollama / bin/mac/ollama), ou None si absent —
+    auto-détecté si non fourni. CORRECTION : n'affiche plus "bin\\ollama.exe serve"
+    quand seul un Ollama système a été détecté par setup_ollama() (le binaire
+    portable n'existe alors pas encore sur la clé, la commande échouerait).
+    """
+    if ollama_portable_path is None:
+        ollama_portable_path = _portable_ollama_path()
+
     print()
     print(cyan("====================================================="))
     print(green("  Installation terminee !"))
@@ -162,10 +183,17 @@ def print_final():
     print("  Prochaines etapes :")
     print()
     if SYSTEM == "windows":
-        print(yellow("  1. Lancer Ollama :  bin\\ollama.exe serve"))
+        if ollama_portable_path:
+            print(yellow("  1. Lancer Ollama :  bin\\ollama.exe serve"))
+        else:
+            print(yellow("  1. Lancer Ollama :  ollama serve   (installation systeme detectee,"))
+            print(yellow("                       pas de binaire portable dans bin\\)"))
         print(yellow("  2. JARVIS Core   :  launchers\\JARVIS.bat"))
     else:
-        print(yellow("  1. Lancer Ollama :  ollama serve"))
+        if ollama_portable_path:
+            print(yellow(f"  1. Lancer Ollama :  {ollama_portable_path} serve"))
+        else:
+            print(yellow("  1. Lancer Ollama :  ollama serve   (installation systeme detectee)"))
         print(yellow("  2. JARVIS Core   :  ./launchers/jarvis.sh"))
     print()
 

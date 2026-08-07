@@ -156,7 +156,7 @@ Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script pyt
 | `Qwen2.5-7B-Instruct` | Polyvalent : raisonnement général, synthèse, suivi d'instructions complexes | Modèle **par défaut** — `@hardware` + profils orchestrateur/techlead/designer/datasecu | ~4,7 Go |
 | `Granite-4.1-8B` | Génération, refactoring et revue de code multi-langages | `@dev` (développement, scripting) | ~4,9 Go |
 | `DeepHat-V1-7B` | Offensive/Défensive, analyse de vulnérabilités, scripts de test d'intrusion | `@cyber` (sécurité offensive & défensive) | ~4,7 Go |
-| `Foundation-Sec-8B-Reasoning` | Analyse réseau, tri de logs SOC, modélisation de menaces et conformité | `@network` (infrastructure, analyse trafic & sécurité réseau) | ~4,9 Go |
+| `Foundation-Sec-8B-Reasoning` | Analyse réseau, tri de logs SOC, modélisation de menaces et conformité | `@network` (infrastructure, analyse trafic & sécurité réseau) | ~8,5 Go ⚠️ |
 | `phi-4-mini-instruct-abliterated` | **Léger & rapide**, tourne en CPU pur (0 VRAM), sans filtre (*abliterated*) | Profils **devops** (automatisation, parsing, scripts rapides) | ~2,6 Go |
 | `Llama-3.2-11B-Vision-Instruct` | **Multimodal** : analyse, compréhension et description d'images / schémas | `@vision` (analyse d'images et diagrammes) | ~7,0 Go |
 | `nomic-embed-text-v2-moe` | Transforme le texte en **vecteurs sémantiques** (768 dim.) | Recherche vectorielle / mémoire (RAG) — pas un agent de chat | ~0,6 Go |
@@ -310,24 +310,38 @@ Start-Sleep 3
 ### Étape 5 — Télécharger les 6 modèles d'IA
 
 ```bash
-.\bin\ollama.exe pull hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0
 .\bin\ollama.exe pull hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M
-.\bin\ollama.exe pull hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
+.\bin\ollama.exe pull hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
 ```
 
 > ⏳ C'est l'étape la plus longue (plusieurs Go à télécharger). À ne faire qu'une seule fois.
 > Si vous préférez utiliser la commande `ollama` globale (hors du dossier `bin\`), assurez-vous que `$env:OLLAMA_HOST="127.0.0.1:11436"` est défini — sinon elle cherchera sur le port 11434 par défaut et échouera.
 
+> 🔧 **Historique de correction (07/08/2026, déploiement réel testé sur Windows) :**
+> 5 des 7 repos Hugging Face d'origine étaient cassés — soit GGUF « sharded » non
+> supporté par Ollama (`Qwen/...`), soit repo introuvable/mal nommé
+> (`ibm-granite/...-instruct-GGUF`, `mradermacher/...-i1-GGUF`,
+> `bartowski/Llama-3.2-11B-Vision-Instruct-GGUF` — bartowski n'a jamais publié ce
+> modèle vision). Remplacés par des repos à fichier unique vérifiés.
+> Les 7 repos ont été **testés en pull réel avec succès** sur ce déploiement
+> (07/08/2026) : `Qwen2.5-7B-Instruct` (bartowski, 4,7 Go), `granite-4.1-8b`
+> (bartowski, 5,5 Go), `DeepHat-V1-7B` (GGUF-A-Lot, 5,3 Go),
+> `Foundation-Sec-8B-Reasoning` (fdtn-ai, en **Q8_0** — pas de Q4_K_M disponible
+> pour cette variante, d'où le poids plus élevé, 8,5 Go), `phi-4-mini-instruct-abliterated`
+> (Melvin56, 2,5 Go), `Llama-3.2-11B-Vision-Instruct` (leafspark, 6,0 Go + 1,9 Go
+> mmproj) et `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
+
 | Modèle | Ce qu'il fait le mieux | Poids |
 |---|---|---:|
 | `Qwen2.5-7B-Instruct` | Polyvalent (par défaut) — raisonnement, synthèse, @hardware + profils | ~4,7 Go |
 | `Granite-4.1-8B` | Code multi-langages — @dev | ~4,9 Go |
 | `DeepHat-V1-7B` | Sécurité offensive & défensive — @cyber | ~4,7 Go |
-| `Foundation-Sec-8B-Reasoning` | Analyse réseau & conformité — @network | ~4,9 Go |
+| `Foundation-Sec-8B-Reasoning` | Analyse réseau & conformité — @network | ~8,5 Go ⚠️ |
 | `phi-4-mini-instruct-abliterated` | Léger, tourne en CPU pur — profils devops | ~2,6 Go |
 | `Llama-3.2-11B-Vision-Instruct` | Analyse d'images (multimodal) — @vision | ~7,0 Go |
 | `nomic-embed-text-v2-moe` | Embeddings — recherche dans vos documents (RAG) | ~0,6 Go |
@@ -408,13 +422,13 @@ python3 -c "from services.launcher import ensure_ollama_binary; import logging; 
 chmod +x bin/linux/ollama
 OLLAMA_HOST=127.0.0.1:11436 OLLAMA_MODELS="$PWD/models/ollama" ./bin/linux/ollama serve &
 sleep 3
-# hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M est le MODÈLE PAR DÉFAUT (DEFAULT_MODEL) — à pull en priorité
-for m in hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
-  hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M \
-  hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M \
-  hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M \
+# hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M est le MODÈLE PAR DÉFAUT (DEFAULT_MODEL) — à pull en priorité
+for m in hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
+  hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M \
+  hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M \
+  hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0 \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
+  hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/linux/ollama pull "$m"
 done
@@ -462,12 +476,12 @@ chmod +x bin/mac/ollama
 
 OLLAMA_HOST=127.0.0.1:11436 OLLAMA_MODELS="$PWD/models/ollama" ./bin/mac/ollama serve &
 sleep 3
-for m in hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
-  hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M \
-  hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M \
-  hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M \
+for m in hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
+  hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M \
+  hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M \
+  hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0 \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
+  hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/mac/ollama pull "$m"
 done
