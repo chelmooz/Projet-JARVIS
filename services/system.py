@@ -16,6 +16,8 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
+from services.embeddable_python import enable_site_packages, is_site_enabled
+
 _logger = logging.getLogger(__name__)
 
 from config.paths import (  # noqa: E402  # avoid circular import
@@ -126,21 +128,42 @@ def _install_deps(python_path: str, requirements: str, log: Callable[..., Any]) 
     return True
 
 
-def ensure_venv(log: Callable[..., Any]) -> str:
+def ensure_venv(log: Callable[..., Any]) -> tuple[str, bool]:
     """Prépare l'interpréteur Python (venv ou direct) avec les dépendances.
 
     Args:
         log: Fonction de callback pour le logging.
 
     Returns:
-        Le chemin vers l'interpréteur Python configuré et prêt à l'emploi.
+        Un tuple ``(python_path, restart_required)``. ``restart_required``
+        est True quand l'interpréteur cible doit redémarrer pour que ses
+        changements prennent effet — soit parce que son fichier ``._pth``
+        vient d'être patché (site-packages activé : un embeddable ne relit
+        ce fichier qu'au démarrage), soit parce qu'un venv distinct de
+        l'interpréteur courant a été sélectionné.
     """
     selected_py = find_python()
     is_portable = selected_py in _portable_candidates()
     is_embeddable = _is_embeddable(selected_py)
+    restart_required = False
 
     if is_portable or is_embeddable:
         target_py = selected_py
+        if not is_site_enabled(target_py):
+            if enable_site_packages(target_py):
+                log(
+                    "Setup",
+                    "site-packages activé (._pth corrigé) — redémarrage requis",
+                    True,
+                )
+                restart_required = True
+            else:
+                log(
+                    "Setup",
+                    "Échec activation site-packages (._pth) : les dépendances "
+                    "installées resteront invisibles à l'import",
+                    False,
+                )
         log("Setup", "Python portable détecté — utilisation directe", True)
     else:
         target_py = _venv_python()
@@ -154,14 +177,14 @@ def ensure_venv(log: Callable[..., Any]) -> str:
             except OSError as exc:
                 log("Setup", f"Échec venv : Python incompatible ({exc.strerror})", False)
                 log("Setup", "Solution : installez Python 3.12+ depuis python.org", False)
-                return selected_py
+                return selected_py, False
 
             if r.returncode != 0:
                 err = r.stderr.strip()
                 log("Setup", f"Échec venv : {err}", False)
                 if "ensurepip" in err and sys.platform != "win32":
                     log("Setup", "Solution : sudo apt install python3-venv", False)
-                return selected_py
+                return selected_py, False
 
             log("Setup", "OK", True)
 
@@ -175,7 +198,7 @@ def ensure_venv(log: Callable[..., Any]) -> str:
         log("Setup", "Installation des dépendances...", None)
         _install_deps(target_py, REQUIREMENTS_FILE, log)
 
-    return target_py
+    return target_py, restart_required
 
 
 def get_ollama_path() -> str | None:

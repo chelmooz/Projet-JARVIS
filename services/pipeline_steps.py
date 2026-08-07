@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from config.agent_profiles import model_for_agent
+
 _logger = logging.getLogger("jarvis.pipeline_steps")
 
 
@@ -18,11 +20,24 @@ def select_agent(state: dict[str, Any], router: Any) -> dict[str, Any]:
 
 
 def select_model(agent_key: str, model: str | None, provider: Any) -> str:
+    """Résout le modèle à utiliser pour ``agent_key``.
+
+    Ordre de priorité : modèle explicite (déjà choisi par l'utilisateur) >
+    modèle configuré pour cet agent dans agent_profiles.json (résolu contre
+    les modèles réellement présents sur Ollama) > premier modèle disponible
+    capable de génération de texte, en dernier recours.
+
+    Note : ``resolve_model()`` attend un nom de modèle (ex. "qwen2.5"), pas
+    une clé d'agent (ex. "techlead") — d'où le passage par
+    ``model_for_agent()`` plutôt qu'un ``resolve(agent_key)`` direct, qui ne
+    matcherait jamais rien.
+    """
     if model:
         return model
     resolve = getattr(provider, "resolve_model", None)
     if resolve is not None:
-        resolved = resolve(agent_key)
+        configured = model_for_agent(agent_key)
+        resolved = resolve(configured) if configured else None
         if resolved:
             return resolved
     first = getattr(provider, "first_available", None)

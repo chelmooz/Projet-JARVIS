@@ -37,10 +37,14 @@ def bootstrap_dependencies(logger: logging.Logger) -> None:
     """Garantit que l'interpréteur courant a les dépendances requises.
 
     Provisionne via ensure_venv() (portable > venv > système) puis se
-    relance sur l'interpréteur choisi si nécessaire.
+    relance sur l'interpréteur choisi si nécessaire — soit parce qu'il
+    diffère de l'interpréteur courant, soit parce qu'ensure_venv() a dû
+    corriger un fichier ``._pth`` (embeddable Python) : celui-ci n'est
+    relu qu'au démarrage, donc même le MÊME interpréteur doit redémarrer
+    pour voir les paquets fraîchement installés.
     """
-    target_python = ensure_venv(to_step_logger(logger))
-    if _needs_relaunch(target_python):
+    target_python, restart_required = ensure_venv(to_step_logger(logger))
+    if restart_required or _needs_relaunch(target_python):
         _relaunch(target_python, logger)
 
 

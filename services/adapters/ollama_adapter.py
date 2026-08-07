@@ -27,7 +27,7 @@ class OllamaAdapter(LLMAdapter):
         self._http = httpx.Client(timeout=httpx.Timeout(30.0, connect=1.0))
         self._backend = "ollama"
         self._max_retries = max(1, int(max_retries))
-        self._models_cache: list[str] | None = None
+        self._models_cache: list[dict] | None = None
         self._models_cache_ts: float = 0.0
         self._timeout: int | None = None
         # CORRECTION : Flag pour éviter les requêtes après fermeture
@@ -165,21 +165,29 @@ class OllamaAdapter(LLMAdapter):
         except RuntimeError as e:
             return Result.fail(error=str(e), agent="system", model=model)
 
-    def _fetch_models(self) -> list[str]:
-        """Fetch models (cache 30s pour eviter 1 HTTP call par resolve_model)."""
+    def _fetch_models_raw(self) -> list[dict]:
+        """Fetch models avec métadonnées complètes (capabilities incluses).
+
+        Cache 30s partagé avec _fetch_models() pour eviter 1 HTTP call par
+        resolve_model()/first_available().
+        """
         now = time.time()
         if self._models_cache is not None and now - self._models_cache_ts < MODELS_CACHE_TTL:
             return self._models_cache
         try:
             client = self._get_http()
             r = client.get(f"{self._base_url}/api/tags", timeout=2)
-            models = [m["name"] for m in r.json().get("models", [])]
+            models = r.json().get("models", [])
         except Exception as e:
             _logger.warning("Liste modeles Ollama indisponible: %s", e)
             models = []
         self._models_cache = models
         self._models_cache_ts = now
         return models
+
+    def _fetch_models(self) -> list[str]:
+        """Fetch models (noms seulement) — cache partage avec _fetch_models_raw()."""
+        return [m["name"] for m in self._fetch_models_raw()]
 
     def list_models(self) -> list[str]:
         """List models."""
@@ -235,9 +243,19 @@ class OllamaAdapter(LLMAdapter):
         return None
 
     def first_available(self) -> str | None:
-        """First available."""
-        models = self._fetch_models()
-        return models[0] if models else None
+        """Premier modèle disponible capable de génération de texte.
+
+        Exclut les modèles embedding-only (ex: nomic-embed-text) : les
+        envoyer à /api/generate produit un 400 Bad Request côté Ollama
+        (capability "embedding" mais pas "completion"). Un modèle sans
+        champ "capabilities" (anciennes versions d'Ollama) est considéré
+        disponible par défaut — comportement historique préservé.
+        """
+        for entry in self._fetch_models_raw():
+            capabilities = entry.get("capabilities")
+            if capabilities is None or "completion" in capabilities:
+                return entry.get("name")
+        return None
 
     def embed(self, text: str, model: str | None = None) -> list[float]:
         model = model or "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"

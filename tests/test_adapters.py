@@ -44,8 +44,32 @@ class TestOllamaAdapter:
 
     def test_first_available_none_when_offline(self, monkeypatch):
         adapter = OllamaAdapter(base_url="http://localhost:99998")
-        monkeypatch.setattr(adapter, "_fetch_models", lambda: [])
+        monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [])
         assert adapter.first_available() is None
+
+    def test_first_available_skips_embedding_only_model(self, monkeypatch):
+        """Reproduction du bug réel : /api/tags renvoie le modèle embedding
+        en premier (dernier pulled) -> first_available() ne doit JAMAIS le
+        proposer pour /api/generate (400 Bad Request garanti côté Ollama)."""
+        adapter = OllamaAdapter(base_url="http://x")
+        monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [
+            {"name": "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M", "capabilities": ["embedding"]},
+            {"name": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", "capabilities": ["completion", "tools"]},
+        ])
+        assert adapter.first_available() == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+
+    def test_first_available_none_when_only_embedding_models(self, monkeypatch):
+        adapter = OllamaAdapter(base_url="http://x")
+        monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [
+            {"name": "embed-only", "capabilities": ["embedding"]},
+        ])
+        assert adapter.first_available() is None
+
+    def test_first_available_treats_missing_capabilities_as_available(self, monkeypatch):
+        """Backward compat : anciennes versions d'Ollama sans champ 'capabilities'."""
+        adapter = OllamaAdapter(base_url="http://x")
+        monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [{"name": "old-model"}])
+        assert adapter.first_available() == "old-model"
 
     def test_get_active_backend(self):
         adapter = OllamaAdapter(base_url="http://localhost:11436")

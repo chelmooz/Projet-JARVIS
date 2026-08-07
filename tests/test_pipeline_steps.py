@@ -9,7 +9,62 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-from services.pipeline_steps import query_model
+from services.pipeline_steps import query_model, select_model
+
+
+class TestSelectModel:
+    """RED → GREEN : select_model(agent_key, ...) ne doit jamais passer
+    agent_key directement à resolve_model() — ce n'est pas un nom de
+    modèle. Bug réel observé : "techlead"/"dev"/etc. ne matchent jamais
+    rien, le fallback first_available() tombe sur le 1er modèle de
+    /api/tags, potentiellement un modèle embedding-only -> 400 Bad
+    Request sur /api/generate en conditions réelles (clé USB, 07/08/2026).
+    """
+
+    def test_explicit_model_wins_over_everything(self):
+        provider = MagicMock()
+        assert select_model("techlead", "explicit-model", provider) == "explicit-model"
+        provider.resolve_model.assert_not_called()
+
+    def test_resolves_via_agent_profile_not_via_agent_key(self, monkeypatch):
+        import services.pipeline_steps as pipeline_steps_module
+        monkeypatch.setattr(
+            pipeline_steps_module, "model_for_agent",
+            lambda key: "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M" if key == "techlead" else None,
+        )
+        provider = MagicMock()
+        provider.resolve_model.side_effect = lambda name: name if name == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M" else None
+        provider.first_available.return_value = "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
+
+        result = select_model("techlead", None, provider)
+
+        assert result == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+        provider.resolve_model.assert_called_with("hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
+        provider.first_available.assert_not_called()
+
+    def test_falls_back_to_first_available_when_profile_unresolvable(self, monkeypatch):
+        import services.pipeline_steps as pipeline_steps_module
+        monkeypatch.setattr(pipeline_steps_module, "model_for_agent", lambda key: None)
+        provider = MagicMock()
+        provider.resolve_model.return_value = None
+        provider.first_available.return_value = "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+
+        result = select_model("techlead", None, provider)
+
+        assert result == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+
+    def test_raises_when_nothing_available(self, monkeypatch):
+        import services.pipeline_steps as pipeline_steps_module
+        monkeypatch.setattr(pipeline_steps_module, "model_for_agent", lambda key: None)
+        provider = MagicMock()
+        provider.resolve_model.return_value = None
+        provider.first_available.return_value = None
+
+        try:
+            select_model("techlead", None, provider)
+            raise AssertionError("devrait lever RuntimeError")
+        except RuntimeError:
+            pass
 
 
 class _RecordingAgent:

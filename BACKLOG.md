@@ -903,3 +903,135 @@ que `bootstrap_dependencies()` installe bien fastapi/uvicorn/etc. dans
 `portable_python\win\` et que JARVIS démarre jusqu'à `http://localhost:8000`.
 Corriger ensuite D4.2 (`Logger` non-callable dans `ensure_ollama_binary`) si un
 déploiement sans binaire Ollama pré-livré est un scénario à couvrir.
+
+---
+
+## 🔧 W-DEPLOY-5 — `ModuleNotFoundError: uvicorn` persistant malgré install "OK" — 07/08/2026
+
+> Suite directe de W-DEPLOY-4. Rejeu réel sur H:\Projet-JARVIS avec le refacto SRP
+> en place : `bootstrap_dependencies()` tourne, log "[Setup] OK" après ~67s
+> d'installation pip réussie — mais `import uvicorn` échoue quand même juste
+> après, dans le même process. Cause racine différente de W-DEPLOY-4 : le
+> `._pth` de la distribution Python embeddable désactive `site-packages`.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| D5.1 | **Bug réel (E2E)** : `logs\jarvis_core.log` → `ModuleNotFoundError: No module named 'uvicorn'` sur `jarvis.py:95` (`import uvicorn`), **après** un log `[Setup] OK` de `bootstrap_dependencies()` confirmant une installation pip réussie (67s, "pip mis à jour avec succès" + "OK") | ✅ reproduit en réel |
+| D5.2 | **Diagnostic** : `portable_python\win\` est une distribution Python **embeddable** officielle (`scripts/install_portable_python.py` télécharge `python-3.12.10-embed-amd64.zip`). Ces distributions livrent un fichier `pythonXXX._pth` qui désactive `site` par défaut → `Lib\site-packages` n'est **jamais** ajouté à `sys.path`, même après un `pip install` réussi. Le projet avait déjà une fonction pour patcher ce fichier (`enable_site_packages` dans `install_portable_python.py`), mais elle n'est appelée que lors d'une installation manuelle via ce script — jamais par `ensure_venv()` au démarrage normal de `jarvis.py` | ✅ cause racine identifiée |
+| D5.3 | **RED** : reproduction fidèle — dossier "embeddable" factice avec `._pth` contenant `#import site` (commenté) → `is_site_enabled()` retourne `False`, confirmant que le scénario réel est bien reproduit avant correctif | ✅ |
+| D5.4 | **GREEN — nouveau module SRP** : `services/embeddable_python.py` (responsabilité unique : lire/patcher le `._pth` — `is_site_enabled()`, `enable_site_packages()`, idempotents, ne connaissent rien de venv/pip/du cycle de vie du process) | ✅ |
+| D5.5 | **GREEN — intégration** : `services/system.py::ensure_venv()` appelle `enable_site_packages()` avant toute installation quand l'interpréteur est portable/embeddable ; **changement de signature** — retourne désormais `tuple[str, bool]` (`python_path`, `restart_required`) au lieu d'un simple `str`, car un `._pth` fraîchement patché n'est relu qu'au **redémarrage** de l'interpréteur (patcher le fichier sur disque ne change rien au `sys.path` du process déjà en cours) | ✅ |
+| D5.6 | **GREEN — propagation** : `services/dependency_bootstrap.py::bootstrap_dependencies()` déclenche désormais la relance (`os.execv`) sur `restart_required OR chemin différent` — auparavant seule la différence de chemin déclenchait une relance, ce qui ratait exactement le cas embeddable (même chemin, mais redémarrage quand même nécessaire) | ✅ |
+| D5.7 | **VERIFY** : `import jarvis` toujours safe ; preuve intégrée — `ensure_venv()` mocké avec `._pth` désactivé → retourne bien `restart_required=True` et log "site-packages activé (._pth corrigé) — redémarrage requis" ; `bootstrap_dependencies()` mocké sur les 3 scénarios (même interpréteur sans patch → pas de relance ; interpréteur différent → relance ; même interpréteur mais `restart_required=True` → relance quand même) → passent ; suite complète → **892 passed / 1 failed (même faux positif préexistant) / 40 skipped / 1 xfailed** (vs 882 avant, +10 tests), ruff clean | ✅ |
+
+**Preuve D5** :
+```
+RED  : is_site_enabled(embeddable factice, #import site) → False (reproduit le bug)
+GREEN: enable_site_packages(...)                          → True, "#import site" → "import site"
+GREEN: is_site_enabled(...) après patch                   → True
+GREEN: ensure_venv() avec ._pth désactivé (mocké)          → (python_path, restart_required=True)
+GREEN: bootstrap_dependencies() avec restart_required=True → os.execv appelé (même si même chemin)
+GREEN: bootstrap_dependencies() cas nominal (déjà activé)  → os.execv non appelé
+Suite complète : 892 passed, 40 skipped, 1 xfailed, 1 failed (préexistant, hors périmètre), ruff clean
+```
+
+**Leçons apprises (W-DEPLOY-5)** :
+- Un `pip install` qui retourne `returncode == 0` ("OK" dans les logs) ne garantit
+  **pas** que les paquets installés seront importables dans le process appelant —
+  piège classique des distributions embeddable Windows, invisible dans n'importe
+  quel test qui ne recrée pas un vrai fichier `._pth` désactivé.
+- Le projet avait déjà la bonne fonction (`enable_site_packages` dans
+  `scripts/install_portable_python.py`) mais elle n'était câblée que sur le chemin
+  d'installation manuelle, jamais sur le chemin de démarrage normal
+  (`jarvis.py` → `ensure_venv()`). Une fonction correcte mais non appelée au bon
+  endroit produit exactement le même symptôme qu'une fonction absente.
+- Un fichier `._pth` n'est lu **qu'au démarrage** de l'interpréteur embeddable — le
+  patcher sur disque en cours d'exécution ne change rien au `sys.path` déjà résolu
+  du process courant. D'où la nécessité d'élargir la condition de relance dans
+  `dependency_bootstrap.py` : chemin différent **OU** drapeau explicite
+  `restart_required`, sans quoi ce cas précis (même interpréteur, mais tout juste
+  patché) ne redémarre jamais et le `ModuleNotFoundError` persiste malgré le "OK".
+
+**Fichiers livrés (session, non encore commités)** : `services/embeddable_python.py`
+(nouveau), `services/system.py` (modifié — signature `ensure_venv` changée),
+`services/dependency_bootstrap.py` (modifié), `tests/test_embeddable_python.py`
+(nouveau, 7 tests), `tests/test_dependency_bootstrap.py` (nouveau, 3 tests).
+
+**Prochaine micro-tâche** : `git add` + commit + push, puis relancer
+`launchers\JARVIS.bat` sur H:\Projet-JARVIS. Attendu cette fois : le premier
+lancement patche le `._pth`, log "redémarrage requis", se relance automatiquement
+(transparent pour l'utilisateur), et JARVIS démarre jusqu'à `http://localhost:8000`.
+Si un `ModuleNotFoundError` persistait malgré tout, vérifier manuellement le
+contenu de `portable_python\win\python312._pth` sur la clé pour confirmer que le
+patch a bien été écrit sur disque (droits d'écriture sur la clé USB à vérifier).
+
+---
+
+## 🔧 W-DEPLOY-6 — 400 Bad Request sur `/api/generate` (question posée via l'UI web) — 07/08/2026
+
+> Suite directe de W-DEPLOY-5 : JARVIS démarre enfin jusqu'à `http://localhost:8000`
+> (fix `._pth` confirmé fonctionnel). Première question posée via l'interface web
+> → `"Une erreur est survenue : Ollama echec apres 3 tentative(s) ... 400 Bad
+> Request"`. Deux bugs réels empilés, retrouvés via `logs\ollama.log` (GIN 400 sur
+> `/api/generate`, juste après un `/api/embed` réussi) + `curl /api/tags`.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| D6.1 | **Bug réel #1 (root cause)** : `services/pipeline_steps.py::select_model()` appelle `provider.resolve_model(agent_key)` — passe la **clé d'agent** ("techlead", "dev", "network"...) là où `resolve_model()` attend un **nom de modèle**. Aucune clé d'agent ne matche jamais un tag Ollama → le fallback `first_available()` est systématiquement atteint, pour n'importe quel agent | ✅ reproduit (RED) |
+| D6.2 | **Bug réel #2 (aggravant)** : `services/adapters/ollama_adapter.py::first_available()` renvoyait `models[0]` sans filtrer par capacité. Sur cette clé, `/api/tags` liste `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` (capability `["embedding"]` seulement) en premier — c'est le modèle **le plus récemment pull**, Ollama semble trier par `modified_at` décroissant. Résultat : le fallback renvoyait un modèle embedding-only à `/api/generate`, qu'Ollama rejette légitimement en 400 | ✅ reproduit (RED) |
+| D6.3 | **Découverte annexe (non exploitée, hors périmètre)** : `config/__init__.py::get_agent_profiles()` attend `agent_profiles.json` sous forme de **liste** avec un champ `"key"` par profil, alors que le fichier réel est un **dict** `{"profiles": {"<key>": {...}}}` (même format que celui déjà lu correctement par `agents/base.py::_load_profile`). Cette fonction planterait si elle était appelée — mais elle est **dead code**, jamais invoquée en production (vérifié par grep exhaustif). Non corrigée cette session (pas sur le chemin du bug réel) | ⚠️ notée, non corrigée |
+| D6.4 | **RED** : reproduction fidèle — `select_model("techlead", None, provider_mock)` avec `resolve_model` échouant toujours (comme sur la clé) → renvoie bien le modèle embedding, confirmant D6.1 ; `first_available()` avec `/api/tags` mocké dans l'ordre observé sur la clé (embedding en premier) → renvoie bien le modèle embedding, confirmant D6.2 | ✅ |
+| D6.5 | **GREEN — nouveau module** : `config/agent_profiles.py` (`model_for_agent(agent_key)`, responsabilité unique : lire le `"model"` configuré pour un agent dans `agent_profiles.json`, dégradation gracieuse si fichier absent/corrompu — ne duplique pas le cache mtime riche de `agents/base.py::_load_profile`, juste l'accès minimal nécessaire aux appelants sans instance `BaseAgent`) | ✅ |
+| D6.6 | **GREEN — fix D6.1** : `select_model()` résout désormais `model_for_agent(agent_key)` puis `provider.resolve_model(<modèle configuré>)`, au lieu de `resolve_model(agent_key)` directement | ✅ |
+| D6.7 | **GREEN — fix D6.2** : `OllamaAdapter` gagne `_fetch_models_raw()` (cache 30s partagé, dicts complets avec `capabilities`) ; `_fetch_models()` en dérive les noms (comportement externe inchangé) ; `first_available()` filtre désormais sur la capability `"completion"` (ou absence du champ `capabilities`, pour compat avec anciennes versions d'Ollama), et saute tout modèle embedding-only | ✅ |
+| D6.8 | **VERIFY** : `import jarvis` toujours safe ; 3 reproductions RED confirmées puis GREEN après fix (`select_model` via profil réel `techlead` → bon tag Qwen2.5, fallback jamais atteint ; `first_available` saute l'embedding, renvoie le premier modèle `completion` ; cas limites `first_available` : que des modèles embedding → `None` sans crash, champ `capabilities` absent → considéré disponible) ; 11 nouveaux tests (`test_agent_profiles_config.py` ×4, `TestSelectModel` ×4 dans `test_pipeline_steps.py`, `TestOllamaAdapter` ×3 dans `test_adapters.py`, 1 test existant adapté) ; suite complète → **903 passed / 1 failed (même faux positif préexistant) / 40 skipped / 1 xfailed** (vs 892 avant, +11), ruff clean | ✅ |
+
+**Preuve D6** :
+```
+RED  : select_model("techlead", None, provider) avec resolve_model(agent_key) qui échoue
+       toujours -> "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M" (bug confirmé)
+GREEN: select_model("techlead", None, provider) avec le vrai agent_profiles.json
+       -> "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", first_available() jamais appelé
+
+RED  : first_available() avec /api/tags = [embedding, completion] (ordre observé sur la clé)
+       -> renvoie le modèle embedding (bug confirmé)
+GREEN: first_available() même liste -> saute l'embedding, renvoie le modèle completion
+GREEN: first_available() que des modèles embedding -> None (pas de crash)
+GREEN: first_available() sans champ 'capabilities' -> considéré disponible (backward compat)
+
+Suite complète : 903 passed, 40 skipped, 1 xfailed, 1 failed (préexistant, hors périmètre), ruff clean
+```
+
+**Leçons apprises (W-DEPLOY-6)** :
+- Deux bugs indépendants peuvent se **masquer l'un l'autre en apparence** : D6.1 seul
+  aurait pu passer inaperçu si `first_available()` avait eu la bonne heuristique
+  (n'importe quel modèle *completion* aurait alors été choisi par accident, et la
+  requête aurait fonctionné malgré la mauvaise raison). C'est l'ordre de pull des 7
+  modèles (embedding en dernier, donc trié en premier par Ollama) qui a rendu le
+  bug D6.1 visible en le combinant à D6.2. Corriger uniquement le symptôme visible
+  (D6.2) aurait laissé D6.1 dormant, prêt à ressurgir dès qu'un nouveau modèle
+  embedding serait pull en dernier.
+- `agent_profiles.json` a **deux lecteurs incompatibles** dans le code : le bon
+  (`agents/base.py::_load_profile`, dict sous `"profiles"`) et un mort mais
+  buggé (`config/__init__.py::get_agent_profiles()`, attend une liste). Un lecteur
+  jamais appelé ne casse jamais rien en pratique — mais laisse un piège pour la
+  prochaine personne qui l'utilisera en pensant qu'il est fonctionnel. À nettoyer
+  ou corriger un jour (D6.3, hors périmètre de cette session).
+- `first_available()` est un **fallback de dernier recours** : son contrat implicite
+  ("un modèle qui marche pour générer du texte") n'était pas vérifié par le code,
+  seulement par la chance de l'ordre des modèles installés. Un fallback doit
+  respecter le même contrat que le chemin nominal, sinon il n'est fiable que par
+  accident.
+
+**Fichiers livrés (session, non encore commités)** : `config/agent_profiles.py`
+(nouveau), `services/pipeline_steps.py` (modifié), `services/adapters/ollama_adapter.py`
+(modifié), `tests/test_agent_profiles_config.py` (nouveau, 4 tests),
+`tests/test_pipeline_steps.py` (modifié, +4 tests `TestSelectModel`),
+`tests/test_adapters.py` (modifié, +3 tests, 1 adapté).
+
+**Prochaine micro-tâche** : `git add` + commit + push (avec le fix `._pth` de
+W-DEPLOY-5, toujours pas poussé à ce stade), puis relancer `launchers\JARVIS.bat`
+et reposer une question via l'UI web. Attendu : la question est traitée par le
+modèle configuré pour l'agent (Qwen2.5 pour techlead/orchestrateur/etc.), plus
+d'erreur 400. Nettoyer D6.3 (`get_agent_profiles()` dead code buggé) dans une
+session ultérieure si cette fonction doit un jour être utilisée.
