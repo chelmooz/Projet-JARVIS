@@ -299,6 +299,14 @@ textarea:focus-visible,
 .tools-key { color: var(--text-dim); font-family: monospace; }
 .tools-val { color: var(--text); font-family: monospace; }
 .tools-empty { text-align: center; color: var(--text-mute); padding: 60px; font-size: 14px; }
+.tools-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.tool-action-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--t); }
+.tool-action-btn:hover { filter: brightness(1.15); }
+.tool-action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tools-actions-hint { font-size: 11px; color: var(--text-dim); }
+.consent-status { font-size: 12px; margin-top: 8px; }
+.consent-ok { color: #66ee88; }
+.consent-warn { color: #ffcc66; }
 
 /* --- Toast --- */
 .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }

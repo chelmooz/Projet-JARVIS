@@ -406,6 +406,52 @@ class TestBackend:
         assert "models" in data
 
 
+class TestDiagnosticConsent:
+    """Endpoints consentement diagnostic externe (witr, psinfo, ...).
+
+    Le service est ré-instancié par la route avec des chemins réels : on
+    monkeypatch la factory de la route vers un fichier de consentement
+    temporaire pour ne jamais toucher config/.diagnostic_consent.
+    """
+
+    def _patch_service(self, tmp_path, monkeypatch):
+        import controllers.routes.diagnostic_ext as de_routes
+        from services.diagnostic_ext import DiagnosticExtService
+
+        consent_file = tmp_path / ".diagnostic_consent"
+        monkeypatch.setattr(
+            de_routes, "_diag_ext_service",
+            lambda: DiagnosticExtService(consent_file=str(consent_file)),
+        )
+        return consent_file
+
+    def test_get_consent_returns_false_when_file_absent(self, tmp_path, monkeypatch):
+        self._patch_service(tmp_path, monkeypatch)
+        resp = client.get("/api/diagnostic/consent")
+        assert resp.status_code == 200
+        assert resp.json()["consent_given"] is False
+
+    def test_post_consent_true_creates_file(self, tmp_path, monkeypatch):
+        consent_file = self._patch_service(tmp_path, monkeypatch)
+        resp = client.post("/api/diagnostic/consent", json={"consent": True})
+        assert resp.status_code == 200
+        assert resp.json()["consent_given"] is True
+        assert consent_file.exists()
+
+    def test_post_consent_false_removes_file(self, tmp_path, monkeypatch):
+        consent_file = self._patch_service(tmp_path, monkeypatch)
+        consent_file.write_text("consent granted 2026-01-01\n", encoding="utf-8")
+        resp = client.post("/api/diagnostic/consent", json={"consent": False})
+        assert resp.status_code == 200
+        assert resp.json()["consent_given"] is False
+        assert not consent_file.exists()
+
+    def test_post_consent_invalid_body_rejected(self, tmp_path, monkeypatch):
+        self._patch_service(tmp_path, monkeypatch)
+        resp = client.post("/api/diagnostic/consent", json={})
+        assert resp.status_code == 422
+
+
 class TestJarvisInfo:
     def test_jarvis_info(self):
         resp = client.get("/api/jarvis")

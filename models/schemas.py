@@ -116,6 +116,18 @@ class FindFilesRequest(_StrictModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Diagnostic externe
+# ---------------------------------------------------------------------------
+
+class ConsentRequest(_StrictModel):
+    """Modification du consentement diagnostic externe (witr, psinfo, ...)."""
+
+    consent: bool = Field(
+        description="True pour accorder l'exécution des outils, False pour la retirer",
+    )
+
+
 __all__ = [
     "AssignRequest",
     "JarvisRequest",
@@ -126,4 +138,5 @@ __all__ = [
     "AuthorizePathRequest",
     "FilePathRequest",
     "FindFilesRequest",
+    "ConsentRequest",
 ]

@@ -1044,7 +1044,7 @@ session ultérieure si cette fonction doit un jour être utilisée.
 
 | # | Micro-tâche | Statut |
 |---|-------------|--------|
-| AUDIT.1 | **Consentement diagnostic_ext — endpoint réel** : ajouter `POST /api/diagnostic/consent` → `DiagnosticExtService.grant_consent()` (services/diagnostic_ext/service.py:72). Le fichier `.diagnostic_consent` devient mécanisme d'urgence seulement. Documenter que `ensure_consent()` n'est pas un vrai contrôle d'accès (gate décoratif : `os.path.exists` contournable en 1 ligne). | ⏳ TODO |
+| AUDIT.1 | **Consentement diagnostic_ext — endpoint réel** : ajouter `POST /api/diagnostic/consent` → `DiagnosticExtService.grant_consent()` (services/diagnostic_ext/service.py:72). Le fichier `.diagnostic_consent` devient mécanisme d'urgence seulement. Documenter que `ensure_consent()` n'est pas un vrai contrôle d'accès (gate décoratif : `os.path.exists` contournable en 1 ligne). | ✅ livré (F-DIAG-1, 07/08/2026) |
 | AUDIT.2 | **Fixture `_restore_ctx` — teardown sans side-effects réseau** : `tests/test_api.py:121-125` appelle `ctx._ctx.initialize()` qui instancie `InferenceService` (tente Ollama 11436), `VectorService`, etc. Remplacer par `AppContext()` vierge sans `_do_initialize()` ou supprimer le rappel (mocks réappliqués au setup suivant via `autouse`). Objectif : tests rapides, déterministes, sans dépendance machine. | ⏳ TODO |
 | AUDIT.3 | **Mémoire vectorielle polluée — documentation hypothèse** : taille 39 KB `vector_index.json` corrélée à "réponse d'hier" = hypothèse sans test de régression (contaminé → nettoyé → non contaminé). Noter comme "nettoyage empirique acceptable en dépannage" — **ne pas classer root cause confirmée** sans repro. Si récurrence → ajouter test d'intégration `test_vector_index_isolation`. | 📝 NOTÉ |
 
@@ -1053,3 +1053,22 @@ session ultérieure si cette fonction doit un jour être utilisée.
 controllers/routes/agents.py:142 → strip_data_uri(image) appelé avant vision_agent.run()
 tests/test_api.py:244-272 → test_vision_strips_data_uri_prefix_before_agent (spy valide)
 ```
+
+---
+
+## 🔧 F-DIAG — Frontend diagnostic étendu : consent API + boutons witr/psinfo (07/08/2026)
+
+> Décision design (senior) : **pas d'endpoint d'exécution direct** pour witr — les
+> boutons de l'onglet Outils pré-remplissent le chat (réutilise Toolbox/agent existant,
+> KISS). Le consentement devient un vrai point d'entrée API (AUDIT.1) avec toggle UI.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| F1.1 | **RED** : 4 tests consent API (`tests/test_api.py::TestDiagnosticConsent`) — GET état absent → False ; POST true → fichier créé + True ; POST false → fichier supprimé + False ; body vide → 422. Service monkeypatché vers tmpdir (jamais `config/.diagnostic_consent`) | ✅ |
+| F1.2 | **GREEN** : `services/diagnostic_ext/service.py` → `revoke_consent()` (suppression fichier, FileNotFoundError toléré, audit log) ; `models/schemas.py` → `ConsentRequest(consent: bool)` ; `controllers/routes/diagnostic_ext.py` (GET état via `ensure_consent()`, POST grant/revoke, réponse = état réel après opération, 500 si échec) ; monté dans `controllers/router.py` | ✅ |
+| F1.3 | **Frontend toggle** : `static/index.html` → groupe Settings « Diagnostic externe » (toggle `.toggle` existant + `#consent-status`) ; `static/assets/js/app.js` → `restoreConsentState()`, `setConsentStatus()`, handler POST change ; appelé au boot | ✅ |
+| F2.1 | **Boutons Outils** : `refreshTools()` → barre `.tools-actions` avec « 🔍 Analyser un processus (witr) » (prompt nom/port → `pourquoi le processus X tourne`) + « 📊 État système détaillé (psinfo) » (→ `état détaillé du système`) ; `switchToChat(text)` bascule sur l'onglet chat + pré-remplit + focus | ✅ |
+| F2.2 | **Fix bug rendu `[object Object]`** : BINARIES/NETWORK.ports affichés « [object Object] » → pretty-print JSON des valeurs objets/tableaux (`typeof === 'object'`) | ✅ |
+| F3.1 | **CSS** : `.tools-actions`, `.tool-action-btn`, `.tools-actions-hint`, `.consent-status`/`.consent-ok`/`.consent-warn` (style.css, cohérent avec design system existant) | ✅ |
+| F3.2 | **README** : section « Outils de diagnostic étendu » (tableau outils/déclencheurs, prérequis consentement + binaires, distinction onglet Outils vs chat) + note sur l'onglet Outils | ✅ |
+| F3.3 | **VERIFY** : `pytest tests/test_api.py` → vert (consent + suite) ; `ruff check` ; suite complète sans régression | ✅ |

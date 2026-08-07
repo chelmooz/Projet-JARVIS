@@ -479,12 +479,39 @@ async function refreshTools() {
             const section = data[key] || {};
             let items = '';
             for (const [k, v] of Object.entries(section)) {
-                items += `<div class="tools-item"><span class="tools-key">${k}</span><span class="tools-val">${escHtml(String(v))}</span></div>`;
+                // Les valeurs imbriquées (liste binaires, ports) étaient rendues
+                // "[object Object]" — pretty-print JSON pour les objets/tableaux.
+                const val = (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
+                items += `<div class="tools-item"><span class="tools-key">${k}</span><span class="tools-val">${escHtml(val)}</span></div>`;
             }
             return `<div class="tools-section"><h4>${key.toUpperCase()}</h4><div class="tools-items">${items}</div></div>`;
         }).join('');
+        const actions = document.createElement('div');
+        actions.className = 'tools-actions';
+        actions.innerHTML =
+            '<button class="tool-action-btn" id="btn-tool-witr">🔍 Analyser un processus (witr)</button>' +
+            '<button class="tool-action-btn" id="btn-tool-psinfo">📊 État système détaillé (psinfo)</button>' +
+            '<span class="tools-actions-hint">Ouvre le chat avec la commande pré-remplie</span>';
+        grid.appendChild(actions);
+        document.getElementById('btn-tool-witr').addEventListener('click', () => {
+            const target = prompt('Nom du processus ou port (ex: explorer, 8080) :');
+            if (target) switchToChat(`pourquoi le processus ${target} tourne`);
+        });
+        document.getElementById('btn-tool-psinfo').addEventListener('click', () => {
+            switchToChat('état détaillé du système');
+        });
     } catch (e) {
         grid.innerHTML = '<div class="tools-empty">Erreur: ' + escHtml(e.message) + '</div>';
+    }
+}
+
+function switchToChat(text) {
+    document.querySelector('.tab-btn[data-tab="chat"]')?.click();
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = text;
+        input.focus();
+        autoResize(input);
     }
 }
 
@@ -1042,6 +1069,53 @@ function applyOfflineState(offline) {
     if (sendBtn) sendBtn.disabled = !!offline;
 }
 
+// --- Diagnostic externe : consentement des outils (witr, psinfo, ...) ---
+function setConsentStatus(given) {
+    const el = document.getElementById('consent-status');
+    if (!el) return;
+    if (given === null) {
+        el.textContent = '';
+        el.className = 'consent-status';
+    } else if (given) {
+        el.textContent = '✅ Consentement accordé — les outils externes peuvent s\'exécuter';
+        el.className = 'consent-status consent-ok';
+    } else {
+        el.textContent = '⚠️ Consentement refusé — les outils externes sont bloqués';
+        el.className = 'consent-status consent-warn';
+    }
+}
+
+async function restoreConsentState() {
+    try {
+        const resp = await fetch('/api/diagnostic/consent');
+        const data = await resp.json();
+        document.getElementById('s-diagnostic-consent').checked = !!data.consent_given;
+        setConsentStatus(!!data.consent_given);
+    } catch (e) {
+        setConsentStatus(null);
+    }
+}
+
+document.getElementById('s-diagnostic-consent').addEventListener('change', async e => {
+    const wanted = e.target.checked;
+    try {
+        const resp = await fetch('/api/diagnostic/consent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ consent: wanted }),
+        });
+        const data = await resp.json();
+        const applied = !!data.consent_given;
+        e.target.checked = applied;
+        setConsentStatus(applied);
+        if (applied !== wanted) toast('Consentement inchangé (échec serveur)', 'error');
+    } catch (err) {
+        e.target.checked = !wanted;
+        setConsentStatus(!wanted);
+        toast('Erreur consentement : ' + err.message, 'error');
+    }
+});
+
 async function restoreSettings() {
     try {
         const resp = await fetch('/api/settings');
@@ -1063,6 +1137,7 @@ async function restoreSettings() {
 }
 
 restoreSettings();
+restoreConsentState();
 refreshSkills();
 
 // --- File Path authorization ---

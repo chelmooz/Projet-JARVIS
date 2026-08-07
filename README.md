@@ -382,6 +382,41 @@ Dans le navigateur (`http://localhost:8000`), l'onglet **🔧 Outils** affiche u
 matériel en direct (CPU, RAM, GPU, disque, réseau) — pratique pour confirmer que JARVIS voit
 bien votre configuration réelle.
 
+> ℹ️ **Onglet Outils vs outils externes** : l'onglet 🔧 Outils est un **inventaire statique**
+> de la machine (via `GET /api/diag`). Les outils de **diagnostic étendu** (witr, psinfo, ...)
+> s'exécutent dans le chat (section ci-dessous).
+
+### 🔧 Outils de diagnostic étendu (witr, psinfo, ...)
+
+JARVIS embarque des binaires portables (Sysinternals, witr) pour l'analyse comportementale
+de la machine. Ils sont déclenchés par des **mots-clés naturels dans le chat**, ou via les
+boutons **Analyser un processus** / **État système détaillé** de l'onglet 🔧 Outils
+(qui pré-remplissent la commande dans le chat).
+
+| Outil | Déclencheur chat | Fonction |
+|-------|------------------|----------|
+| **witr** | « pourquoi le processus X tourne » / « why running X » | Ancestry processus/port/service (PID, PPID, user, commande) |
+| **psinfo** | « état détaillé du système » / « info systeme » | Informations système (uptime, patches, version) |
+| **psloglist** | « journaux Windows » / « evenements » | Lecture des logs Windows (System, Application, Security) |
+| **handle** | « handles ouverts » / « processus X » | Handles fichiers/registre par processus |
+| **psping** | « ping X » / « latence reseau » | Test de latence TCP/ICMP |
+| **psservice** | « services Windows » / « services » | État des services Windows |
+
+**Prérequis (une seule fois) :**
+
+1. **Consentement** : à accorder via l'onglet **Réglages → Diagnostic externe** (toggle),
+   ou manuellement :
+   ```powershell
+   echo consent > config\.diagnostic_consent
+   ```
+2. **Binaires** présents dans `bin\diagnostic\win\` (`witr.exe`, `psinfo.exe`,
+   `psloglist.exe`, `handle.exe`, `psping.exe`, `psservice.exe`) — fournis sur la clé USB /
+   dans la release.
+
+Sans consentement, les outils se bloquent proprement (« Consentement non donné ») :
+c'est un garde-fou **local mono-utilisateur** (fichier texte), pas un contrôle d'accès
+multi-utilisateur.
+
 ---
 
 <details>

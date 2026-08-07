@@ -36,6 +36,7 @@ from controllers.routes import beta_dashboard as beta_dashboard_routes  # noqa: 
 from controllers.routes import code_review as code_review_routes  # noqa: E402  # avoid circular import
 from controllers.routes import conversations as conv_routes  # noqa: E402  # avoid circular import
 from controllers.routes import diagnostic as diagnostic_routes  # noqa: E402  # avoid circular import
+from controllers.routes import diagnostic_ext as diagnostic_ext_routes  # noqa: E402  # avoid circular import
 from controllers.routes import documents as doc_routes  # noqa: E402  # avoid circular import
 from controllers.routes import files as files_routes  # noqa: E402  # avoid circular import
 from controllers.routes import jarvis as jarvis_routes  # noqa: E402  # avoid circular import
@@ -205,6 +206,7 @@ def create_app() -> FastAPI:
         agents_routes.router,
         conv_routes.router,
         diagnostic_routes.router,
+        diagnostic_ext_routes.router,
         doc_routes.router,
         analytics_routes.router,
         files_routes.router,

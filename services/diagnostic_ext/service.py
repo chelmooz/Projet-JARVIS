@@ -82,6 +82,19 @@ class DiagnosticExtService:
             audit_log(self._log, "ERROR", f"Échec consentement: {e}")
             return False
 
+    def revoke_consent(self) -> bool:
+        """Retire le consentement (supprime le fichier CONSENT_FILE)."""
+        try:
+            os.remove(self._consent_file)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            audit_log(self._log, "ERROR", f"Échec retrait consentement: {e}")
+            return False
+        self._consent_given = False
+        audit_log(self._log, "CONSENT", "Consentement diagnostic retiré")
+        return True
+
     def _run_tool(
         self,
         tool_name: str,
