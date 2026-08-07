@@ -190,7 +190,7 @@ class OllamaAdapter(LLMAdapter):
         """Extrait le nom de dépôt d'un tag Ollama (suffixe -gguf retiré).
 
         'hf.co/org/Repo-GGUF:Q4_K_M'     -> 'repo'
-        'hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M' -> 'qwen2.5-7b-instruct'
+        'hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M' -> 'qwen2.5-7b-instruct'
         """
         name = tag.rsplit("/", 1)[-1].lower()
         return name.split(":", 1)[0].removesuffix("-gguf")
@@ -220,7 +220,7 @@ class OllamaAdapter(LLMAdapter):
     def resolve_model(self, model: str) -> str | None:
         """Retourne le tag Ollama réel correspondant à un nom court de config.
 
-        'qwen2.5' -> 'hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M'
+        'qwen2.5' -> 'hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M'
         'phi-4-mini-instruct-abliterated' -> 'hf.co/Melvin56/...-GGUF:Q4_K_M'
         Renvoie None si aucun modèle ne matche.
         """

@@ -237,12 +237,12 @@ async def test_agents_profiles(client: httpx.AsyncClient) -> bool:
 async def test_agents_assign(client: httpx.AsyncClient) -> bool:
     """Test: Assignation modèle à un agent."""
     try:
-        resp = await client.post("/api/agents/assign", json={"profile": "techlead", "model": "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"}, timeout=TIMEOUT)
+        resp = await client.post("/api/agents/assign", json={"profile": "techlead", "model": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"}, timeout=TIMEOUT)
         assert resp.status_code == 200, f"Status {resp.status_code}"
         data = resp.json()
         actual = data.get("data", data)
         assert actual.get("profile") == "techlead", "Profile mismatch"
-        assert actual.get("model") == "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", "Model mismatch"
+        assert actual.get("model") == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", "Model mismatch"
         print("  [OK] Assignation techlead -> Qwen2.5-7B confirmée")
         return True
     except Exception as e:
@@ -253,7 +253,7 @@ async def test_agents_assign(client: httpx.AsyncClient) -> bool:
 async def test_agents_assign_persist(client: httpx.AsyncClient) -> bool:
     """Test: L'assignation persiste dans config/model_preferences.json."""
     try:
-        resp = await client.post("/api/agents/assign", json={"profile": "techlead", "model": "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"}, timeout=TIMEOUT)
+        resp = await client.post("/api/agents/assign", json={"profile": "techlead", "model": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"}, timeout=TIMEOUT)
         assert resp.status_code == 200, f"Status {resp.status_code}"
 
         import json
@@ -264,7 +264,7 @@ async def test_agents_assign_persist(client: httpx.AsyncClient) -> bool:
             prefs = json.load(f)
         model_map = prefs.get("model_map", {})
         assert "dev" in model_map, f"dev non persisté dans model_map: {model_map}"
-        assert model_map["dev"] == "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", f"dev model mismatch: {model_map['dev']}"
+        assert model_map["dev"] == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", f"dev model mismatch: {model_map['dev']}"
         print("  [OK] Assignation persistée dans model_preferences.json (dev -> Qwen2.5-7B)")
         return True
     except Exception as e:

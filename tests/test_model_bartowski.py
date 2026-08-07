@@ -1,5 +1,5 @@
 r"""
-TDD Test Suite: hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M
+TDD Test Suite: hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M
 
 Domaine: Generation et refactoring de code multi-langages.
 Cas d'usage: Générer du code Python/SQL à partir d'instruction en langage naturel.
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.live
 class TestGraniteCodeGeneration:
     """Suite TDD pour Granite-4.1-8B"""
 
-    MODEL_NAME = "hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M"
+    MODEL_NAME = "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M"
     OLLAMA_MODELS = r"J:\Projet JARVIS\models\ollama"
 
     @classmethod

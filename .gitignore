@@ -51,3 +51,18 @@ config/model_preferences.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# --- Binaires et modèles portables (jamais committés — Go de poids, gitignorés
+# depuis le début en intention mais jamais réellement listés ici ; corrige le
+# risque qu'un `git add -A .` un jour committe des Go de binaires/modèles) ---
+bin/
+portable_python/
+models/ollama/blobs/
+models/ollama/manifests/
+opencode.json
+
+# --- Artefacts orphelins récurrents (signalés en session, jamais nettoyés à la
+# source — cf BACKLOG.md, récidive constatée plusieurs fois) ---
+tmp_old_toolbox.py
+tests/table-*.csv
+-p/

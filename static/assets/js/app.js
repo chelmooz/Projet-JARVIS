@@ -339,7 +339,7 @@ function populateDefaultModelSelect() {
     const sel = document.getElementById('s-default-model');
     if (!sel) return;
     const current = sel.value;
-    const models = availableModels.length > 0 ? availableModels : ['hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M'];
+    const models = availableModels.length > 0 ? availableModels : ['hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M'];
     sel.innerHTML = models.map(m => `<option value="${escHtml(m)}"${m === current ? ' selected' : ''}>${escHtml(m)}</option>`).join('');
 }
 

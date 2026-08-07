@@ -795,3 +795,58 @@ Windows réel — `Qwen2.5-7B-Instruct` (4,7 Go), `granite-4.1-8b` (5,5 Go), `De
 `services/selector.py` référencent bien les noms de modèles Ollama réellement présents
 (`ollama list`) et pas les anciens tags cassés — point de vigilance signalé en fin de
 W-DEPLOY-2, non encore vérifié.
+
+---
+
+## 🔧 W-DEPLOY-3 — 71 références aux anciens tags cassés dans 21 fichiers du code — 07/08/2026
+
+> Suite directe de W-DEPLOY-2. Point de vigilance signalé en fin de session précédente
+> ("les nouveaux noms de modèles ne matchent plus forcément les clés attendues par
+> config/model_sizes.json, services/selector.py") — confirmé fondé après vérification.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| D3.1 | **Recherche exhaustive** : `grep -rl` des 5 tags cassés sur tout le repo → 21 fichiers touchés (config prod, sélecteur de modèles, adaptateur Ollama, frontend JS, script smoke-test, doc MODELS.md, AGENTS.md ×2, RUNBOOK.md, 10 fichiers de tests) | ✅ |
+| D3.2 | **RED** : `test_no_broken_model_tags_in_tracked_source` (`tests/test_model_tags_consistency.py`) — scan de tous les fichiers `git ls-files` texte (hors BACKLOG.md, changelog légitime) → confirmé en échec sur l'état d'origine (54 occurrences, `git stash` + rejoué pour preuve) | ✅ |
+| D3.3 | **GREEN** : remplacement des 5 tags cassés par leurs équivalents vérifiés dans les 21 fichiers (71 occurrences au total) — mêmes correspondances que W-DEPLOY-2 | ✅ |
+| D3.4 | **VERIFY** : JSON validés (`config/model_sizes.json`, `config/agent_profiles.json`), suite complète → **883 passed / 0 failed / 40 skipped / 1 xfailed** (vs 882 après sync origin/main, +1 test), ruff clean | ✅ |
+
+**Fichiers touchés (21, hors README/BACKLOG déjà faits en W-DEPLOY-2)** :
+`config/model_sizes.json`, `config/constants.py`, `config/agent_profiles.json`,
+`services/selector.py`, `services/adapters/ollama_adapter.py`,
+`static/assets/js/app.js`, `scripts/smoke_test_frontend_api.py`,
+`models/ollama/MODELS.md`, `AGENTS.md`, `.opencode/AGENTS.md`, `docs/RUNBOOK.md`,
+`tests/test_integration_ollama.py`, `tests/test_model_llama_vision.py`,
+`tests/test_model_bartowski.py`, `tests/test_model_ornith.py`,
+`tests/test_offline_enforcement.py`, `tests/test_model_qwen25.py`,
+`tests/test_api_fuzz.py`, `tests/test_agents.py`, `tests/conftest.py`,
+`tests/test_selector.py`
+
+**Anomalie annexe découverte** : le fichier `tests/test_readme_install_consistency.py`
+livré en W-DEPLOY-2 (2 tests ajoutés) n'a **jamais été committé** — `git status` sur
+la clé ne l'a jamais listé comme modifié après copie, confirmé par
+`git show origin/main:tests/test_readme_install_consistency.py` (3 tests seulement,
+pas 5). Cause probable : le fichier n'a pas été effectivement écrasé sur `H:\Projet-JARVIS`
+lors de la copie manuelle. Re-livré avec cette session, à committer.
+
+**Leçons apprises (W-DEPLOY-3)** :
+- Corriger un README ne corrige rien côté application si le code prod référence les
+  mêmes identifiants en dur ailleurs — la documentation et la config peuvent diverger
+  silencieusement sans qu'aucun test ne le détecte, sauf à écrire un test qui scanne
+  le repo entier plutôt qu'un fichier précis. `test_model_tags_consistency.py`
+  comble ce trou durablement (toute réintroduction future d'un tag cassé fera échouer
+  la suite, quel que soit le fichier).
+- La copie manuelle de fichiers livrés par chat vers une clé USB est un point de
+  fragilité non technique : un fichier peut silencieusement ne pas être remplacé
+  sans qu'aucune erreur ne le signale (`git status` ne peut détecter que ce qu'il
+  voit sur disque). Vérifier `git status` après chaque copie reste la meilleure
+  garde-fou disponible côté utilisateur.
+
+**Fichiers livrés (session, non encore commités)** : les 21 fichiers listés ci-dessus,
+`tests/test_model_tags_consistency.py` (nouveau), `BACKLOG.md`, et le re-livrable
+`tests/test_readme_install_consistency.py` (2 tests manquants du commit précédent).
+
+**Prochaine micro-tâche** : `git add` de tous ces fichiers + commit + push, puis
+relancer `launchers\JARVIS.bat` et vérifier `curl /api/status` + `/api/agents` +
+`/api/agents/assign` pour confirmer que JARVIS résout bien les modèles sous leurs
+nouveaux noms auprès d'Ollama en conditions réelles.

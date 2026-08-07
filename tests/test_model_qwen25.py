@@ -9,7 +9,7 @@ from controllers.router import app  # Assurez-vous que votre application FastAPI
 
 client = TestClient(app)
 
-MODEL = "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+MODEL = "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 
 def test_qwen25_chat():
     # Simuler une requête à l'API pour une conversation avec le modèle Qwen2.5

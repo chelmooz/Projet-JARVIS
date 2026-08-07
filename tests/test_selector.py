@@ -50,10 +50,10 @@ class TestSelector:
 
     def test_select_model_uses_first_available_fallback(self):
         inference = MagicMock()
-        inference.resolve_model.return_value = "hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M"
-        inference.first_available.return_value = "hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M"
+        inference.resolve_model.return_value = "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M"
+        inference.first_available.return_value = "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M"
         result = select_model("dev", inference)
-        assert result == "hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M"
+        assert result == "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M"
 
     def test_read_preferences_returns_dict(self):
         prefs = read_preferences()
@@ -72,7 +72,7 @@ class TestRecommendModel:
         result = recommend_model(specs)
         assert isinstance(result, dict)
         assert "model" in result
-        assert result["model"] == "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+        assert result["model"] == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 
     def test_recommend_model_cpu_only(self):
         specs = self._specs(cpu_only=True, vram_gb=0)
@@ -93,5 +93,5 @@ class TestRecommendModel:
         specs = self._specs(ram_gb=32, vram_gb=8, cpu_only=False)
         result = recommend_model(specs)
         assert result["fallback"] is False
-        assert result["model"] == "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+        assert result["model"] == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 

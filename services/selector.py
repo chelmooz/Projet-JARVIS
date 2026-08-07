@@ -18,8 +18,8 @@ PREFERENCES_PATH = os.path.join(PROJECT_DIR, "config", "model_preferences.json")
 MODEL_SIZES_PATH = os.path.join(PROJECT_DIR, "config", "model_sizes.json")
 
 VISION_KEY = "vision"
-VISION_MODELS = ["hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M"]
-DEFAULT_FALLBACK_MODEL = "hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+VISION_MODELS = ["hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M"]
+DEFAULT_FALLBACK_MODEL = "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 RAM_HEADROOM_RATIO = 0.8  # 20% de marge de sécurité pour éviter les OOM
 
 
@@ -133,9 +133,9 @@ def read_preferences() -> dict[str, Any]:
 def fallback_models() -> dict[str, str]:
     """Correspondance agent -> modèle par défaut."""
     return {
-        "cyber": "hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M",
-        "dev": "hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M",
-        "network": "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M",
+        "cyber": "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M",
+        "dev": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
+        "network": "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0",
         "hardware": DEFAULT_FALLBACK_MODEL,
         VISION_KEY: VISION_MODELS[0],
     }

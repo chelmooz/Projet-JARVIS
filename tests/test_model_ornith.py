@@ -9,7 +9,7 @@ from controllers.router import app  # Assurez-vous que votre application FastAPI
 
 client = TestClient(app)
 
-MODEL = "hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M"
+MODEL = "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M"
 
 def test_deephat_chat_generation():
     # Simuler une requête à l'API pour une conversation avec le modèle DeepHat
