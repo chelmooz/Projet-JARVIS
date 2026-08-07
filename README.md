@@ -270,10 +270,13 @@ en option (interface web supplémentaire sur `:3000`).
 
 ---
 
-### Étape 4 — Démarrer le serveur Ollama portable
+### Étape 4 — Installer le moteur portable + démarrer JARVIS (première fois)
 
 Le projet utilise le port **11436** (pas le 11434 par défaut) pour rester indépendant
-de toute installation système d'Ollama.
+de toute installation système d'Ollama. Le point important : **le CLI**
+`.\bin\ollama.exe` parle au serveur sur le port **11434 par défaut** — si vous lancez
+un `pull` sans `$env:OLLAMA_HOST`, il échoue (cf. exactement l'erreur
+`connectex: Aucune connexion`). Les variables d'environnement ci-dessous font le lien.
 
 D'abord, copier le fichier de configuration (utilisé par JARVIS au lancement) :
 
@@ -284,7 +287,35 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Puis définir les variables d'environnement **dans le même terminal** pour que les commandes `ollama` ci-dessous utilisent le bon port et le bon dossier de modèles :
+Puis lancez la plateforme — le `.bat` fait tout (téléchargement du moteur portable,
+démarrage du serveur sur 11436, puis lancement de l'API) :
+
+```powershell
+launchers\JARVIS.bat
+```
+
+> **Premier lancement (avec internet)** : le `.bat` télécharge le binaire portable
+> depuis GitHub Releases (~700 Mo, souvent 1 à 5 min selon la connexion) — dans le log,
+> il faut attendre les lignes suivantes avant de passer à la suite :
+> ```text
+> [Ollama] Téléchargement binaire Windows...
+> > Vérification SHA256 sautée (source de hash indisponible)...   ← normal, fallback sûr
+> ```
+> Ne coupez pas la fenêtre tant que l'invite n'est pas revenue. Une fois terminé,
+> le serveur tourne sur **11436** et le port **8000** est ouvert.
+
+> ⚠️ **Ne relancez pas un 2e `JARVIS.bat` tant que le 1er tourne** : erreur
+> « Le processus ne peut pas accéder au fichier car ce fichier est utilisé par un
+> autre processus. » On n'a qu'**un seule console JARVIS** à la fois. Pour repartir :
+> `taskkill /F /IM ollama.exe` puis relancez le `.bat`.
+
+---
+
+### Étape 5 — Télécharger les 7 modèles d'IA (dans un 2e terminal)
+
+Appuyez sur **Entrée** dans votre terminal PowerShell actuel pour obtenir un nouveau
+prompt, gardez la console JARVIS **ouverte** (elle fait tourner le serveur Ollama),
+puis définissez les variables d'environnement **dans ce nouveau terminal** :
 
 ```powershell
 # PowerShell — adaptez la lettre (ici H:) à celle de votre clef
@@ -293,28 +324,11 @@ $env:OLLAMA_MODELS="H:\Projet-JARVIS\models\ollama"
 ```
 
 > 💡 Ces variables ne sont valables que dans ce terminal. Fermer la fenêtre = à redéfinir au prochain pull.
+> ⚠️ Sans `$env:OLLAMA_HOST`, toute commande échoue avec « Error: Head "http://127.0.0.1:11434/": dial tcp » — le serveur ne tourne QUE sur 11436.
 
-> ⚠️ **`bin\ollama.exe` absent ?** Le binaire Ollama Windows **n'est pas dans le dépôt**
-> (gitignoré), mais il est installé sur la clé par l'étape 3 (`scripts\install.py`
-> répondre **y** à la question « Installer Ollama portable sur la cle ? »). S'il manque
-> encore, `JARVIS.bat` le téléchargera automatiquement au premier lancement
-> (`jarvis.py` → `ensure_ollama_binary`) : en cas d'échec, vérifiez la connexion
-> Internet (nécessaire uniquement à ce moment) et relancez `JARVIS.bat`.
-
-Démarrer le serveur Ollama portable (en arrière-plan) :
+Puis téléchargez les 7 modèles (à faire **une seule fois**, avec internet) :
 
 ```powershell
-Start-Process -NoNewWindow .\bin\ollama.exe serve
-Start-Sleep 3
-```
-
-> Le `Start-Sleep` attend que le serveur soit prêt à recevoir des requêtes.
-
----
-
-### Étape 5 — Télécharger les 7 modèles d'IA
-
-```bash
 .\bin\ollama.exe pull hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M
@@ -324,11 +338,20 @@ Start-Sleep 3
 .\bin\ollama.exe pull hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
 ```
 
-> ⏳ C'est l'étape la plus longue (plusieurs Go à télécharger). À ne faire qu'une seule fois.
-> Si vous préférez utiliser la commande `ollama` globale (hors du dossier `bin\`), assurez-vous que `$env:OLLAMA_HOST="127.0.0.1:11436"` est défini — sinon elle cherchera sur le port 11434 par défaut et échouera.
+> ⏳ C'est l'étape la plus longue (plusieurs Go). À ne faire qu'une seule fois.
+> Si un modèle est déjà présent sur la clé (liste ci-dessous), le re-pull se contente
+> de `using existing manifest` — il ne re-télécharge pas les poids déjà présents.
+
+> 🪄 **Vision (08/08/2026)** : le modèle vision historique
+> `Llama-3.2-Vision` (leafspark) est devenu **incompatible avec la version d'Ollama embarquée**.
+> Il est remplacé par **`moondream`** (1,8B, ~1,4 Go, CPU-only) :
+> ```powershell
+> .\bin\ollama.exe pull moondream
+> .\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M   # si encore présent
+> ```
 
 > 🔧 **Historique de correction (07/08/2026, déploiement réel testé sur Windows) :**
-> 5 des 7 repos Hugging Face d'origine étaient cassés — soit GGUF « sharded » non
+> 5 des 7 repos Hugging Face d'origine étaient cassés — soit GGUF « sharded» non
 > supporté par Ollama (`Qwen/...`), soit repo introuvable/mal nommé
 > (`ibm-granite/...-instruct-GGUF`, `mradermacher/...-i1-GGUF`,
 > `bartowski/Llama-3.2-11B-Vision-Instruct-GGUF` — bartowski n'a jamais publié ce
@@ -337,20 +360,8 @@ Start-Sleep 3
 > (07/08/2026) : `Qwen2.5-7B-Instruct` (bartowski, 4,7 Go), `granite-4.1-8b`
 > (bartowski, 5,5 Go), `DeepHat-V1-7B` (GGUF-A-Lot, 5,3 Go),
 > `Foundation-Sec-8B-Reasoning` (fdtn-ai, en **Q8_0** — pas de Q4_K_M disponible
-> pour cette variante, d'où le poids plus élevé, 8,5 Go), `phi-4-mini-instruct-abliterated`
-> pour cette variante, d'où le poids plus élevé, 8,5 Go), `phi-4-mini-instruct-abliterated`
-> (Melvin56, 2,5 Go), `moondream` (1,4 Go, remplace `Llama-3.2-11B-Vision-Instruct` de
-> leafspark devenu incompatible avec Ollama — voir note ci-dessous) et
-> `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
-
-> 🪄 **Vision (08/08/2026)** : le modèle vision historique
-> `Llama-3.2-11B-Vision-Instruct` (leafspark) est devenu **incompatible avec la
-> version d'Ollama embarquée** (`'llama3.2-vision' is no longer compatible...` à
-> chaque pull/génération). Remplacé par **`moondream`** (1,8B, ~1,4 Go, CPU-only) :
-> ```bash
-> .\bin\ollama.exe pull moondream
-> .\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M
-> ```
+> pour cette variante, d'où le poids plus élevé, 8,5 Go),
+> note ci-dessus) et `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
 
 | Modèle | Ce qu'il fait le mieux | Poids |
 |---|---|---:|
@@ -363,8 +374,6 @@ Start-Sleep 3
 | `nomic-embed-text-v2-moe` | Embeddings — recherche dans vos documents (RAG) | ~0,6 Go |
 
 > 📖 Détail de ce que chaque modèle sait faire le mieux : voir la section [🧠 Les 7 modèles](#-les-7-modèles--100-huggingface--ollama-portable).
-
-> ⏳ C'est l'étape la plus longue (plusieurs Go à télécharger). À ne faire qu'une seule fois.
 
 ---
 

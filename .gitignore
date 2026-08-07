@@ -56,6 +56,7 @@ Thumbs.db
 # depuis le début en intention mais jamais réellement listés ici ; corrige le
 # risque qu'un `git add -A .` un jour committe des Go de binaires/modèles) ---
 bin/
+lib/
 portable_python/
 models/ollama/blobs/
 models/ollama/manifests/
