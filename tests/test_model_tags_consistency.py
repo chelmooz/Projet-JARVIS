@@ -33,10 +33,12 @@ def _tracked_files():
     # BACKLOG.md est un changelog : il documente volontairement les anciens tags
     # cassés comme trace historique (colonne "avant correction"), pas comme config
     # active — exclu du scan pour ne pas produire de faux positif.
+    # tests/test_model_tags_consistency.py (ce fichier) contient BROKEN_TAGS en dur
+    # comme données de test : sans cette exclusion, il se détecte toujours lui-même.
     return [
         line for line in result.stdout.splitlines()
         if line.endswith((".py", ".json", ".yaml", ".yml", ".js", ".md"))
-        and line != "BACKLOG.md"
+        and line not in ("BACKLOG.md", "tests/test_model_tags_consistency.py")
     ]
 
 

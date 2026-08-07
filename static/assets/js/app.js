@@ -555,17 +555,18 @@ async function pollStatus() {
     if (document.hidden) return;
     try {
         const resp = await fetch('/api/status');
-        const s = await resp.json();
+        const payload = await resp.json();
+        const s = payload.data || payload;
         const backendDot = s.ollama ? 'ok' : 'warn';
         const setSide = (id, text, cls) => {
             const el = document.getElementById(id);
             if (!el) return;
             el.innerHTML = `<span class="status-dot dot-${cls}"></span>${text}`;
         };
-        setSide('st-backend', s.backend || '?', backendDot);
+        setSide('st-backend', s.ollama ? 'ollama' : '?', backendDot);
         setSide('st-ollama', s.ollama ? 'OK' : 'HS', s.ollama ? 'ok' : 'err');
-        setSide('st-memory', s.memory_ok ? 'OK' : 'ERR', s.memory_ok ? 'ok' : 'err');
-        setSide('st-vector', s.vector_ok ? 'OK' : 'ERR', s.vector_ok ? 'ok' : 'err');
+        setSide('st-memory', s.memory ? 'OK' : 'ERR', s.memory ? 'ok' : 'err');
+        setSide('st-vector', s.vector ? 'OK' : 'ERR', s.vector ? 'ok' : 'err');
     } catch (e) {
         document.getElementById('st-backend').innerHTML = '<span class="status-dot dot-err"></span>HS';
         document.getElementById('st-ollama').innerHTML = '<span class="status-dot dot-err"></span>HS';
