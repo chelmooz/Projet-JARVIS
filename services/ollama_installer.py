@@ -68,12 +68,12 @@ def _sha256_of(path: str) -> str:
 def _expected_ollama_sha256(asset_name: str, log: _LogFn) -> str | None:
     """Récupère le hash SHA256 attendu depuis les releases GitHub."""
     try:
-        url = f"https://github.com/ollama/ollama/releases/download/v{OLLAMA_VERSION}/sha256sums.txt"
+        url = f"https://github.com/ollama/ollama/releases/download/v{OLLAMA_VERSION}/sha256sum.txt"
         with urllib.request.urlopen(url, timeout=LAUNCHER_DOWNLOAD_TIMEOUT) as r:
             content = r.read().decode("utf-8", "ignore")
         for line in content.splitlines():
             parts = line.split()
-            if len(parts) >= 2 and parts[1].strip("*") == asset_name:
+            if len(parts) >= 2 and parts[1].strip("*").removeprefix("./") == asset_name:
                 return parts[0].lower()
     except Exception as e:
         _logger.debug("SHA256 Ollama indisponible (offline ?) : %s", e)
