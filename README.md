@@ -438,18 +438,13 @@ boutons **Analyser un processus** / **État système détaillé** de l'onglet �
 
 **Prérequis (une seule fois) :**
 
-1. **Consentement** : à accorder via l'onglet **Réglages → Diagnostic externe** (toggle),
-   ou manuellement :
-   ```powershell
-   echo consent > config\.diagnostic_consent
-   ```
-2. **Binaires** présents dans `bin\diagnostic\win\` (`witr.exe`, `psinfo.exe`,
+1. **Binaires** présents dans `bin\diagnostic\win\` (`witr.exe`, `psinfo.exe`,
    `psloglist.exe`, `handle.exe`, `psping.exe`, `psservice.exe`) — fournis sur la clé USB /
    dans la release.
 
-Sans consentement, les outils se bloquent proprement (« Consentement non donné ») :
-c'est un garde-fou **local mono-utilisateur** (fichier texte), pas un contrôle d'accès
-multi-utilisateur.
+> ℹ️ **Aucun consentement requis** : usage mono-utilisateur (clé USB) — les outils externes
+> s'exécutent directement, sans toggle ni fichier d'autorisation (ancien mécanisme
+> `.diagnostic_consent` retiré).
 
 ---
 

@@ -60,7 +60,6 @@ ultérieurement :
 - `services.selector.recommend_model` (testé, pas encore appelé en prod)
 - `services.sanitize.safe_model_name` / `safe_path_segment` / `strip_data_uri` / `safe_json_key`
 - `services.file_system.FileSystemService.is_authorized` (testé)
-- `services.diagnostic_ext.DiagnosticService.ensure_consent` / `grant_consent` / `is_ready` (testés)
 - `services.profiling.reset_profiling` (helper de test)
 - `services.analysis.Analyzer.violations` (propriété, non lue)
 

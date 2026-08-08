@@ -13,7 +13,6 @@ from services.diagnostic_ext.exceptions import DiagnosticExtError
 
 CONFIG_PATH: str = os.path.join(PROJECT_DIR, "config", "diagnostic_tools.yaml")
 BIN_DIR: str = os.path.join(PROJECT_DIR, "bin", "diagnostic")
-CONSENT_FILE: str = os.path.join(PROJECT_DIR, "config", ".diagnostic_consent")
 
 
 def default_smart_device() -> str:
@@ -54,7 +53,6 @@ def get_tools_config(config: dict[str, Any]) -> dict[str, Any]:
 __all__ = [
     "CONFIG_PATH",
     "BIN_DIR",
-    "CONSENT_FILE",
     "default_smart_device",
     "load_config",
     "get_tools_config",

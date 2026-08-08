@@ -45,15 +45,15 @@ class CommandExecutor:
     def run(
         self,
         tool_name: str,
-        consent_given: bool,
         args: list[str] | None = None,
         extra_kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Exécute l'outil ou renvoie un dict d'erreur court-circuité."""
-        if not consent_given:
-            audit_log(self._log, "WARN", f"AUDIT tool={tool_name}: consentement non donné")
-            return {"success": False, "tool": tool_name, "error": "Consentement non donné"}
+        """Exécute l'outil ou renvoie un dict d'erreur court-circuité.
 
+        C1 — le consentement a été retiré (usage mono-utilisateur) : aucun
+        gate de permission, l'exécution dépend uniquement de la présence du
+        binaire et de son intégrité SHA256.
+        """
         cfg = self._config.get("tools", {}).get(tool_name)
         if not cfg:
             audit_log(self._log, "WARN", f"AUDIT tool={tool_name}: outil inconnu")

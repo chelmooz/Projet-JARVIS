@@ -65,7 +65,6 @@ ROUTING_CONFIG: Final[Path] = CONFIG_DIR / "agent_routing.yaml"
 TRIGGERS_CONFIG: Final[Path] = CONFIG_DIR / "toolbox_triggers.yaml"
 CYBER_KEYWORDS_CONFIG: Final[Path] = CONFIG_DIR / "cyber_workflow_keywords.yaml"
 DIAGNOSTIC_CONFIG: Final[Path] = CONFIG_DIR / "diagnostic_tools.yaml"
-CONSENT_FILE: Final[Path] = CONFIG_DIR / ".diagnostic_consent"
 CYBER_WORKFLOWS_CONFIG: Final[Path] = CONFIG_DIR / "cyber_workflows.json"
 SKILLS_CONFIG: Final[Path] = CONFIG_DIR / "skills.json"
 REQUIREMENTS_FILE: Final[Path] = ROOT / "requirements.txt"
@@ -149,7 +148,6 @@ __all__ = [
     "TRIGGERS_CONFIG",
     "CYBER_KEYWORDS_CONFIG",
     "DIAGNOSTIC_CONFIG",
-    "CONSENT_FILE",
     "CYBER_WORKFLOWS_CONFIG",
     "SKILLS_CONFIG",
     "REQUIREMENTS_FILE",

@@ -2,6 +2,49 @@
 
 ---
 
+## 🔧 C1 — Retrait du consentement diagnostic (usage mono-utilisateur, clé USB) — 08/08/2026
+
+> Décision Michel : « je n'ai pas besoin de consentement, donne tous les droits,
+> ce n'est pas un inconnu qui possède la clé ». Le gate `.diagnostic_consent`
+> (AUDIT.1 : mécanisme décoratif par design, contournable en 1 ligne) est retiré :
+> exécution directe des outils externes (witr, psinfo, ...) sans fichier ni toggle.
+> KISS : suppression pure, pas de config pour réactiver (YAGNI).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| C1.1 | **RED** : `test_diagnostic_ext_charact.py` — `test_run_sans_consentement_court_circuite` remplacé par `test_run_sans_consentement_execute` : `CommandExecutor.run("smartctl")` (sans arg consent) doit exécuter (subprocess appelé) → échoue : TypeError param manquant | ✅ |
+| C1.2 | **GREEN** : `executor.py` — supprime le paramètre `consent_given` de `run()` + le court-circuit « Consentement non donné » | ✅ |
+| C1.3 | **RED** : `test_diagnostic_ext.py` — `test_run_tool_without_consent` remplacé : `_run_tool("smartctl")` sans consent → erreur « introuvable » (pas « Consentement ») ; `test_is_ready_false_without_consent` remplacé par `test_is_ready_sans_consentement_selon_outils` | ✅ |
+| C1.4 | **GREEN** : `service.py` — supprime `ensure_consent`/`grant_consent`/`revoke_consent`/`_consent_given`/param `consent_file` ; `is_ready()` ne dépend plus du consentement ; `_run_tool` n'appelle plus `run(consent_given=...)` | ✅ |
+| C1.5 | **RED** : `test_api.py::TestDiagnosticConsent` réécrit — `GET /api/diagnostic/consent` → `{"consent_given": true}` (toujours) ; `POST` → 200 sans écriture fichier | ✅ |
+| C1.6 | **GREEN** : `controllers/routes/diagnostic_ext.py` — GET renvoie `{"consent_given": true}` constant, POST no-op (compat) ; `ConsentRequest` **conservé** dans `models/schemas.py` (validé par le POST : body `{}` → 422, contrat préservé) | ✅ |
+| C1.7 | **RED** : `test_consent_ui_removed.py` (pattern test_dark_mode) — index.html sans `#s-diagnostic-consent` ni `#consent-status` ; app.js sans `restoreConsentState`/`setConsentStatus` → échoue (2 tests) | ✅ |
+| C1.8 | **GREEN** : `static/index.html` (groupe « Diagnostic externe » supprimé) + `static/assets/js/app.js` (bloc consentement + appel boot `restoreConsentState()` supprimés) + `style.css` (`.consent-status`/`.consent-ok`/`.consent-warn` supprimés) | ✅ |
+| C1.9 | **VERIFY** : périmètre C1 → **129 passed** (diagnostic_ext ×2 + toolbox 21 + api 44 + consent_ui 2 + config 60) ; ruff 0 erreur ; suite complète **921 passed, 14 failed / 6 errors hors périmètre** (pré-existants : intégration Ollama/405, vectorize, system, install_final_message) | ✅ |
+| C1.10 | **Docs** : README (prérequis consentement → note « aucun consentement requis ») ; `docs/inventory-dead-code.md` (ligne consent supprimée) ; BACKLOG preuves ci-dessous | ✅ |
+
+**Preuve C1** :
+```
+pytest tests/test_diagnostic_ext.py + charact + toolbox + api + consent_ui + config_files → 129 passed
+pytest tests/ → 921 passed / 14 failed + 6 errors hors périmètre (pré-existants)
+ruff check services/diagnostic_ext controllers/routes/diagnostic_ext.py ... → All checks passed!
+```
+
+**Leçons apprises (C1)** :
+- `is_ready()` dépend de `sha256_ok` : un test « outil dispo » doit fournir le **hash
+  réel** du binaire factice (`hashlib.sha256(content).hexdigest().upper()`), pas `sha256: ""`
+  (liste vide → jamais prêt).
+- `ConsentRequest` est **conservé** dans les schémas même si le consentement est retiré :
+  le POST no-op s'en sert pour valider le body (422 sur body vide) — suppression = 1 API break.
+- L'API de consentement reste en place **en no-op** (retourne toujours `true`) au lieu d'être
+  supprimée : compat clients/frontend anciens, 2 lignes de code (KISS).
+- Les 14 échecs de la suite complète sont **pré-existants** (intégration Ollama sans serveur,
+  `test_system`/`vectorize`/`install_final_message` liés à l'état du workspace — hors périmètre C1).
+
+**Prochaine micro-tâche** : aucune — C1 clos.
+
+---
+
 ## 🔧 W1 — witr : requêtes port via `--port` (bug P1 de l'audit binaire) — 06/08/2026
 
 > P1 vérifié binaire en main : `witr --json 8000` traite « 8000 » comme un **nom**

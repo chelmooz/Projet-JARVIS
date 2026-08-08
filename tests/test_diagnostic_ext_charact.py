@@ -136,17 +136,43 @@ class TestCommandExecutorRun:
     def teardown_method(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    def test_run_sans_consentement_court_circuite(self):
-        result = self.executor.run("smartctl", consent_given=False)
-        assert result == {"success": False, "tool": "smartctl", "error": "Consentement non donné"}
+    def test_run_sans_consentement_execute(self):
+        """C1 — le consentement est retiré : `run()` exécute sans gate,
+        même si le paramètre historique `consent_given` n'est plus requis."""
+        subdir = _platform_subdir()
+        bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
+        bin_path = os.path.join(self.tmpdir, "bin", subdir, bin_name)
+        os.makedirs(os.path.dirname(bin_path), exist_ok=True)
+        with open(bin_path, "wb") as f:
+            f.write(b"fake")
+        cfg = {"tools": {name: dict(c) for name, c in SAMPLE_CONFIG["tools"].items()}}
+        cfg["tools"]["smartctl"]["sha256"] = ""
+        self.executor = CommandExecutor(
+            config=cfg,
+            bin_dir=os.path.join(self.tmpdir, "bin"),
+            log_service=FakeLog(),
+            verified=set(),
+        )
+        fake_result = subprocess.CompletedProcess(
+            args=[bin_path], returncode=0, stdout="ok output\n", stderr="",
+        )
+        with mock.patch(
+            "services.diagnostic_ext.executor.subprocess.run", return_value=fake_result
+        ) as mocked_run:
+            result = self.executor.run("smartctl")
+
+        assert result["success"] is True
+        assert result["stdout"] == "ok output"
+        assert result["tool"] == "smartctl"
+        mocked_run.assert_called_once()
 
     def test_run_outil_inconnu(self):
-        result = self.executor.run("nope", consent_given=True)
+        result = self.executor.run("nope")
         assert not result["success"]
         assert "inconnu" in result["error"]
 
     def test_run_binaire_introuvable(self):
-        result = self.executor.run("smartctl", consent_given=True)
+        result = self.executor.run("smartctl")
         assert not result["success"]
         assert "introuvable" in result["error"]
 
@@ -172,7 +198,7 @@ class TestCommandExecutorRun:
         with mock.patch(
             "services.diagnostic_ext.executor.subprocess.run", return_value=fake_result
         ) as mocked_run:
-            result = self.executor.run("smartctl", consent_given=True)
+            result = self.executor.run("smartctl")
 
         assert result["success"] is True
         assert result["stdout"] == "ok output"
@@ -444,7 +470,7 @@ class TestJsonResultFormatter:
             with mock.patch(
                 "services.diagnostic_ext.executor.subprocess.run", return_value=fake_result
             ):
-                result = executor.run("witr", consent_given=True, extra_kwargs={"target": "nginx"})
+                result = executor.run("witr", extra_kwargs={"target": "nginx"})
             assert result["success"] is True
             assert result["data"] == {"process": "nginx"}
             assert "stdout" not in result
@@ -462,12 +488,10 @@ class TestRunWitr:
             yaml.dump(SAMPLE_CONFIG, f)
         self.bin_dir = os.path.join(self.tmpdir, "bin")
         os.makedirs(self.bin_dir, exist_ok=True)
-        self.consent_file = os.path.join(self.tmpdir, ".consent")
         self.log = FakeLog()
         self.svc = DiagnosticExtService(
             config_path=self.config_path,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
 
@@ -489,9 +513,11 @@ class TestRunWitr:
         mocked.assert_called_once_with("witr", extra_kwargs={"port": "8080"})
 
     def test_run_witr_sans_consentement_court_circuite(self):
+        """C1 — consentement retiré : run_witr exécute (n'échoit pas sur
+        « Consentement non donné ») ; sans binaire, l'échec est « introuvable »."""
         result = self.svc.run_witr("nginx")
         assert not result["success"]
-        assert "Consentement" in result["error"]
+        assert "Consentement" not in result["error"]
 
     def test_run_witr_cible_ambigue_remonte_data_ambiguous(self):
         """Sortie witr en liste numérotée (plusieurs process matchent) →
@@ -521,10 +547,8 @@ class TestRunWitr:
         svc = DiagnosticExtService(
             config_path=self.config_path,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
-        svc.grant_consent()
         fake_result = subprocess.CompletedProcess(
             args=[bin_path],
             returncode=0,
@@ -551,12 +575,10 @@ class TestServiceCheckTools:
             yaml.dump(SAMPLE_CONFIG, f)
         self.bin_dir = os.path.join(self.tmpdir, "bin")
         os.makedirs(self.bin_dir, exist_ok=True)
-        self.consent_file = os.path.join(self.tmpdir, ".consent")
         self.log = FakeLog()
         self.svc = DiagnosticExtService(
             config_path=self.config_path,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
 
@@ -586,12 +608,28 @@ class TestServiceCheckTools:
         # Binaire présent mais SHA256 faux (contenu fake) → PAS dans la liste
         assert self.svc.list_available() == []
 
-    def test_is_ready_false_sans_consentement(self):
+    def test_is_ready_false_sans_outil_disponible(self):
         assert not self.svc.is_ready()
 
-    def test_is_ready_false_sans_outil_disponible(self):
-        self.svc.grant_consent()
-        assert not self.svc.is_ready()
+    def test_is_ready_vrai_avec_outil_disponible(self):
+        """C1 — `is_ready()` dépend des outils, plus du consentement."""
+        subdir = _platform_subdir()
+        bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
+        bin_path = os.path.join(self.bin_dir, subdir, bin_name)
+        os.makedirs(os.path.dirname(bin_path), exist_ok=True)
+        content = b"\x00" * 100
+        with open(bin_path, "wb") as f:
+            f.write(content)
+        cfg = {"tools": {name: dict(c) for name, c in SAMPLE_CONFIG["tools"].items()}}
+        cfg["tools"]["smartctl"]["sha256"] = hashlib.sha256(content).hexdigest().upper()
+        with open(self.config_path, "w") as f:
+            yaml.dump(cfg, f)
+        self.svc = DiagnosticExtService(
+            config_path=self.config_path,
+            bin_dir=self.bin_dir,
+            log_service=self.log,
+        )
+        assert self.svc.is_ready()
 
     def test_check_tool_witr_linux_utilise_hash_linux(self):
         """Sous linux, le hash attendu est `linux_sha256`, pas le hash win32.
@@ -624,7 +662,6 @@ class TestServiceCheckTools:
         svc = DiagnosticExtService(
             config_path=self.config_path,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
         with mock.patch("sys.platform", "linux"), mock.patch(

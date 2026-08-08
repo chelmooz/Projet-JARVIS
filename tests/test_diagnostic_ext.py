@@ -1,4 +1,5 @@
-"""Tests DiagnosticExtService — consentement, SHA256, exécution simulée."""
+"""Tests DiagnosticExtService — exécution simulée, SHA256, is_ready."""
+import hashlib
 import os
 import shutil
 import sys
@@ -76,12 +77,10 @@ class TestDiagnosticExtService:
             yaml.dump(SAMPLE_CONFIG, f)
         self.bin_dir = os.path.join(self.tmpdir, "bin")
         os.makedirs(self.bin_dir, exist_ok=True)
-        self.consent_file = os.path.join(self.tmpdir, ".consent")
         self.log = FakeLog()
         self.svc = DiagnosticExtService(
             config_path=self.config_path,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
 
@@ -91,37 +90,13 @@ class TestDiagnosticExtService:
     def test_load_config(self):
         assert "smartctl" in self.svc.get_tools_config()
 
-    def test_consent_initially_not_given(self):
-        ok, msg = self.svc.ensure_consent()
-        assert not ok
-        assert "Consentement requis" in msg
-
-    def test_grant_consent_returns_ok(self):
-        ok = self.svc.grant_consent()
-        assert ok
-
-    def test_grant_consent_creates_file_and_ensure_ok(self):
-        self.svc.grant_consent()
-        assert os.path.exists(self.consent_file)
-        ok2, _ = self.svc.ensure_consent()
-        assert ok2
-
-    def test_grant_consent_twice(self):
-        self.svc.grant_consent()
-        ok2, _ = self.svc.ensure_consent()
-        assert ok2
-
-    def test_consent_without_log(self):
-        svc = DiagnosticExtService(
-            config_path=self.config_path,
-            bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
-        )
-        ok = svc.grant_consent()
-        assert ok
+    def test_service_fonctionne_sans_mecanisme_consent(self):
+        """C1 — le consentement est retiré : ni `ensure_consent` ni
+        `grant_consent` n'existent plus ; l'exécution dépend des binaires."""
+        assert not hasattr(self.svc, "ensure_consent")
+        assert not hasattr(self.svc, "grant_consent")
 
     def test_sha256_verify_fails_on_mismatch(self):
-        self.svc.grant_consent()
         tool_name = "smartctl"
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
         binary_path = _binary_path(self.bin_dir, bin_name)
@@ -140,10 +115,8 @@ class TestDiagnosticExtService:
         svc = DiagnosticExtService(
             config_path=config_path2,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
-        svc.grant_consent()
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
         binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
@@ -153,19 +126,19 @@ class TestDiagnosticExtService:
         assert "SHA256" not in result["error"]
         assert result["error"] is not None
 
-    def test_run_tool_without_consent(self):
+    def test_run_tool_sans_consentement_execute(self):
+        """C1 — consentement retiré : l'échec vient du binaire absent
+        (« introuvable »), plus jamais d'erreur « Consentement »."""
         result = self.svc._run_tool("smartctl")
         assert not result["success"]
-        assert "Consentement" in result["error"]
+        assert "Consentement" not in result["error"]
 
     def test_run_tool_unknown_name(self):
-        self.svc.grant_consent()
         result = self.svc._run_tool("nonexistent")
         assert not result["success"]
         assert "inconnu" in result["error"]
 
     def test_run_tool_binary_not_found(self):
-        self.svc.grant_consent()
         result = self.svc._run_tool("smartctl")
         assert not result["success"]
         assert "introuvable" in result["error"]
@@ -178,7 +151,6 @@ class TestDiagnosticExtService:
                 assert info["path"] is None
 
     def test_check_all_tools_with_binary_available_true(self):
-        self.svc.grant_consent()
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
         binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
@@ -187,7 +159,6 @@ class TestDiagnosticExtService:
         assert results["smartctl"]["available"]
 
     def test_check_all_tools_with_binary_sha256_not_ok(self):
-        self.svc.grant_consent()
         bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
         binary_path = _binary_path(self.bin_dir, bin_name)
         with open(binary_path, "wb") as f:
@@ -198,25 +169,35 @@ class TestDiagnosticExtService:
     def test_list_available_empty_initially(self):
         assert self.svc.list_available() == []
 
-    def test_is_ready_false_without_consent(self):
+    def test_is_ready_false_sans_outil_disponible(self):
         assert not self.svc.is_ready()
 
-    def test_is_ready_false_without_binaries(self):
-        self.svc.grant_consent()
-        assert not self.svc.is_ready()
+    def test_is_ready_selon_outils_sans_consentement(self):
+        """C1 — `is_ready()` ne dépend plus du consentement : la
+        disponibilité des outils décide seule (ici binaire + SHA256 OK)."""
+        cfg = SAMPLE_CONFIG.copy()
+        bin_name = "smartctl.exe" if sys.platform == "win32" else "smartctl"
+        binary_path = _binary_path(self.bin_dir, bin_name)
+        content = b"\x00" * 100
+        with open(binary_path, "wb") as f:
+            f.write(content)
+        cfg["tools"]["smartctl"]["sha256"] = hashlib.sha256(content).hexdigest().upper()
+        config_path = os.path.join(self.tmpdir, "tools_ready.yaml")
+        with open(config_path, "w") as f:
+            yaml.dump(cfg, f)
+        svc = DiagnosticExtService(
+            config_path=config_path,
+            bin_dir=self.bin_dir,
+            log_service=self.log,
+        )
+        assert svc.is_ready()
 
     def test_audit_log_on_run_rejected(self):
         self.svc._run_tool("smartctl")
         messages = [e["message"] for e in self.log.entries]
         assert any("AUDIT" in m for m in messages)
 
-    def test_audit_log_on_consent(self):
-        self.svc.grant_consent()
-        levels = [e["level"] for e in self.log.entries]
-        assert any("CONSENT" in lev for lev in levels)
-
     def test_timeout_returns_error(self):
-        self.svc.grant_consent()
         timeout_config = SAMPLE_CONFIG.copy()
         timeout_config["tools"]["smartctl"]["timeout"] = 0.001
         config_path = os.path.join(self.tmpdir, "tools_timeout.yaml")
@@ -226,7 +207,6 @@ class TestDiagnosticExtService:
         svc = DiagnosticExtService(
             config_path=config_path,
             bin_dir=self.bin_dir,
-            consent_file=self.consent_file,
             log_service=self.log,
         )
         binary_path = _binary_path(self.bin_dir, "smartctl.exe")

@@ -92,6 +92,10 @@
         <div class="input-actions">
           <button id="vision-btn" title="Joindre une image" aria-label="Joindre une image">📷</button>
         </div>
+        <div id="chat-image-badge" class="chat-image-badge d-none" role="status">
+          <span class="chat-image-label">📷 Image jointe (Ctrl+V pour remplacer)</span>
+          <button id="chat-image-clear" class="chat-image-clear" aria-label="Retirer l'image" title="Retirer l'image">✕</button>
+        </div>
       </div>
       <button id="send-btn" aria-label="Envoyer le message">Envoyer</button>
     </div>
@@ -208,17 +212,6 @@
         <div id="offline-banner" class="d-none"></div>
       </div>
       <div class="settings-group">
-        <h3>Diagnostic externe</h3>
-        <div class="setting-row">
-          <span>Autoriser les outils externes (witr, psinfo…)</span>
-          <label class="toggle">
-            <input type="checkbox" id="s-diagnostic-consent">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div id="consent-status" class="consent-status"></div>
-      </div>
-      <div class="settings-group">
         <h3>Dossiers autorisés</h3>
         <div id="fp-list"></div>
         <div class="setting-row">
@@ -254,6 +247,7 @@
 <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" id="image-input" class="d-none" aria-label="Sélection d'image cachée">
 
 <script src="assets/js/app.js" defer></script>
+<script type="module" src="assets/js/modules/boot.js" defer></script>
 
 </body>
 </html>

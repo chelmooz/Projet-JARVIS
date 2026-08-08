@@ -34,9 +34,8 @@ class TestToolbox:
         with open(config_path, "w") as f:
             yaml.dump(SAMPLE_CONFIG, f)
         bin_dir = f"{self.tmpdir}/bin"
-        consent_file = f"{self.tmpdir}/.consent"
         diag = DiagnosticExtService(
-            config_path=config_path, bin_dir=bin_dir, consent_file=consent_file,
+            config_path=config_path, bin_dir=bin_dir,
         )
         self.fs = FileSystemService()
         self.toolbox = Toolbox(diag, file_service=self.fs)
@@ -83,7 +82,7 @@ class TestToolbox:
         results = self.toolbox.auto_execute("pourquoi le processus explorer tourne")
         assert "why_running" in results
         assert results["why_running"]["tool"] == "witr"
-        assert not results["why_running"]["success"]  # echec propre sans consentement
+        assert not results["why_running"]["success"]  # echec car binaire witr absent
 
     def test_extract_target_witr(self):
         cases = {

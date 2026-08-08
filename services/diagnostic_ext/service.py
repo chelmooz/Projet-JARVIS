@@ -1,10 +1,12 @@
 """DiagnosticExtService — orchestre l'exécution des outils de diagnostic externes.
 
 Responsabilités :
-- Gestion du consentement utilisateur (fichier CONSENT_FILE).
 - Résolution et vérification SHA256 des binaires externes.
 - Délégation de l'exécution à CommandExecutor (SRP).
 - Orchestration des outils : smartctl, psinfo, psloglist, handle, psping, psservice, witr.
+
+(C1 — le consentement utilisateur a été retiré : usage mono-utilisateur,
+aucun gate de permission.)
 
 Dettes signalées (non corrigées ici) :
 - ``list_available()`` et ``is_ready()`` appellent ``check_all_tools()`` à chaque
@@ -15,9 +17,7 @@ Dettes signalées (non corrigées ici) :
 
 from __future__ import annotations
 
-import os
 import sys
-import time
 from typing import Any
 
 from services.diagnostic_ext.audit import audit_log
@@ -25,7 +25,6 @@ from services.diagnostic_ext.binary import resolve_binary, resolve_expected_sha2
 from services.diagnostic_ext.config import (
     BIN_DIR,
     CONFIG_PATH,
-    CONSENT_FILE,
     default_smart_device,
     get_tools_config,
     load_config,
@@ -37,63 +36,24 @@ from services.diagnostic_ext.security import verify_sha256
 class DiagnosticExtService:
     """Orchestre les outils de diagnostic externes (Sysinternals, smartctl, etc.).
 
-    Gère le consentement, la vérification d'intégrité (SHA256) et délègue
-    l'exécution à CommandExecutor.
+    Vérifie l'intégrité (SHA256) et délègue l'exécution à CommandExecutor.
     """
 
     def __init__(
         self,
         config_path: str = CONFIG_PATH,
         bin_dir: str = BIN_DIR,
-        consent_file: str = CONSENT_FILE,
         log_service: Any | None = None,
     ) -> None:
         self._config_path = config_path
         self._bin_dir = bin_dir
-        self._consent_file = consent_file
         self._log = log_service
         self._config = load_config(self._config_path)
-        self._consent_given = os.path.exists(self._consent_file)
         self._verified: set[str] = set()
 
     def get_tools_config(self) -> dict:
         """Retourne la configuration des outils (section ``tools`` du config)."""
         return get_tools_config(self._config)
-
-    def ensure_consent(self) -> tuple[bool, str]:
-        """Vérifie si le consentement a été donné, retourne (ok, message)."""
-        if self._consent_given:
-            return True, "Consentement déjà donné"
-        return False, (
-            "Consentement requis. Lancez d'abord : "
-            f"echo 'consent' > {self._consent_file}"
-        )
-
-    def grant_consent(self) -> bool:
-        """Accorde le consentement (écrit le fichier CONSENT_FILE)."""
-        try:
-            os.makedirs(os.path.dirname(self._consent_file), exist_ok=True)
-            with open(self._consent_file, "w") as f:
-                f.write(f"consent granted {time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
-            self._consent_given = True
-            audit_log(self._log, "CONSENT", "Consentement diagnostic accordé")
-            return True
-        except Exception as e:
-            audit_log(self._log, "ERROR", f"Échec consentement: {e}")
-            return False
-
-    def revoke_consent(self) -> bool:
-        """Retire le consentement (supprime le fichier CONSENT_FILE)."""
-        try:
-            os.remove(self._consent_file)
-        except FileNotFoundError:
-            pass
-        except OSError as e:
-            audit_log(self._log, "ERROR", f"Échec retrait consentement: {e}")
-            return False
-        self._consent_given = False
-        audit_log(self._log, "CONSENT", "Consentement diagnostic retiré")
-        return True
 
     def _run_tool(
         self,
@@ -105,7 +65,7 @@ class DiagnosticExtService:
         executor = CommandExecutor(
             self._config, self._bin_dir, self._log, self._verified,
         )
-        return executor.run(tool_name, self._consent_given, args, extra_kwargs)
+        return executor.run(tool_name, args, extra_kwargs)
 
     def run_smartctl(self, device: str | None = None) -> dict:
         """Exécute smartctl sur le device spécifié (défaut: auto-détecté)."""
@@ -177,9 +137,7 @@ class DiagnosticExtService:
         ]
 
     def is_ready(self) -> bool:
-        """Vérifie si le service est prêt (consentement + au moins un outil disponible)."""
-        if not self._consent_given:
-            return False
+        """Vérifie si le service est prêt (au moins un outil disponible)."""
         return len(self.list_available()) > 0
 
 

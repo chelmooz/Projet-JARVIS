@@ -237,7 +237,6 @@ input.addEventListener('keydown', e => {
 sendBtn.addEventListener('click', send);
 document.getElementById('vision-btn').addEventListener('click', () => document.getElementById('image-input').click());
 document.getElementById('image-input').addEventListener('change', handleImageSelect);
-document.getElementById('upload-zone').addEventListener('click', () => document.getElementById('vision-file').click());
 
 // Click delegation for CSP nonce compliance
 document.addEventListener('click', e => {
@@ -267,58 +266,45 @@ function handleImageSelect(e) {
     reader.readAsDataURL(file);
 }
 
-// --- Vision ---
-function handleVisionFile(inputEl) {
-    const file = inputEl.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function (e) {
-        const preview = document.getElementById('vision-preview');
-        preview.src = e.target.result;
-        preview.style.display = 'block';
-        document.querySelector('.upload-zone .icon').textContent = '✅';
-
+// --- Vision : analyse d'une image fournie par un module (clic/change/drop/paste).
+// Le module (modules/vision.js + boot.js) ne POSTe pas : il délègue ici.
+// SRP : app.js garde l'accès réseau + rendu, le module garde l'UX d'entrée.
+window.handleVisionDataUrl = function (dataUrl, file, err) {
+    if (err) {
         const result = document.getElementById('vision-result');
-        result.style.display = 'block';
-        result.textContent = 'Analyse en cours...';
+        if (result) { result.style.display = 'block'; result.textContent = 'Erreur lecture : ' + err.message; }
+        return;
+    }
+    if (!dataUrl) return;
+    const preview = document.getElementById('vision-preview');
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    document.querySelector('.upload-zone .icon').textContent = '✅';
 
-        try {
-            const resp = await fetch('/api/vision', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: e.target.result, task: 'Decris cette image en detail' })
-            });
-            const data = await resp.json();
+    const result = document.getElementById('vision-result');
+    result.style.display = 'block';
+    result.textContent = 'Analyse en cours...';
 
-            if (!resp.ok) {
-                result.textContent = '❌ Erreur ' + resp.status + ' : ' + (data.error || JSON.stringify(data));
-                return;
-            }
-            if (!data.response) {
-                result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que le modele moondream est bien installe.';
-                return;
-            }
-
-            result.innerHTML = '<div class="model-meta">Modele: ' + escHtml(data.model || '?') + '</div>' + renderMarkdown(data.response);
-            updateBadges(data.agent, data.model, data.backend);
-        } catch (err) {
-            result.textContent = 'Erreur : ' + err.message;
+    fetch('/api/vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl, task: 'Decris cette image en detail' })
+    })
+    .then(resp => resp.json().then(data => ({ ok: resp.ok, status: resp.status, data })))
+    .then(({ ok, status, data }) => {
+        if (!ok) {
+            result.textContent = '❌ Erreur ' + status + ' : ' + (data.error || JSON.stringify(data));
+            return;
         }
-    };
-    reader.readAsDataURL(file);
-}
-
-// Drag & drop
-const zone = document.getElementById('upload-zone');
-zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-zone.addEventListener('drop', e => {
-    e.preventDefault();
-    zone.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file) document.getElementById('vision-file').files = e.dataTransfer.files;
-    handleVisionFile(document.getElementById('vision-file'));
-});
+        if (!data.response) {
+            result.textContent = '⚠️ Reponse vide du modele vision. Verifiez que le modele moondream est bien installe.';
+            return;
+        }
+        result.innerHTML = '<div class="model-meta">Modele: ' + escHtml(data.model || '?') + '</div>' + renderMarkdown(data.response);
+        updateBadges(data.agent, data.model, data.backend);
+    })
+    .catch(err => { result.textContent = 'Erreur : ' + err.message; });
+};
 
 // --- Agents ---
 let selectedAgent = null;
@@ -770,7 +756,9 @@ async function send() {
         }
 
         const body = { task: taskText, conversation_id: currentConvId };
-        if (pendingImage) { body.image = pendingImage; pendingImage = null; }
+        const pastedImage = (window.__jarvisImage && window.__jarvisImage.pendingImage()) || null;
+        if (pastedImage) { body.image = pastedImage; window.__jarvisImage.clear(); }
+        else if (pendingImage) { body.image = pendingImage; pendingImage = null; }
 
         const resp = await fetch('/api/jarvis', {
             method: 'POST',
@@ -1069,53 +1057,6 @@ function applyOfflineState(offline) {
     if (sendBtn) sendBtn.disabled = !!offline;
 }
 
-// --- Diagnostic externe : consentement des outils (witr, psinfo, ...) ---
-function setConsentStatus(given) {
-    const el = document.getElementById('consent-status');
-    if (!el) return;
-    if (given === null) {
-        el.textContent = '';
-        el.className = 'consent-status';
-    } else if (given) {
-        el.textContent = '✅ Consentement accordé — les outils externes peuvent s\'exécuter';
-        el.className = 'consent-status consent-ok';
-    } else {
-        el.textContent = '⚠️ Consentement refusé — les outils externes sont bloqués';
-        el.className = 'consent-status consent-warn';
-    }
-}
-
-async function restoreConsentState() {
-    try {
-        const resp = await fetch('/api/diagnostic/consent');
-        const data = await resp.json();
-        document.getElementById('s-diagnostic-consent').checked = !!data.consent_given;
-        setConsentStatus(!!data.consent_given);
-    } catch (e) {
-        setConsentStatus(null);
-    }
-}
-
-document.getElementById('s-diagnostic-consent').addEventListener('change', async e => {
-    const wanted = e.target.checked;
-    try {
-        const resp = await fetch('/api/diagnostic/consent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ consent: wanted }),
-        });
-        const data = await resp.json();
-        const applied = !!data.consent_given;
-        e.target.checked = applied;
-        setConsentStatus(applied);
-        if (applied !== wanted) toast('Consentement inchangé (échec serveur)', 'error');
-    } catch (err) {
-        e.target.checked = !wanted;
-        setConsentStatus(!wanted);
-        toast('Erreur consentement : ' + err.message, 'error');
-    }
-});
-
 async function restoreSettings() {
     try {
         const resp = await fetch('/api/settings');
@@ -1137,7 +1078,6 @@ async function restoreSettings() {
 }
 
 restoreSettings();
-restoreConsentState();
 refreshSkills();
 
 // --- File Path authorization ---
