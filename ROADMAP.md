@@ -1,6 +1,6 @@
 # ROADMAP.md — Projet JARVIS
 # Micro-tâches TDD — Une tâche = Un fichier = Un cycle RED/GREEN
-# Mis à jour : 26 juillet 2026
+# Mis à jour : 8 août 2026
 # Règle : cocher [x] UNIQUEMENT après preuve verte collée.
 
 ---
@@ -179,7 +179,6 @@
 - [x] **PREUVE** : Sur macOS avec Ollama système, JARVIS démarre sans erreur.
 - [x] **COMMIT** : `fix(portability): fallback Ollama système dans JARVIS.sh (macOS)`
 
----
 
 ---
 
@@ -297,8 +296,19 @@
 - [x] **PREUVE** : lecture humanisée du README Installation (étapes 2→6)
 - [x] **COMMIT** : inclus dans le commit 11.1
 
+
 ---
 
+## PHASE 7 - DEPLOIEMENT CLE USB REEL (08/08/2026)
+
+### 7.1 Timeout OllamaAdapter a froid (Server error apres 3 tentatives)
+
+- [x] **RED** : chat navigateur, 1er message -> « Ollama echec apres 3 tentative(s) sur http://127.0.0.1:11436/api/generate: Server error » ; cause : client httpx cree avec timeout 30 s fixes alors que le chargement a froid du modele sur cle USB depasse 30 s et que la retry attend jusqu'a 120 s (config/model_preferences.json).
+- [x] **GREEN** : ollama_adapter.py : creation du client httpx avec httpx.Timeout(self._load_timeout(), connect=1.0) dans __init__ (apres init de self._timeout) et _get_http() - timeout aligne sur le timeout modele (120 s par defaut). Ruff clean.
+- [x] **PREUVE** : ruff check ollama_adapter.py -> All checks passed ; les 3 tests d'integration en erreur sont PRE-EXISTANTS (echec identique sans la modif, verifie par git stash) : contrat de test query() str vs Result.
+- [x] **COMMIT** : fix(adapter): aligne le timeout httpx sur le timeout modele (cold start 30-120 s)
+
+---
 ## RÈGLES DE VALIDATION (ne pas violer)
 
 1. **UNE micro-tâche = UN fichier = UN cycle RED/GREEN.**

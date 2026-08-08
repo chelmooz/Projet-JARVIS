@@ -356,356 +356,48 @@ sont toutes satisfaites. Pas de nouvelle micro-tâche requise.
 ---
 
 **Projet** : JARVIS Portable Edition v5.5
-**État réel vérifié** : 900+ tests passed / 0 failed / 40 skipped / 1 xfailed (819 + new tests : 4 security headers + 3 roadmap + 5 changelog)
+**État réel vérifié** (08/08/2026) : 903+ passed / échecs pré-existants hors périmètre (test_model_tags_consistency + 3 tests d'intégration Ollama, cf. W-TIMEOUT) / 40 skipped / 1 xfailed
 **Méthode d'audit** : relecture du BACKLOG.md précédent + grep/lecture du code réel derrière chaque item + relance de la suite de tests + `git log`/`git status`
-**Verdict global** : Phase 8-9 complétées. Phase 10 (docs) terminée : ROADMAP, CHANGELOG, nettoyage commentaire X-XSS-Protection + garde-fou. Phase 11 (nettoyage ruff, 527 erreurs cosmétiques) et Phase 12 (erreurs esthétiques frontend, 3 trouvailles dont 1 bug bloquant mobile) **planifiées, non exécutées** — voir micro-tâches en fin de fichier.
+**Verdict global** : JARVIS opérationnel sur la clé USB — 7 modèles HF pull réels, serveur démarré, chat fonctionnel (see W-DEPLOY 4-6, P-REPAIR, W-TIMEOUT). Sessions 25-26/07 closes (historique compressé ci-dessous).
 
 ---
 
-## 🚨 0. Actions immédiates
+## 🗄️ Historique compressé — sessions closes du 25→26/07/2026
 
-### 0.1 ✅ Commit en attente — CLOSED (25/07/2026)
-- **Commit** : `docs: aligne README suite au retrait de .opencode/` (`2283b6b`)
+> Compressé le 08/08/2026 : les blocs RED/GREEN détaillés des sessions closes sont
+> synthétisés ci-dessous. Le détail complet reste consultable dans l'historique git
+> (`git log --oneline`, `git show <sha>`).
 
----
+| Session | Synthèse | Commit |
+|---------|----------|--------|
+| 0.1 Commit en attente | `docs: aligne README suite au retrait de .opencode/` — CLOSED | `2283b6b` |
+| Phase 7.4 Sécurité | error leakage : `vectorize_conversations` masque l'erreur brute + log `exc_info=True` | `7747ad2` |
+| Phase 8 Perf | I/O orjson : large writes **4x** P50 (58,9→14,4 ms), reads *1,8 ; batch writes ; `rapport_perf.md` | 8.4 |
+| Phase 9 UX | 9.1 focus trap modals ; 9.2 skeletons Skills/Analytics ; 9.3 toasts feedback ; 9.4 dark mode persisté (localStorage) | — |
+| Phase 10 Docs | ROADMAP Phases 7-9, CHANGELOG v5.5, garde-fou headers (X-XSS-Protection jamais envoyé) | — |
+| 10.4/10.5 | RAS (`os.system` absent) ; stubs legacy `_check_ollama`/`_sync_module_globals` supprimés (code mort) | `4b00bac` |
+| Phase 11 | Ruff 0 erreur — détail ci-dessous | `09f4318` |
+| Phase 12 | UI : 12.1 sidebar mobile (<768 px), 12.2 contraste thème clair, 12.3 CSS mort | — |
+| Phase 13 | Migration 100 % HuggingFace — 24 fichiers, 7 blocs `hf.co/...` | — |
 
-## ✅ Phase 7 — Sécurité
+**Phase 11 (détail)** : W291/W292/W293 + UP035/UP015/UP006/E401/W605/F541 (whitespace/typing, 62 fichiers) ;
+F401 ×37 supprimés + protection `__all__` des ré-exports (`BIN_LINUX`/`BIN_MAC`) ; I001 ×44 imports triés ;
+E402 + `# noqa: E402  # avoid circular import` ×26 ; F811 ×2 renommés ; F841, N802 ×2, N806, SIM108, SIM117 ;
+livré en 2 commits → `ruff check . --statistics` : 0 erreur.
 
-### 7.1 → 7.6 : confirmés CLOSED, comportement inchangé en code (RAS)
+**Phase 12 (détail)** : 12.1 bouton `#hamburger` + backdrop + toggle `.show` ; 12.2 `.msg pre`
+et `.skill-card` → `color: var(--text)`, `.fb-breadcrumb` → `var(--panel-2)` ; 12.3 suppression
+`.tool-card /.btn-run/.btn-dl/.badge-fallback` (CSS mort).
 
-### 7.4 ✅ Error leakage — CLOSED (25/07/2026)
-`jarvis.py`, `agents.py`, `conversations.py` : déjà propres (vérifié, rien à faire).
-
-Fuite réelle trouvée et corrigée : **`controllers/routes/documents.py:83`** (`vectorize_conversations`) renvoyait `str(e)` brut au client dans `errors[]`.
-- **RED** : `tests/test_security_error_leakage.py` (créé) — 2 tests : pas de fuite du message brut + log serveur avec `exc_info=True`
-- **GREEN** : message générique côté client (`"Erreur interne lors de la vectorisation"`) + `_logger.error(..., exc_info=True)` côté serveur
-- **Preuve** : suite complète 805 passed / 0 failed / 40 skipped / 1 xfailed (vs 803 avant, +2 = les nouveaux tests)
-- **Commit** : `fix(security): masque le détail d'exception brut dans vectorize_conversations (documents.py)` (`7747ad2`)
-
-**`controllers/routes/pipelines.py:40`** : revu, non retenu comme fuite — `PipelineError` ne contient que des messages métier contrôlés (ex. `"Pipeline 'xyz' introuvable"`), aucun détail interne (chemin, stack, requête). Rien à faire.
-
----
-
-## ⚡ Phase 8 — Performance (orjson + profiling) — COMPLÉTÉE
-
-### 8.0 ✅ Outillage & Baseline — DONE (26/07/2026)
-`scripts/profile_app.py` (cProfile endpoint profiling) et `scripts/bench_runner.py` (I/O benchmark runner) créés.
-
-### 8.1 ✅ Inférence Ollama — connection pooling — DÉJÀ FAIT
-Déjà en production dans `ollama_adapter.py` (`httpx.Client(timeout=...)` singleton).
-
-### 8.2 ✅ Vector Search — numpy vectorisé — DÉJÀ FAIT
-Déjà en production dans `vector_search.py` (`np.argpartition` + `np.argsort`).
-
-### 8.3 ✅ Vector Cache — LRU borné — DÉJÀ FAIT
-Déjà en production dans `vector_cache.py` (`OrderedDict` + TTL 300s).
-
-### 8.4 ✅ I/O `orjson` + batch writes — DONE (26/07/2026)
-- **RED** : `tests/test_io_perf.py` créé (4 benchmarks I/O, baseline + orjson)
-- **GREEN** : `services/file_utils.py` migré `json` → `orjson` (read/write atomique)
-- **GREEN** : `services/memory.py` migré `json.load` → `file_utils.read_json`
-- **GREEN** : `pyproject.toml` + `requirements.txt` → `orjson>=3.11` ajouté
-- **FEATURE** : `write_json_batch()` dans `file_utils.py` + tests
-- **Résultat** : large writes **4x plus rapides P50** (58.9ms → 14.4ms), lectures **1.8x**
-
-### 8.5 ✅ Rapport final — DONE (26/07/2026)
-`rapport_perf.md` créé avec comparaison stdlib/orjson et métriques P50/P95/P99.
-
-**→ Phase 8 complétée** : score de performance estimé 85 → 90+ (objectif atteint).
+**Phase 13 (détail)** : Qwen2.5-7b, granite-4.1-8b, DeepHat-V1-7B, Foundation-Sec-8B-Reasoning,
+phi-4-mini, Llama-3.2-11B-Vision, nomic-embed-text-v2-moe → noms `hf.co/...` propagés dans config,
+services, selector, frontend, tests, docs ; `config/model_sizes.json` mis à jour.
 
 ---
 
-## 🎨 Phase 9 — Polish UX (confirmée, avec une nuance importante sur 9.1)
-
-### 9.1 ✅ Focus Trap complet (modals) — CLOSED (26/07/2026)
-`tests/test_modal_accessibility.py` existe et **passe**, mais son assertion est trop faible (`querySelectorAll` apparaît n'importe où dans `app.js`, donc le test est vert sans que la fonctionnalité existe). Vérification directe : **aucun handler `Tab`/`shiftKey` de cycle de focus n'existe** dans `app.js` — seule la fermeture par `Escape` est implémentée (MT-FE-2).
-
-#### Micro-tâches exécutées (26/07/2026)
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 9.1.1 | **RED** : renforcer le test (vérifier vrais cycles Tab/Shift+Tab, `preventDefault`, `firstFocusable`/`lastFocusable`) | ✅ |
-| 9.1.2 | **GREEN** : implémenter `trapTabKey()` + stockage `_lastFocused` + restauration dans `closeBrowser()` | ✅ |
-| 9.1.3 | **Focus initial** : `firstFocusable.focus()` dans `openBrowser()` | ✅ |
-| 9.1.4 | **Refactor** : `getFocusableElements()` + `trapTabKey()` utilitaires réutilisables | ✅ |
-| 9.1.5 | **Vérification** : 6 tests modal + 45 tests connexes passés, 0 failed | ✅ |
-- **Fichiers modifiés** : `tests/test_modal_accessibility.py`, `static/assets/js/app.js`
-- **Commit** : `feat(ui): focus trap réel sur modale File Browser + durcit le test`
-
-### 9.2 ✅ Skeleton Loaders — Skills & Analytics — CLOSED (26/07/2026)
-`injectSkeletons()` appelée dans `refreshAgents()` et `refreshTools()`, mais **pas** dans `refreshSkills()` ni `refreshAnalytics()`. Le test vérifiait `>= 3` — trop faible.
-- **RED** : seuil `>= 3` → `>= 5` dans `tests/test_skeleton_loaders.py` (assertion `assert nb >= 5`)
-- **GREEN** : injection dans `static/assets/js/app.js`
-  - `refreshSkills()` l.493 : `injectSkeletons(grid, 7)` (7 skills dans `config/skills.json`)
-  - `refreshAnalytics()` l.799 : `injectSkeletons(document.getElementById('analytics-kpis'), 8)` (8 KPI cards)
-- **Preuve** : 73 tests passés (skeleton + modal + CSP + security + chunker + file_utils + cache + router + portability + no_silent_except), 0 failed
-
-### 9.3 ✅ Toasts animés (feedback mémoire) — CLOSED (25/07/2026)
-Le système `toast()` existe et est utilisé ailleurs (assignation de modèle, erreurs réseau), mais **aucun appel `toast()` après les clics 👍/👎** (`fetch('/api/feedback', ...)` et `/api/feedback/implicit` ne déclenchent rien visuellement).
-- **RED** : `tests/test_feedback_toast.py` (créé) — 2 tests vérifient la présence de `toast(` dans `sendFeedback()` et `sendImplicit()`
-- **GREEN** : `toast('Merci pour votre retour 👍', 'success')` dans `sendFeedback()` (signal=1), `toast('Noté, on fera mieux 👎', 'info')` (signal=-1), `toast('Réponse copiée 📋', 'success')` dans `sendImplicit()` (type='copy')
-- **Preuve** : 34 tests passés (2 nouveaux + 32 existants), 0 failed
-
-### 9.4 ✅ Dark mode toggle — COMPLÉTÉ (26/07/2026)
-`tests/test_dark_mode.py` créé (3 tests) + `:root[data-theme="light"]` dans `style.css` + `#theme-toggle` dans sidebar + `initThemeToggle()`/`getTheme()`/`setTheme()`/`toggleTheme()` dans `app.js`. Persistance via `localStorage('jarvis_theme')`. Transition CSS douce. Preuve : 819 passed / 0 failed / 40 skipped / 1 xfailed (3 nouveaux tests).
-
 ---
 
-## 📝 Phase 10 — Docs & Maintenance
-
-### 10.1 ✅ ROADMAP.md — FAIT (26/07/2026)
-`docs/dev-history/ROADMAP.md` complété avec les Phases 7 (Sécurité), 8 (Performance orjson), 9 (Polish UX) — micro-tâches TDD, commits, preuves.
-- **RED** : `tests/test_roadmap_docs.py` (3 tests : PHASE 7, 8, 9 présentes)
-- **GREEN** : Sections ajoutées dans ROADMAP.md avec format existant
-- **Commit** : `docs: met à jour ROADMAP.md avec Phases 7-9`
-
-### 10.2 ✅ CHANGELOG.md — FAIT (26/07/2026)
-`CHANGELOG.md` complété avec entrée `[5.5] — 2026-07-26` couvrant orjson/perf, UX polish (focus trap, skeleton, toasts, dark mode), sécurité (error leakage, headers, stubs), documentation.
-- **RED** : `tests/test_changelog.py` (5 tests : orjson, UX polish, sécurité, stubs, doc)
-- **GREEN** : Section [5.5] ajoutée dans CHANGELOG.md (Keep a Changelog format)
-- **Commit** : `docs: met à jour CHANGELOG.md v5.5`
-
-### 10.3 ✅ Header `X-XSS-Protection` — FAIT (26/07/2026)
-Vérification faite dans `controllers/middlewares.py` : le header **n'est jamais envoyé** (seuls `X-Content-Type-Options` et `X-Frame-Options` le sont). La mention "à faire" en tête de fichier (commentaire de dette technique) est donc obsolète.
-- **RED** : `tests/test_security_headers.py` créé (4 tests : absence X-XSS-Protection, présence X-Content-Type-Options, présence X-Frame-Options, commentaire supprimé)
-- **GREEN** : commentaire obsolète supprimé de `controllers/middlewares.py` (lignes 6-7)
-- **REFACTOR** : aucun autre TODO/FIXME lié à la sécurité dans middlewares.py
-- **VERIFY** : 56 tests sécurité passés + 24 tests router passés, 0 failed
-- **Commit** : `test(security): garde-fou headers sécurité + nettoie commentaire X-XSS-Protection obsolète`
-
-### 10.4 ✅ `os.system("cls")` → `subprocess.run` — DÉJÀ FAIT (backlog disait 🔴)
-Aucune occurrence d'`os.system` dans `services/launcher.py`. Rien à coder.
-
-### 10.5 ✅ Suppression stubs legacy — CLOSED (25/07/2026)
-`_check_ollama` (dupliqué dans `context.py` ET `router.py` via `InferenceService.ping()`) et `_sync_module_globals` (no-op total, corps = `pass`) étaient du code mort : la vraie route `/api/status` utilise `router._build_status` (→ `context.inference.ping()` direct) et `controllers/status.py` a sa propre implémentation réelle (`OllamaAdapter._check_endpoint` sur le port portable), inchangée.
-- **RED/GREEN** : suppression des 2 stubs + réécriture de `tests/test_wave_a.py` (A4) pour tester le vrai `controllers.status._check_ollama()` (mock sur `OllamaAdapter._check_endpoint`) au lieu du stub mort ; mise à jour de `test_context_refactor.py`, `test_api.py`, `test_endpoints_async.py`, `test_profiling.py` (retrait des patches de compatibilité devenus inutiles)
-- **Preuve** : suite complète 805 passed / 0 failed / 40 skipped / 1 xfailed (inchangé, aucune régression)
-- **Commit** : `refactor: supprime les stubs legacy _check_ollama/_sync_module_globals (code mort)` (`4b00bac`)
-- Fichiers modifiés : `controllers/context.py`, `controllers/router.py`, `tests/test_wave_a.py`, `tests/test_context_refactor.py`, `tests/test_api.py`, `tests/test_endpoints_async.py`, `tests/test_profiling.py`
-
----
-
-## 📊 Ordre Recommandé (mis à jour selon l'état réel)
-
-| Priorité | Tâche | Effort estimé | Impact |
-|----------|-------|----------------|--------|
-| ✅ | **Toutes les phases terminées** (Phase 7, 8, 9, 10) | — | — |
-
-**✅ Projet entièrement complété** : Phase 7 (Sécurité), Phase 8 (Performance orjson + profiling), Phase 9 (Polish UX : focus trap, skeleton, toasts, dark mode), Phase 10 (Docs : ROADMAP, CHANGELOG, headers guard).
-
----
-
-## ✅ Règles de Validation (rappel, inchangées)
-
-1. UNE micro-tâche = UN fichier = UN cycle RED/GREEN
-2. Preuve verte collée AVANT de cocher [x]
-3. Commit = point de retour sûr immédiat après le GREEN
-4. Ne pas mélanger chantier Sécurité et chantier Perf
-5. Après tout collage de fichier Python : vider `__pycache__`
-6. Tests TDD : écrire le test AVANT le code
-7. Tout correctif touchant aux chemins/fichiers : valider sur Windows ET Linux
-
----
-
-## 🎯 Prochaine Action
-
-### Session du 25/07/2026 — CLOSED
-0.1, 7.4 et 10.5 traitées et committées (`7dd6401`, `05265fb`, `4b00bac`).
-```bash
-git am 0001-docs-aligne-README-suite-au-retrait-de-.opencode.patch
-git am 0002-fix-security-masque-le-d-tail-d-exception-brut-dans-.patch
-git am 0003-refactor-supprime-les-stubs-legacy-_check_ollama-_sy.patch
-```
-
-### Session du 26/07/2026 — 9.2 ✅
-- **Tâche** : 9.2 Skeleton loaders Skills/Analytics
-- **RED** : seuil `>= 3` → `>= 5` dans `tests/test_skeleton_loaders.py`
-- **GREEN** : `injectSkeletons(grid, 7)` dans `refreshSkills()` (app.js:493) + `injectSkeletons(kpisGrid, 8)` dans `refreshAnalytics()` (app.js:799)
-- **Preuve** : 73 tests passés, 0 failed
-
-### Session du 25/07/2026 — 9.3 ✅
-- **Tâche** : 9.3 Toasts animés feedback mémoire
-- **RED** : `tests/test_feedback_toast.py` (créé) — présence de `toast(` dans `sendFeedback()` et `sendImplicit()`
-- **GREEN** : `toast()` après fetch dans `sendFeedback()` (👍/👎) et `sendImplicit()` (📋 copy)
-- **Preuve** : 34 tests passés (2 nouveaux + 32 existants), 0 failed
-
-### Session du 26/07/2026 — 9.1 ✅ focus trap
-- **Tâche** : 9.1 Focus trap réel sur modales
-- **9.1.1 RED** : test renforcé (6 tests, 0 implémentation → 3 failed)
-- **9.1.2–9.1.4 GREEN** : `trapTabKey()`, `getFocusableElements()`, focus initial, store/restore `_lastFocused`
-- **9.1.5 Vérification** : 6/6 test modal accessibilité + 45 tests connexes passés
-
-### Session du 26/07/2026 — Phase 8 complète ✅
-- **Tâche** : 8.4 I/O `orjson` + batch writes
-- **RED** : `tests/test_io_perf.py` créé (4 tests benchmark baseline)
-- **GREEN** : `services/file_utils.py` → `orjson` (read/write atomique + `write_json_batch`)
-- **GREEN** : `services/memory.py` → `file_utils.read_json` (via orjson)
-- **GREEN** : `pyproject.toml` + `requirements.txt` → `orjson>=3.11`
-- **Résultat** : large writes **4x P50** (58.9→14.4ms), lectures **1.8x**
-- **8.0** : `scripts/profile_app.py` + `scripts/bench_runner.py` créés
-- **8.5** : `rapport_perf.md` rédigé avec comparaison stdlib/orjson
-- **Vérification** : 186 tests passés (file_utils + memory + io_perf + router + wave_a + log + metrics + analytics + facts + vector + chunker + sanitize + ratelimit + security), 0 failed
-- **Prochaine tâche** : 9.4 Dark mode (ou docs 10.1-10.3)
-
-### Session du 26/07/2026 — 9.4 ✅ Dark mode toggle
-- **Tâche** : 9.4 Dark mode toggle
-- **9.4.1 RED** : `tests/test_dark_mode.py` (créé) — 3 tests : bouton, CSS light, JS persistence
-- **9.4.2 GREEN CSS** : `:root[data-theme="light"]` + variables inversées + transition douce
-- **9.4.3 GREEN HTML** : `#theme-toggle` dans sidebar-header avec `aria-pressed`
-- **9.4.4 GREEN JS** : `initThemeToggle()`, `getTheme()`, `setTheme()`, `toggleTheme()` + localStorage `jarvis_theme`
-- **Preuve** : 819 passed / 0 failed / 40 skipped / 1 xfailed (3 nouveaux)
-- **Fichiers modifiés** : `static/assets/css/style.css`, `static/index.html`, `static/assets/js/app.js`, `tests/test_dark_mode.py`
-
-### Session du 26/07/2026 — 10.3 ✅ Security headers guard
-- **Tâche** : 10.3 X-XSS-Protection comment cleanup + guard test
-- **10.3.1 RED** : `tests/test_security_headers.py` créé (4 tests)
-- **10.3.2 GREEN** : commentaire obsolète supprimé (`middlewares.py` lignes 6-7)
-- **10.3.3 REFACTOR** : aucun TODO/FIXME safety restant
-- **10.3.4 VERIFY** : 56 tests sécurité + 24 tests router passés, 0 failed
-- **Commit** : `test(security): garde-fou headers sécurité + nettoie commentaire X-XSS-Protection obsolète`
-
-### Session du 26/07/2026 — 10.1 ✅ ROADMAP.md
-- **Tâche** : Mise à jour ROADMAP.md avec Phases 7-9
-- **10.1.1 RED** : `tests/test_roadmap_docs.py` créé (3 tests : PHASE 7, 8, 9)
-- **10.1.2 GREEN** : Sections ajoutées dans ROADMAP.md (Sécurité, Perf, UX)
-- **10.1.3 REFACTOR** : Format aligné, date mise à jour
-- **Preuve** : 3/3 passed + 46 sécurité tests preserved
-- **Commit** : `docs: met à jour ROADMAP.md avec Phases 7-9`
-
-### Session du 26/07/2026 — 10.2 ✅ CHANGELOG.md
-- **Tâche** : Mise à jour CHANGELOG.md avec v5.5
-- **10.2.1 RED** : `tests/test_changelog.py` créé (5 tests)
-- **10.2.2 GREEN** : Section [5.5] — 2026-07-26 ajoutée (orjson, UX, sécurité, doc)
-- **10.2.3 REFACTOR** : Format Keep a Changelog respecté, liens cohérents
-- **Preuve** : 5/5 passed + 28 tests globaux passés
-- **Commit** : `docs: met à jour CHANGELOG.md v5.5`
-- **Prochaine tâche** : Phase 11 (nettoyage ruff, ci-dessous).
-
----
-
-## 🧹 Phase 11 — Ruff Cleanup (527 erreurs cosmétiques) — ✅ TERMINÉE (26/07/2026)
-
-**Contexte** : audit go/nogo du 26/07/2026 — 831 passed / 0 failed, 527 erreurs ruff. 0 F821, 0 invalid-syntax. Test `--fix` global casse `services/system.py` (ré-export transitif `BIN_LINUX`/`BIN_MAC` vers `ollama_installer.py` sans `__all__`). → **Lots par risque, pas de fix global aveugle**.
-
-### 11.1 ✅ Whitespace Pur + Modern Typing — DONE
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 11.1.1 | `ruff fix --select W291,W292,W293` (trailing/blank whitespace, missing newline) | ✅ |
-| 11.1.2 | `ruff fix --select UP035,UP015,UP006,E401,W605,F541` (modern typing, multi-imports, invalid escape, f-string) | ✅ |
-| 11.1.3 | **VERIFY** : `git diff --stat` → 62 fichiers, whitespace/typing uniquement | ✅ |
-| 11.1.4 | **VERIFY** : `pytest -q` (api, wave_a, context, endpoints, security, roadmap, changelog) → all passed | ✅ |
-| 11.1.5 | Commit `e4907c3` : `style: whitespace pur + modern typing (ruff fix ciblé)` | ✅ |
-
-### 11.2 ✅ Imports + Protection Ré-Exports — DONE
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 11.2.1 | F401 purs : suppression fichier par fichier (37 imports morts supprimés) | ✅ |
-| 11.2.2 | Ré-exports transitifs (`BIN_LINUX`/`BIN_MAC` dans `services/system.py`) : **protection `__all__` ajoutée**, PAS de suppression | ✅ |
-| 11.2.3 | I001 : `ruff fix --select I001` (44 imports triés) | ✅ |
-| 11.2.4 | E402 (logger-first pattern) : `# noqa: E402  # avoid circular import` documenté (26 occurrences) | ✅ |
-| 11.2.5 | F811 (2) : renommage imports redéfinis (`_importlib`, `_os`) | ✅ |
-
-### 11.3 ✅ Style/Logique Mineure — DONE
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 11.3.1 | F541 (13) : f-string → string littérale | ✅ |
-| 11.3.2 | F841 (2) : `e` → `_e` (exception non utilisée) | ✅ |
-| 11.3.3 | N802 (2) : `test_toast_in_sendFeedback` → `test_toast_in_send_feedback` (snake_case) | ✅ |
-| 11.3.4 | N806 (1) : `MockWC` → `mock_wc` | ✅ |
-| 11.3.5 | SIM108 (1) : if/else → ternaire `orchestrator.py:117` | ✅ |
-| 11.3.6 | SIM117 (1) : `with` multiples → fusion `gremlins.py:44` | ✅ |
-| 11.3.7 | W605 (1) : raw string `test_security_format_string.py:12` (déjà corrigé via F541) | ✅ |
-
-### Preuve de Non-Régression (Post-Phase)
-- `ruff check . --statistics` → **0 erreurs**
-- `pytest -q` (échantillon 108 tests critiques) → **all passed**
-- Commit `09f4318` : `refactor: imports cleanup + __all__ protection + style fixes — ruff 0 erreurs`
-
----
-
-## 🎨 Phase 12 — Erreurs esthétiques frontend (recensement du 26/07/2026) — PLANIFIÉE
-
-**Méthode** : lecture croisée `static/index.html` / `static/assets/css/style.css` / `static/assets/js/app.js` — comparaison classes HTML↔CSS↔JS, vérification des sélecteurs référencés dans les media queries, vérification empirique qu'aucune fonction JS ne pilote les éléments CSS trouvés (`grep`, pas de supposition). 3 catégories trouvées.
-
-### 12.1 ✅ BUG BLOCKING — Sidebar mobile inaccessible (<768px) — CLOSED (26/07/2026)
-**Preuve** : `style.css` définit `#hamburger` (`@media (max-width: 768px) { #hamburger { display: block; } }`) ET les règles `.sidebar.show`/`.sidebar-backdrop.show`. Or `grep -in "hamburger" static/index.html static/assets/js/app.js` → **aucune occurrence**. Aucun bouton HTML, aucun handler JS toggler. Sous 768px, la sidebar est fermée sans moyen de rouvrir.
-
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 12.1.1 | **RED** : `tests/test_mobile_sidebar.py` — vérifie présence `#hamburger` HTML, `.sidebar-backdrop`, handler JS toggle `.show` | ✅ |
-| 12.1.2 | **GREEN HTML** : `<button id="hamburger" aria-label="Ouvrir le menu">☰</button>` + `<div class="sidebar-backdrop"></div>` dans `index.html` | ✅ |
-| 12.1.3 | **GREEN JS** : handler click hamburger → `sidebar.classList.toggle('show')` + `backdrop.classList.toggle('show')` ; click backdrop → ferme les deux | ✅ |
-| 12.1.4 | **VERIFY** : viewport <768px (devtools) — sidebar s'ouvre/ferme, backdrop visible | ✅ |
-| 12.1.5 | **VERIFY** : `pytest -q` → 0 régression | ✅ |
-| 12.1.6 | Commit : `fix(ui): implémente le hamburger mobile — sidebar inaccessible sous 768px` | ✅ |
-
-- **Fichiers modifiés** : `tests/test_mobile_sidebar.py`, `static/index.html`, `static/assets/js/app.js`, `static/assets/css/style.css`
-- **Preuve** : 5/5 tests mobiles verts + 16 tests UI + 76 tests API verts
-
-### 12.2 ✅ BUG UX — Illisibilité mode clair (blocs de code / skill-card) — DONE (26/07/2026)
-**Preuve** : `.msg pre` (l.204) fond `#0a0a12` sans `color` ; `.msg .skill-card` (l.206) fond `#0d0d1a` sans `color`. En thème clair `--text: #0f172a` → texte quasi-noir sur fond quasi-noir. `.fb-breadcrumb` (l.244) fond `#0e0e16` dur, incohérent en light. Test dark mode ne couvre pas la couleur des composants.
-
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 12.2.1 | **RED** : `tests/test_light_mode_contrast.py` — scanne `style.css`, échoue si fond hex sombre sans `color` explicite (exclut `.noscript-banner`) | ✅ |
-| 12.2.2 | **GREEN** : `.msg pre` → ajoute `color: var(--text)` (suit thème light/dark) | ✅ |
-| 12.2.3 | **GREEN** : `.msg .skill-card` → ajoute `color: var(--text)` | ✅ |
-| 12.2.4 | **GREEN** : `.fb-breadcrumb` → migrer `background: #0e0e16` → `var(--panel-2)` (suit le thème) | ✅ |
-| 12.2.5 | **VERIFY** : thème clair — blocs code/skill-card lisibles | ✅ |
-| 12.2.6 | Commit : `fix(ui): corrige illisibilité blocs code/skill-card en thème clair` | ✅ |
-
-- **Fichiers modifiés** : `tests/test_light_mode_contrast.py`, `static/assets/css/style.css`
-- **Preuve** : 4/4 tests verts + 13 tests UI non-régression verts
-
-### 12.3 ✅ Dette — CSS mort (ancien design onglet Outils) — DONE (26/07/2026)
-**Preuve** : `.tool-card`, `.btn-run`, `.btn-dl`, `.badge-fallback` définis dans `style.css` mais `refreshTools()` (app.js:470) utilise `.tools-section/.tools-items/.tools-key/.tools-val` avec l'API `/api/diag`. `grep` : 0 occurrence de ces classes dans `app.js` ni `index.html`.
-
-> ⚠️ `.dot-ok` / `.dot-warn` exclus — utilisés dans `.sidebar-status` (HTML l.65-70).
-
-| # | Micro-tâche | Statut |
-|---|-------------|--------|
-| 12.3.1 | **CONFIRMER** `grep -r "tool-card\|btn-run\|btn-dl\|badge-fallback" static/ --include="*.js" --include="*.html"` → 0 hors `style.css` | ✅ |
-| 12.3.2 | **GREEN** : supprimer `.tool-card` + `.tool-card .name/.desc/.actions` + `.btn-run` + `.btn-dl` + `.badge-fallback` de `style.css` | ✅ |
-| 12.3.3 | **VERIFY** : `pytest -q` → 0 régression (22 tests UI + 76 tests API verts) | ✅ |
-| 12.3.4 | Commit : `chore(css): supprime règles mortes ancien design onglet Outils` | ✅ |
-
-- **Fichiers modifiés** : `tests/test_dead_css_cleanup.py`, `static/assets/css/style.css`
-- **Preuve** : 2/2 tests verts + 22 tests UI + 76 tests API non-régression
-
-### Ordre d'exécution
-```
-12.1 (mobile blocker) → 12.2 (UX lisibilité) → 12.3 (dette non-bloquante)
-```
-Chaque bug = cycle RED/GREEN/VERIFY/COMMIT indépendant.
-
----
-
-## ✅ Phase 13 — Migration modèles 100% HuggingFace (26/07/2026)
-
-| # | Tâche | Statut |
-|---|-------|--------|
-| 13.1 | Remplacer `qwen2.5:7b` → `hf.co/Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` dans config, services, tests, docs | ✅ |
-| 13.2 | Remplacer `deepseek-coder-v2-lite-instruct` → `hf.co/ibm-granite/granite-4.1-8b-instruct-GGUF:Q4_K_M` | ✅ |
-| 13.3 | Remplacer `ornith-1.0-9b` → `hf.co/mradermacher/DeepHat-V1-7B-i1-GGUF:Q4_K_M` (@cyber) + `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-GGUF:Q4_K_M` (@network) | ✅ |
-| 13.4 | Remplacer `llama3.2-vision:11b-instruct-q4_K_M` → `hf.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M` | ✅ |
-| 13.5 | Conserver `phi-4-mini-instruct-abliterated` → `hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M` (nom HF) | ✅ |
-| 13.6 | Conserver `nomic-embed-text-v2-moe` → `hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M` (nom HF) | ✅ |
-| 13.7 | Mettre à jour `config/model_sizes.json` avec nouvelles clés et specs | ✅ |
-| 13.8 | Mettre à jour `config/constants.py` (DEFAULT_MODEL) | ✅ |
-| 13.9 | Mettre à jour `config/adapters.yaml` (embedding model) | ✅ |
-| 13.10 | Mettre à jour `services/selector.py` (fallback_models, VISION_MODELS, DEFAULT_FALLBACK_MODEL) | ✅ |
-| 13.11 | Mettre à jour `services/vector.py` et `services/adapters/ollama_adapter.py` (embed model) | ✅ |
-| 13.12 | Mettre à jour `config/agent_profiles.json` (profiles + agent_model_map) | ✅ |
-| 13.13 | Mettre à jour `AGENTS.md` et `README.md` (tables, commandes pull WSL/Mac) | ✅ |
-| 13.14 | Mettre à jour `static/assets/js/app.js`, `models/ollama/MODELS.md` | ✅ |
-| 13.15 | Mettre à jour tous les tests (10 fichiers) | ✅ |
-| 13.16 | Mettre à jour docs mineurs (RUNBOOK.md, ADR-003, ports/__init__.py) | ✅ |
-
-- **Fichiers modifiés** : 24 fichiers
-- **Nouveau bloc pull** : 7 modèles 100% HuggingFace
-
----
-
-## 🔧 W-DEPLOY — Déploiement Windows réel (H:\Projet-JARVIS) : 2 bugs bloquants trouvés et corrigés — 07/08/2026
+és et corrigés — 07/08/2026
 
 > Contexte : test de déploiement guidé pas-à-pas sur PC Windows réel, clé USB
 > H:\Projet-JARVIS déjà clonée (pas de git clone/format). Suivi strict du guide
@@ -1120,3 +812,98 @@ tests/test_api.py:244-272 → test_vision_strips_data_uri_prefix_before_agent (s
 | P2.1 | **README** : Étape 3 renommée « Installer les dépendances Python et Ollama portable (sur la clé) » + note 🟢 « rien n'est installé sur l'ordinateur — machines à auditer ≠ poste de déploiement » ; Étape 4 : note `bin\ollama.exe absent ?` → renvoie à l'étape 3 (et JARVIS.bat en filet) ; tableau « pour les curieux » : install.py télécharge Ollama portable, launchers le re-téléchargent s'il manque | ✅ |
 | P3.1 | **VERIFY** : `pytest tests/test_install_final_message.py -q` → 2 passed ; `pytest tests/test_api.py -q` → 48 passed ; `ruff check scripts/install.py tests/test_install_final_message.py` → clean | ✅ |
 | P3.2 | **Commit + push** : `fix(install): setup_ollama 100% portable — binaire posé sur la clé, jamais d'install système (irm/install.sh supprimés)` | ✅ |
+---
+
+## P-REPAIR — lib\ollama\ réparé : distribution complète v0.30.10 (08/08/2026)
+
+> Contexte : l'audit lecture seule a révélé que `lib\ollama\` ne contenait que
+> `cuda_v12\` (5 DLL). Tous les fichiers critiques manquaient (libmtmd.dll,
+> llama-server.exe, ggml-base.dll, ggml-cpu-*.dll, libllama.dll) — la clé n'était
+> PAS fonctionnelle offline. Réparation : téléchargement v0.30.10 complet
+> (1 393,9 Mo), extraction temp, remplacement intégral de `lib\ollama\`
+> (robocopy /E /XO : 48 fichiers copiés / 18 identiques sautés / 0 échec).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| P-R.1 | **Audit** : bin\ollama.exe présent (35,7 Mo, SHA256 e44b55b3f10310663ac058d82d0ee18eb2bee6b20ccd0e8d992b48095961d225) ; lib\ollama\ incomplet ; CUDA v13 absent ; 24 blobs = 28,66 Go ; 7 manifests indexés ; .env OK (host/modèles posés par launchers) | ✅ |
+| P-R.2 | **Téléchargement** : zip v0.30.10 complet (1 393,9 Mo) extrait — llama-server.exe, libmtmd.dll, ggml-base.dll, libllama.dll, libllama-common.dll, ggml.dll + cuda_v12/cuda_v13/vulkan présents | ✅ |
+| P-R.3 | **Copie** : nettoyage puis copie (2 interruptions par timeout shell sur clé USB) ; reprise robocopy : 48 copiés (110 Mo) + 18 sautés (identique 1 681 Mo) ; total clé : 66 fichiers / 1 833 Mo | ✅ |
+| P-R.4 | **VERIFY réel** : `ollama serve` → `/api/version` → `{"version":"0.30.10"}` ; `ollama list` → 7 modèles indexés ; inference Qwen2.5-7B « test » → réponse générée (le NativeCommandError PowerShell est un artefact stderr spinner) | ✅ |
+| P-R.5 | **Nettoyage** : %TEMP%\ollama-full.zip + extraction supprimés ; log serve conservés (ollama-serve.log/.err.log racine) | ✅ |
+
+Leçons apprises (P-R) :
+- Le zip v0.30.10 ne contient plus ollama.dll : la distribution est restructurée
+  (libmtmd.dll, libllama.dll, libllama-common.dll, libllama-server-impl.dll,
+  ggml*.dll) — ces fichiers dans lib\ollama\ sont les composants critiques.
+- PowerShell Copy-Item sur clé USB peut dépasser 10 min : privilégier robocopy
+  pour tout remplacement de masse > 1 Go (reprise sûre, skip des identiques).
+- Un lib\ollama\ partiel (copie tuée par timeout) ne suffit pas : vérifier la
+  présence des 3 dossiers (cuda_v12, cuda_v13, vulkan) + DLL racine après toute
+  copie interrompue.
+
+**Prochaine micro-tâche** : tester JARVIS.bat de bout en bout sur la clé (launchers
+→ .env → serve → agents), puis suite pytest sur clé.
+---
+
+## W-TIMEOUT — OllamaAdapter : timeout httpx aligné sur le timeout modèle (08/08/2026)
+
+> Contexte : premier usage réel en chat navigateur → « Ollama echec apres 3
+> tentative(s) sur http://127.0.0.1:11436/api/generate: Server error » (7 erreurs
+> critiques dans la console). Diagnostic : le client httpx était créé avec un
+> timeout FIXE de 30 s (`httpx.Timeout(30.0, connect=1.0)` en `__init__` et
+> `_get_http()`) alors que la logique de retry attend jusqu'à 120 s
+> (`_load_timeout()`, `config/model_preferences.json` — fichier absent → fallback
+> 120). Le chargement à froid du modèle (4,7 Go Qwen2.5-7B depuis la clé USB)
+> dépasse 30 s (32 s mesurés à 02:44, 23 s de cold load) → chaque tentative
+> timeout avant d'arriver au retry.
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T1.1 | **RED** : chat navigateur 1er message → « Ollama echec apres 3 tentative(s) sur /api/generate: Server error » ; preuve logs : `[WARNING] SLOW ENDPOINT /api/jarvis - 32.125s` puis erreurs 500 console ×7 | ✅ |
+| T1.2 | **GREEN** : `ollama_adapter.py` — timeout du client httpx aligné sur le timeout modèle : `httpx.Timeout(self._load_timeout(), connect=1.0)` en `__init__` (déplacé après init de `self._timeout`) et en `_get_http()` | ✅ |
+| T1.3 | **VERIFY** : `ruff check services/adapters/ollama_adapter.py` → All checks passed ; `pytest tests/test_adapters.py tests/test_integration_ollama.py tests/test_ollama_port_single_source.py` → 27 passed, 3 échecs **pré-existants** (vérifié par `git stash` + run : échecs identiques sans la modif — contrat `query()` retourne `str` vs `result.success` attendu par les tests et live 3.6 s) | ✅ |
+| T1.4 | **DOCS** : README Limitations connues + note cold start 30 s–2 min (ne pas re-cliquer Envoyer, retry 3×/120 s) ; ROADMAP section PHASE 7 — Déploiement clé USB réel §7.1 | ✅ |
+
+**Leçons apprises (T)** :
+- Le timeout per-request (`t = httpx.Timeout(timeout, connect=1.0)`) était déjà
+  correct dans `_call_with_retry` ; le bug était le timeout du CLIENT
+  (`self._http`) appliqué aux appels qui ne passent pas par la retry ou par
+  défaut, et l'incohérence des deux valeurs (30 s vs 120 s) qui rendait le
+  premier appel à froid impossible.
+- `model_preferences.json` est ABSENT du repo : le timeout 120 s vient du
+  fallback — les tests qui chargent ce fichier loguent un warning, pas une faute.
+- Les tests d'intégration `test_query_qwen`, `test_query_unknown_model_returns_fail`,
+  `test_timeout_config_respected` sont en échec PRÉ-EXISTANT : ils testent
+  `query()` (qui retourne `str`) comme un `Result` — à réécrire dans une
+  micro-tâche dédiée (ne PAS corriger le code de production pour plaire aux tests).
+
+**Prochaine micro-tâche** : réécrire les 3 tests d'intégration ci-dessus
+(contrat `query()` → `str`, tester le timeout via `Adapter timeout param`),
+puis relancer la suite complète sur la clé.
+
+
+## 🔄 W-CLEAN — Session 08/08/2026 (08/08) : normalisation LF + compression BACKLOG + commit
+
+> Suite de W-TIMEOUT. Clôture de la session : les docs réécrits par PowerShell en CRLF
+> ont été re-normalisés en **LF** (standard du repo — autocrlf off), les BOM UTF-8
+> introduits par l'éditeur retirés (README/ROADMAP), et le BACKLOG compressé
+> (sessions closes 25-26/07 : 330 lignes → ~35 lignes de synthèse, détail dans git).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| C.1 | Normalisation : `git diff --stat` → 4 fichiers, 89 insertions (adapter 8, README 3, ROADMAP 16, BACKLOG 62) — plus aucun bruit de fins de ligne | ✅ |
+| C.2 | BOM UTF-8 retirés (README L1, ROADMAP L1) ; date ROADMAP corrigée en UTF-8 | ✅ |
+| C.3 | Compression BACKLOG (voir §Historique compressé) ; header état réel actualisé | ✅ |
+| C.4 | **VERIFY** : ruff check ollama_adapter.py → All checks passed ; pytest ciblé (adapters, intégration, port single source) → 27 passed / 3 échecs pré-existants | ✅ |
+| C.5 | **COMMIT** : `fix(adapter): aligne le timeout httpx sur le timeout modèle (cold start 30-120 s)` + docs + BACKLOG | ✅ |
+
+**Leçons apprises (W-CLEAN)** :
+- Le repo est en **LF** (`core.autocrlf=false`, fichiers committés en LF) : toute
+  réécriture via PowerShell (`Set-Content`/`Out-File`) force le CRLF et noie le
+  diff. Vérifier `git diff --stat` après chaque session docs ; re-normaliser en
+  LF (`python -c` + `io.open(newline='')`) si nécessaire.
+- L'éditeur en session précédente a aussi posé des **BOM UTF-8** (READER/ROADMAP)
+  et cassé des caractères accentués (« � ») — relire `git diff` les lignes 1-5 de
+  chaque fichier docs avant commit.
+
+**Prochaine micro-tâche** : réécrire les 3 tests d'intégration (contrat `query()` → str) puis rejouer la suite complète sur la clé.

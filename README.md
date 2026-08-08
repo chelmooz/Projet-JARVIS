@@ -690,6 +690,7 @@ opencode
 - **Performance sur clef USB** — les modèles LLM font ~2–5 Go chacun. Une clef **USB 3.0** (port bleu, 5 Gb/s) est recommandée pour des temps de chargement corrects. Un modèle comme l'**Emtec 64 Go** offre un bon rapport qualité/débit. Pour de meilleures perfs (chargement modèles, index vectoriel), une **SSD portable USB 3.2** est recommandée (débit ~10× supérieur à l'USB 3.0 générique).
 - **Pas de HTTPS** — l'interface web ne sert qu'en HTTP local
 - **Mémoire non persistante entre redémarrages** — l'historique des conversations est conservé, mais la mémoire vectorielle est reconstruite au démarrage
+- **1er chargement de modèle lent (cold start)** - au premier message dans le chat, le modèle (4-8 Go) est chargé depuis la clef : la réponse peut prendre 30 s à 2 min. Ne pas re-cliquer « Envoyer » : les requêtes sont retentées 3 fois par l'adaptateur Ollama (timeout 120 s par défaut, cf. config/model_preferences.json).
 
 ---
 

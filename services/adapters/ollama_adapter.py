@@ -24,12 +24,14 @@ class OllamaAdapter(LLMAdapter):
 
     def __init__(self, base_url: str | None = None, max_retries: int = 3):
         self._base_url = (base_url or self._load_base_url()).rstrip("/")
-        self._http = httpx.Client(timeout=httpx.Timeout(30.0, connect=1.0))
+        self._timeout: int | None = None
+        # CORRECTION : timeout client aligne sur le timeout modele (120s par defaut),
+        # pas 30s fixes — le chargement a froid sur cle USB peut depasser 30s.
+        self._http = httpx.Client(timeout=httpx.Timeout(self._load_timeout(), connect=1.0))
         self._backend = "ollama"
         self._max_retries = max(1, int(max_retries))
         self._models_cache: list[dict] | None = None
         self._models_cache_ts: float = 0.0
-        self._timeout: int | None = None
         # CORRECTION : Flag pour éviter les requêtes après fermeture
         self._closed = False
 
@@ -69,7 +71,7 @@ class OllamaAdapter(LLMAdapter):
         garde la référence de l'ancien client (fermé) qui lève -> pas de zombie.
         """
         if self._http is None:
-            self._http = httpx.Client(timeout=httpx.Timeout(30.0, connect=1.0))
+            self._http = httpx.Client(timeout=httpx.Timeout(self._load_timeout(), connect=1.0))
         return self._http
 
     @staticmethod
