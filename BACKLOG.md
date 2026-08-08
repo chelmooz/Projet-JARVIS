@@ -1047,3 +1047,33 @@ puis relancer la suite complète sur la clé.
 **Prochaine micro-tâche** : rejouer la suite complète `pytest tests/` sur la clé
 (sous Windows réel) puis confirmer chat navigateur + `/api/status` en conditions
 réelles.
+
+## 🔧 SKILLS-SP — Intégration sélective Superpowers dans config/skills.json (08/08/2026)
+
+> Ticket "Intégration sélective de Superpowers dans config/skills.json" (RTOC v2,
+> pour coder TDD). Sources récupérées depuis `obra/superpowers` (branche `main`,
+> téléchargées en temp). Fusion NE MODIFIE PAS `services/skills.py` (ticket
+> de contenu pur).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T.1 | **RED** : `tests/test_skills_content.py` créé (13 tests : structure, kill_coding, code_review, systematic_debugging) → 10 échecs attendus (Iron Law absente, anti-patterns absents, skill absent) | ✅ |
+| T.2 | **GREEN** : `config/skills.json` — `kill_coding` enrichi (Iron Law + cycle TDD complet + anti-patterns de `writing-good-tests.md`), `code_review` enrichi (checklist What to Check extraite de `code-reviewer.md`), nouveau skill `systematic_debugging` (4 phases + règle des 3 correctifs) | ✅ |
+| T.3 | **VERIFY** : `pytest tests/test_skills_content.py` → **13 passed** ; `test_skills + test_agents` → **53 passed** ; `json.tool` → valide ; `ruff` → 0 erreur | ✅ |
+| T.4 | **Non-régression** : suite complète → 937 passed, 14 failed + 6 errors. Tous les échecs sont PRÉ-EXISTANTS (prouvé par `git stash` : mêmes échecs baseline dans test_vectorize, test_system, test_no_silent_except, test_model_*, liés au contexte pré-déploiement : pas d'Ollama/modèles). Zéro régression imputable au ticket | ✅ |
+| T.5 | **Attribution** : `config/SKILLS_ATTRIBUTION.md` créé (licence MIT complète + mapping sources → skills + exclusions documentées) | ✅ |
+| T.6 | **BACKLOG** : trace SKILLS-SP ajoutée | ✅ |
+
+**Leçons apprises (SKILLS-SP)** :
+- Le contenu d'un skill LLM doit rester *condensé* : il est injecté dans le contexte
+  à chaque appel (`get_enabled_skills_text()` concatène les prompts). Les exemples
+  TypeScript `<Good>/<Bad>` de la source ont été écartés (coût tokens, modèle 7-8B).
+- Langue : français pour le corps, labels techniques anglais conservés (`Iron Law`,
+  `RED-GREEN-REFACTOR`, `TDD`) — convention déjà présente dans le fichier.
+- Séparer la vérification de *structure* (keys requises, `enabled: false`) de la
+  vérification de *contenu* (sous-chaîne dans prompt) permet de cibler précisément
+  ce qui manque avant la fusion.
+
+**Prochaine micro-tâche (optionnelle)** : signaler les 20 échecs pré-existants
+de la suite complète en ticket séparé (Ollama absent → tests modèles + vectorize
+leaders), indépendamment de ce ticket de contenu.
