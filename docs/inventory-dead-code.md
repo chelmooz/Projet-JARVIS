@@ -78,9 +78,15 @@ supplémentaire justifiée sans câblage explicite.
 
 | Élément | Preuve de mortalité | Action |
 |---------|---------------------|--------|
-| `services/kill_coding.py` (`KillCodingAnalyzer`, `KillCodingReport`) | Shim de réexport créé lors du renommage Kill Coding → Analysis (`services/analysis.py`). Zéro import ailleurs dans le dépôt (`controllers/routes/kill_coding.py` importe directement `Analyzer` depuis `services.analysis`, pas depuis ce shim). Non détecté par vulture (module valide, juste jamais importé — hors du périmètre de détection symbole par symbole). | **Correction 26/07/2026** : le fichier existe toujours (shim de compatibilité, 5 lignes). À supprimer après vérification qu'aucun import externe ne le référence. |
+| `services/kill_coding.py` (`KillCodingAnalyzer`, `KillCodingReport`) | Shim de réexport créé lors du renommage Kill Coding → Analysis (`services/analysis.py`). Zéro import ailleurs dans le dépôt (`controllers/routes/kill_coding.py` importe directement `Analyzer` depuis `services.analysis`, pas depuis ce shim). Non détecté par vulture (module valide, juste jamais importé — hors du périmètre de détection symbole par symbole). | ✅ **Supprimé (08/08/2026, MT-D4)** — vérification grep exhaustive : aucun `import services.kill_coding` / `KillCodingAnalyzer`/`KillCodingReport` hors du shim. L'absence du module est figée par `tests/test_dead_config_api_removed.py`. |
 
 > Méthode complémentaire à vulture : recherche par module, pour chaque fichier
 > source, d'un `import <module>` ou `from <module> import` ailleurs dans le
 > dépôt. Un seul fichier n'avait aucune référence externe.
+
+## 6. MT-D4 — API typée `config/__init__.py` supprimée (08/08/2026)
+
+| Élément | Preuve de mortalité | Action |
+|---------|---------------------|--------|
+| `config/__init__.py` — `ConfigError`, dataclasses (`AgentProfileConfig`, `ModelPreference`, `CyberWorkflow`, `ComponentAsset`, `ComponentsConfig`), getters (`get_agent_profiles`, `get_model_preferences`, `get_cyber_workflows`, `get_components`), `reload`, `_load_json` | API de chargement typée **jamais consommée** : grep exhaustif (production, `controllers/`, `services/`, `scripts/`, `tests/`) → aucun import de ces symboles depuis le package racine `config`. Les sous-modules utilisés sont des fichiers séparés : `config/constants.py`, `config/paths.py`, `config/agent_profiles.py` (le lecteur CORRECT de `agent_profiles.json`, créé en W-DEPLOY-6 — l'ancien getter attendait une liste là où le fichier est un dict, bug latent D6.3). | Le package racine est réduit à un docstring de routage vers les sous-modules ; `test_dead_config_api_removed.py` fige l'absence des symboles. **Fermé : D6.3 du BACKLOG enfin traité.** |
 

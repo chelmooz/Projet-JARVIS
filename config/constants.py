@@ -169,7 +169,7 @@ def _get_env_str(key: str, default: str) -> str:
 # ---------------------------------------------------------------------------
 # Runtime (surchargeable via .env ou variables système)
 # NOTE: Ces valeurs sont figées au premier import. Pour un rechargement
-# à chaud, utiliser config.reload() ou redémarrer le processus.
+# à chaud, redémarrer le processus.
 # ---------------------------------------------------------------------------
 
 JARVIS_PORT: Final[int] = _get_env_int("JARVIS_PORT", 8000)

@@ -45,6 +45,66 @@ ruff check services/diagnostic_ext controllers/routes/diagnostic_ext.py ... → 
 
 ---
 
+## 🔧 MT-D4 — Code mort : API typée config/__init__.py + shim services/kill_coding.py (08/08/2026)
+
+> Suite directe de C1. Cleanup « zéro mort » (skill clean-code) via l'inventaire
+> `docs/inventory-dead-code.md` + re-vérification grep exhaustive. Deux nids de
+> code mort confirmés, jamais câblés :
+> (1) `config/__init__.py` exposait une API typée complète (5 dataclasses,
+> `ConfigError`, 4 getters, `reload`) **sans aucun appelant** — bug latent D6.3
+> du BACKLOG (le getter `get_agent_profiles` attendait une liste alors que
+> `agent_profiles.json` est un dict ; le bon lecteur existe déjà :
+> `config/agent_profiles.py` créé en W-DEPLOY-6).
+> (2) `services/kill_coding.py` était un shim de réexport de `services/analysis.py`,
+> jamais importé (routes → `Analyzer` directement depuis `services.analysis`).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| MT4.1 | **RED** : `tests/test_dead_config_api_removed.py` (3 tests — les 11 symboles morts absents du package racine + de `__all__` ; `services.kill_coding` introuvable par `find_spec`) → échoue : 3 failed (symboles encore présents) | ✅ |
+| MT4.2 | **GREEN** : `config/__init__.py` réduit à un docstring de routage (docstring, zéro code) ; `services/kill_coding.py` supprimé ; `config/constants.py` — commentaire « config.reload() » retiré (référence morte) | ✅ |
+| MT4.3 | **Docs** : `docs/inventory-dead-code.md` — §5 MT-D3 marqué ✅ supprimé, §6 MT-D4 ajouté | ✅ |
+| MT4.4 | **VERIFY ciblé** : 3 tests verts ; suite config/agents/analysis/kill_coding → **115 passed** ; `ruff check` sur les fichiers touchés → All checks passed! ; 41 passed (re-test) | ✅ |
+| MT4.5 | **VERIFY déploiement** : suite complète → **924 passed / 14 failed / 6 errors** ; preuve non-régression par `git stash -u` + rejeu des tests en échec → **échecs IDENTIQUES sans mes modifications** (23 des 24 = pré-existants Ollama sans serveur/vectorize/system/install_final ; `TestConcurrentNoDuplicate` volatile passe/skip selon ordre) ; `import jarvis` + `import controllers.router` + `import services.analysis` OK | ✅ |
+
+**Preuve MT-D4** :
+```
+RED  : pytest tests/test_dead_config_api_removed.py → 3 failed
+       (get_agent_profiles/ConfigError/... encore exposés, ModuleSpec trouvé)
+GREEN: pytest tests/test_dead_config_api_removed.py → 3 passed
+Suite ciblée                                    → 115 passed
+Suite complète (avec mes changements)           → 924 passed / 14 failed / 6 errors
+Suite même fichiers (stash -u, sans mes chang.) → 84 passed / 15 failed / 6 errors (identique)
+ruff check config/__init__.py constants.py tests/test_dead_config_api_removed.py → All checks passed
+ruff check . → 36 erreurs PRÉ-EXISTANTES dans services/file_system.py + 3 tests volumiques
+                (W293/W291/W605/I001/UP007, git status propre pour ces fichiers → présentes dès e29864b)
+```
+
+**Leçons apprises (MT-D4)** :
+- L'API typée de `config/__init__.py` datait d'avant la simplification de la config —
+  « code mort avec bug latent » (D6.3) : vivre longtemps sans appelant ne rend pas
+  une fonction correcte, juste silencieuse. Le test de non-exposition
+  (`hasattr(config, symbol) is False`) fige la suppression — pattern du repo
+  (cf. test_dark_mode), la seule preuve durable contre la réintroduction.
+- `git stash -u` reste la preuve de non-régression la plus rapide : les mêmes
+  23 échecs (Ollama sans serveur, vectorize, system, install_final) réapparaissent
+  sans mes changements → aucun échec nouveau ; le 24e (`TestConcurrentNoDuplicate`)
+  est volatile : alterne échec/pass selon l'ordre d'exécution.
+- Les 36 erreurs `ruff check .` viennent de fichiers **non modifiés** (git status
+  propre pour eux → présentes dès e29864b) : la pratique du repo (BACKLOG) vérifie
+  les fichiers touchés par la session, pas le dépôt entier. Un nettoyage global
+  W291/W293/W605/I001/UP007 reste à faire hors périmètre.
+
+**Fichiers livrés (session, non encore commités)** : `config/__init__.py` (réécrit),
+`config/constants.py` (commentaire), `services/kill_coding.py` (supprimé),
+`tests/test_dead_config_api_removed.py` (nouveau, 3 tests),
+`docs/inventory-dead-code.md` (sections 5-6).
+
+**Prochaine micro-tâche** : commit + push ; puis (optionnel) corriger les 36
+erreurs ruff pré-existantes de `services/file_system.py` + `tests/test_file_system.py`
++ `test_pyproject_dependencies.py` + `test_sanitize.py`.
+
+---
+
 ## 🔧 W1 — witr : requêtes port via `--port` (bug P1 de l'audit binaire) — 06/08/2026
 
 > P1 vérifié binaire en main : `witr --json 8000` traite « 8000 » comme un **nom**
