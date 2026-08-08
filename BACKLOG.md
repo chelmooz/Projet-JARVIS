@@ -907,3 +907,40 @@ puis relancer la suite complète sur la clé.
   chaque fichier docs avant commit.
 
 **Prochaine micro-tâche** : réécrire les 3 tests d'intégration (contrat `query()` → str) puis rejouer la suite complète sur la clé.
+
+---
+
+## 🧪 W-TES — Tests d'intégration Ollama : contrat `query()` → str (08/08/2026)
+
+> Échecs PRÉ-EXISTANTS documentés en W-TIMEOUT (T1.3) : `test_query_qwen`,
+> `test_query_unknown_model_returns_fail`, `test_timeout_config_respected`
+> testaient `query()` (retourne `str`) comme un `Result`. Réécrits selon le
+> contrat réel de `ollama_adapter.py` : `query()` → `str` pure, échec = levée
+> `RuntimeError` (via `_call_with_retry`), timeout piloté par `_load_timeout()`
+> (default 120 s — aucune modification de production, les tests sont mis au contrat).
+
+| # | Micro-tâche | Statut |
+|---|-------------|--------|
+| T.1 | **RED (rejoué)** : `test_query_qwen` → `AttributeError: 'str' object has no attribute 'success'` ; `test_query_unknown_model_returns_fail` → `RuntimeError` non capté (404 réel) ; `test_timeout_config_respected` → même `AttributeError` | ✅ |
+| T.2 | **GREEN** `tests/test_integration_ollama.py` : `test_query_qwen` → assert `isinstance(str)` + non vide ; `test_query_unknown_model_raises` (renommé) → `pytest.raises(RuntimeError)` ; `test_timeout_config_respected` → `adapter._timeout = 0.01` → RuntimeError < 10 s (retries ≈ 3×(0,01 s + 1 s sleep)) ; `import time` remonté en tête de module | ✅ |
+| T.3 | **VERIFY** : `pytest tests/test_integration_ollama.py` → **12 passed** ; `test_adapters + test_ollama_port_single_source` → **18 passed** (non-régression) ; `ruff` → 0 erreur | ✅ |
+| T.4 | **BACKLOG** : trace W-TES ajoutée ; les 3 échecs pré-existants de la suite sont clos | ✅ |
+| T.5 | **COMMIT** : `test(integration): aligne les tests Ollama sur le contrat query() -> str` | ✅ |
+
+**Leçons apprises (W-TES)** :
+- Ne jamais corriger le code de production pour satisfaire un test qui ne reflète
+  pas le contrat : `query()` est une `str` pure par design ; la réécriture s'est
+  faite du côté des tests. `chat()` reste le contrat `Result` (exceptions déjà
+  embarquées — les deux contrats coexistent par choix d'API).
+- Le timeout n'a pas de paramètre public sur `query()` : il est porté par
+  `_load_timeout()` (fichier config → défaut 120) et appliqué au client
+  (`self._http`) et par requête (`_call_with_retry`). Pour forcer un timeout
+  court en test d'intégration : positionner `adapter._timeout` (attribut
+  documenté à l'init), sans toucher au fichier de config réel.
+- Cold start vs warm : après un 1er appel réussi (`keep_alive`), la réponse
+  Qwen2.5-7B revient en < 1 s sur cette machine — le test de timeout 0,01 s reste
+  déterministe (aucun serveur ne répond en 10 ms).
+
+**Prochaine micro-tâche** : rejouer la suite complète `pytest tests/` sur la clé
+(sous Windows réel) puis confirmer chat navigateur + `/api/status` en conditions
+réelles.

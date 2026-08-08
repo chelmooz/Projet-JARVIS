@@ -12,6 +12,7 @@ Lancement avec Docker :
   python -m pytest tests/test_integration_ollama.py -v
 """
 import os
+import time
 
 import httpx
 import pytest
@@ -101,10 +102,9 @@ class TestOllamaAdapter:
 
     @has_model("hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
     def test_query_qwen(self):
-        result = self.adapter.query("Reponds uniquement par 'ok'.", model="hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
-        assert result.success is True
-        assert "response" in result.data
-        assert len(result.data["response"]) > 0
+        response = self.adapter.query("Reponds uniquement par 'ok'.", model="hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
+        assert isinstance(response, str)
+        assert response.strip()
 
     @has_model("hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
     def test_chat_qwen(self):
@@ -115,10 +115,9 @@ class TestOllamaAdapter:
         assert "content" in result.data
         assert len(result.data["content"]) > 0
 
-    def test_query_unknown_model_returns_fail(self):
-        result = self.adapter.query("hello", model="this-model-does-not-exist-42")
-        assert result.success is False
-        assert result.error is not None
+    def test_query_unknown_model_raises(self):
+        with pytest.raises(RuntimeError):
+            self.adapter.query("hello", model="this-model-does-not-exist-42")
 
     def test_embed_nomic(self):
         """Test embed with nomic-embed-text if available."""
@@ -137,12 +136,11 @@ class TestOllamaAdapter:
 
     @has_model("hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
     def test_timeout_config_respected(self):
-        """Short timeout should fail on a large prompt."""
-        import time
+        """Un timeout tres court fait echouer la requete (RuntimeError apres retries)."""
         adapter = OllamaAdapter(base_url=OLLAMA_URL)
+        adapter._timeout = 0.01
         t0 = time.time()
-        # A short simple prompt should still work quickly
-        result = adapter.query("Reponds 'ok'.", model="hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
+        with pytest.raises(RuntimeError):
+            adapter.query("Reponds 'ok'.", model="hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M")
         elapsed = time.time() - t0
-        assert result.success is True
-        assert elapsed < 30
+        assert elapsed < 10
