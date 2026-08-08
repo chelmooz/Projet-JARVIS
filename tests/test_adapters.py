@@ -58,6 +58,27 @@ class TestOllamaAdapter:
         ])
         assert adapter.first_available() == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 
+    def test_first_available_prefers_text_over_vision_model(self, monkeypatch):
+        """Bug réel clé USB : moondream (vision) arrive en premier dans
+        /api/tags -> le chat tombait sur un modèle vision qui répond n'importe
+        quoi. S'il existe un modèle completion NON-vision, il doit être choisi
+        ; un modèle vision n'est proposé qu'en dernier recours."""
+        adapter = OllamaAdapter(base_url="http://x")
+        monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [
+            {"name": "moondream", "capabilities": ["completion", "vision"]},
+            {"name": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M", "capabilities": ["completion", "tools"]},
+        ])
+        assert adapter.first_available() == "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+
+    def test_first_available_falls_back_to_vision_model(self, monkeypatch):
+        """Seul un modèle vision est disponible : pas de panique, il reste
+        utilisable en dernier recours (plutôt que rien)."""
+        adapter = OllamaAdapter(base_url="http://x")
+        monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [
+            {"name": "moondream", "capabilities": ["completion", "vision"]},
+        ])
+        assert adapter.first_available() == "moondream"
+
     def test_first_available_none_when_only_embedding_models(self, monkeypatch):
         adapter = OllamaAdapter(base_url="http://x")
         monkeypatch.setattr(adapter, "_fetch_models_raw", lambda: [

@@ -19,6 +19,24 @@ MODELS_CACHE_TTL = 30  # Secondes : cache des /api/tags pour eviter 1 HTTP call 
 ADAPTERS_PATH = os.path.join(PROJECT_DIR, "config", "adapters.yaml")
 
 
+def _first_completion(models: list[dict], prefer_pure_text: bool = False) -> str | None:
+    """Premier modèle ``completion`` de la liste, en excluant ``embedding``-only.
+
+    ``prefer_pure_text`` : exclut aussi les modèles ``vision`` en première
+    passe — un modèle vision branché sur le chat répond hors sujet ; il ne
+    reste sélectionnable qu'en dernier recours.
+    Un modèle sans champ ``capabilities`` (vieilles versions d'Ollama) est
+    toujours éligible (comportement historique).
+    """
+    for entry in models:
+        capabilities = entry.get("capabilities")
+        if capabilities is None or "completion" in capabilities:
+            if prefer_pure_text and capabilities is not None and "vision" in capabilities:
+                continue
+            return entry.get("name")
+    return None
+
+
 class OllamaAdapter(LLMAdapter):
     """OllamaAdapter."""
 
@@ -252,12 +270,13 @@ class OllamaAdapter(LLMAdapter):
         (capability "embedding" mais pas "completion"). Un modèle sans
         champ "capabilities" (anciennes versions d'Ollama) est considéré
         disponible par défaut — comportement historique préservé.
+
+        Préférence texte pur : un modèle completion avec la capability
+        "vision" (ex: moondream) n'est proposé qu'en dernier recours —
+        brancher un modèle vision au chat produit des réponses hors sujet.
         """
-        for entry in self._fetch_models_raw():
-            capabilities = entry.get("capabilities")
-            if capabilities is None or "completion" in capabilities:
-                return entry.get("name")
-        return None
+        candidates = self._fetch_models_raw()
+        return _first_completion(candidates, prefer_pure_text=True) or _first_completion(candidates)
 
     def embed(self, text: str, model: str | None = None) -> list[float]:
         model = model or "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"

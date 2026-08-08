@@ -25,6 +25,22 @@ class TestModelForAgent:
         monkeypatch.setattr(agent_profiles, "PROFILES_FILE", path)
         assert agent_profiles.model_for_agent("inconnu") is None
 
+    def test_routing_key_maps_to_profile_model(self, tmp_path, monkeypatch):
+        """Bug réel clé USB : @orchestrateur/@dev → agent_key "dev" n'existe
+        pas dans agent_profiles.json (clés = profils) → fallback
+        first_available() → moondream (modèle vision) → chat absurde.
+        Les clés de routage doivent résoudre vers le profil associé
+        (même mapping que agents/factory.py)."""
+        path = _write_profiles(tmp_path, {
+            "profiles": {
+                "techlead": {"model": "TECHLEAD_MODEL"},
+                "orchestrateur": {"model": "ORCHESTRATEUR_MODEL"},
+            },
+        })
+        monkeypatch.setattr(agent_profiles, "PROFILES_FILE", path)
+        assert agent_profiles.model_for_agent("dev") == "TECHLEAD_MODEL"
+        assert agent_profiles.model_for_agent("hardware") == "ORCHESTRATEUR_MODEL"
+
     def test_missing_file_returns_none(self, tmp_path, monkeypatch):
         monkeypatch.setattr(agent_profiles, "PROFILES_FILE", tmp_path / "absent.json")
         assert agent_profiles.model_for_agent("techlead") is None
