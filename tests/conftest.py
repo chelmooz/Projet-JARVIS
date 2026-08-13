@@ -9,8 +9,12 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+from models import Result
+from ports import ChatPort
 
 
 @pytest.fixture
@@ -29,3 +33,32 @@ def sandbox_root(tmp_path: Path) -> Iterator[Path]:
             os.environ.pop("JARVIS_FILES_SANDBOX_ROOT", None)
         else:
             os.environ["JARVIS_FILES_SANDBOX_ROOT"] = previous
+
+
+class FakeInference(ChatPort):
+    """``ChatPort`` déterministe : renvoie une réponse configurable (echo par défaut)."""
+
+    def __init__(self, response: str = "fake-answer") -> None:
+        self.response = response
+        self.last_prompt: str | None = None
+        self.last_model: str | None = None
+        self.last_messages: list[dict[str, Any]] | None = None
+
+    def query(self, prompt: str, model: str, system: str | None = None) -> str:
+        self.last_prompt = prompt
+        self.last_model = model
+        return self.response
+
+    def chat(self, model: str, messages: list[dict[str, Any]]) -> Result:
+        self.last_model = model
+        self.last_messages = messages
+        return Result.ok(data={"text": self.response}, agent="fake", model=model)
+
+
+fake_inference: ChatPort = FakeInference()
+
+
+@pytest.fixture
+def inference() -> ChatPort:
+    """Fournit le ``ChatPort`` factice déterministe."""
+    return fake_inference
