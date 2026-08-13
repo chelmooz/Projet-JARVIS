@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from models import Result
-from ports import ChatPort
+from ports import ChatPort, EmbeddingPort, VectorPort
 
 
 @pytest.fixture
@@ -62,3 +62,57 @@ fake_inference: ChatPort = FakeInference()
 def inference() -> ChatPort:
     """Fournit le ``ChatPort`` factice déterministe."""
     return fake_inference
+
+
+class FakeEmbedding(EmbeddingPort):
+    """``EmbeddingPort`` en mémoire : vecteur constant déterministe (dérivé du texte)."""
+
+    def __init__(self, dim: int = 8) -> None:
+        self.dim = dim
+
+    def embed(self, text: str, model: str | None = None) -> list[float]:
+        return [float((len(text) % (i + 1)) + 1) for i in range(self.dim)]
+
+
+class FakeVector(VectorPort):
+    """``VectorPort`` en mémoire : index/recherche triviale (pas de similarité réelle)."""
+
+    def __init__(self) -> None:
+        self._docs: list[tuple[str, dict[str, Any] | None]] = []
+
+    def index(self, text: str, metadata: dict[str, Any] | None = None) -> None:
+        self._docs.append((text, metadata))
+
+    def index_batch(self, documents: list[tuple[str, dict[str, Any] | None]]) -> None:
+        self._docs.extend(documents)
+
+    def vectorize_pending(self) -> int:
+        return len(self._docs)
+
+    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
+        return [{"text": text, "metadata": metadata, "score": 1.0} for text, metadata in self._docs[:top_k]]
+
+    def stats(self) -> dict[str, Any]:
+        return {"count": len(self._docs)}
+
+    def preload(self) -> None:
+        return None
+
+    def is_healthy(self) -> bool:
+        return True
+
+
+fake_embedding: EmbeddingPort = FakeEmbedding()
+fake_vector: VectorPort = FakeVector()
+
+
+@pytest.fixture
+def embedding() -> EmbeddingPort:
+    """Fournit le ``EmbeddingPort`` factice."""
+    return fake_embedding
+
+
+@pytest.fixture
+def vector() -> VectorPort:
+    """Fournit le ``VectorPort`` factice."""
+    return fake_vector
