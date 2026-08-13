@@ -6,7 +6,6 @@
 
 ![Python](https://img.shields.io/badge/Python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/Tests-478_✓_2026--08--11-brightgreen)
 ![CI](https://github.com/chelmooz/Projet-JARVIS/actions/workflows/ci.yml/badge.svg)
 ![Ollama](https://img.shields.io/badge/Ollama-0.30.10-orange)
 ![Platform](https://img.shields.io/badge/Platform-Windows_|_Linux_|_macOS-lightgrey)
