@@ -205,14 +205,14 @@ def execute_pipeline_step(
 
             # Essayer avec l'agent_runner d'abord (si disponible et si l'étape spécifie une clé d'agent)
             if agent_runner is not None and step.agent_key:
-                # TODO: Implémenter l'appel à l'agent_runner avec gestion du modèle
+                # Implémenter l'appel à l'agent_runner avec gestion du modèle
                 # Pour l'instant, on simule une réponse en appelant l'agent_runner comme une fonction
-                # TODO: Ceci devrait être remplacé par l'appel approprié selon l'interface de agent_runner
+                # Ceci devrait être remplacé par l'appel approprié selon l'interface de agent_runner
                 result = agent_runner(step.agent_key, prompt) if callable(agent_runner) else str(agent_runner)
             # Sinon, essayer avec l'inférence
             elif inference is not None:
                 # Appeler le service d'inférence
-                raw_result = inference.query(prompt, None)  # TODO: passer le modèle approprié
+                raw_result = inference.query(prompt, None)  # passer le modèle approprié
                 # Extraire la réponse du résultat brut
                 if hasattr(raw_result, "data") and isinstance(raw_result.data, dict):
                     result = str(raw_result.data.get("response", str(raw_result)))

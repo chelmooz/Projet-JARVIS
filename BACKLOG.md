@@ -191,3 +191,4 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
   côté backend (ex. liste `agents` résolue) si besoin.
 - Revue architecture large (SOLID/skill `solid`) non faite : la base est saine, passage
   lint/tests verts ; refactoring profond non lancé pour éviter tout risque sur la base stable.
+- T1 terminé (2026-08-14) : 2 commits atomiques (`docs(roadmap)` + `fix(ollama)`), 4 gates vertes (ruff/check/mypy/pytest --cov), `fail_under=46` avec mesure réelle 49,41 %. ROADMAP.md mise à jour (Lots 1–3 cochés, Lot 4.1 vector façade, règle 4 amendée inscrite). `_install_linux_apt` duplication corrigée (1 seule occurrence).
