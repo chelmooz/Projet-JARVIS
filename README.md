@@ -33,7 +33,7 @@ Le projet est aussi un terrain d'apprentissage et d'expérimentation autour de l
 | 🔌 **100% offline** | Pas besoin d'Internet — tout tourne en local |
 | 💾 **Portable** | Sur clef USB, zéro installation système |
 | 🌐 **Interface web** | UI dark moderne accessible sur `localhost:8000` |
-| 👁️ **Vision IA** | Analyse d'images via moondream (léger, tourne en CPU) |
+| 👁️ **Vision IA** | Extraction de texte via OCR déterministe (RapidOCR, ONNX, CPU, 100% offline) |
 | 🛡️ **Cyber workflows** | NVISO security workflows intégrés |
 | 🔧 **Système de Skills** | Règles injectées dynamiquement dans le contexte |
 | 🧩 **Mémoire vectorielle** | Recherche sémantique via embeddings Ollama |
@@ -50,7 +50,15 @@ Le projet est aussi un terrain d'apprentissage et d'expérimentation autour de l
 
 ## 🖼️ Aperçu
 
-![JARVIS UI](docs/dashboard.png)
+<p align="center">
+  <img src="docs/screenshots/chat.png" width="49%" alt="Chat avec l'agent @dev" />
+  <img src="docs/screenshots/conversations.png" width="49%" alt="Historique des conversations" />
+</p>
+<p align="center">
+  <sub><b>Chat</b> — réponse de l'agent <code>@dev</code></sub>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <sub><b>Conversations</b> — historique persistant</sub>
+</p>
 
 ---
 
@@ -138,18 +146,24 @@ Détail architectural complet : [docs/adr/ADR-008-rag-diagnostic-amelioration-co
 | `@dev` | Développement, scripting | techlead | `Granite-4.1-8B` |
 | `@network` | Réseaux, connectivité | devops | `Foundation-Sec-8B-Reasoning` |
 | `@hardware` | Matériel, diagnostics | orchestrateur | `Qwen2.5-7B` |
-| `@vision` | Analyse d'images | VisionAgent dédié | `moondream` |
+| `@vision` | Extraction de texte depuis une image (OCR) | RapidOCR (déterministe, non-LLM) | `rapidocr` |
 
 Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script python`.
 
-> Les **7** modèles réellement installés sont détaillés juste en dessous.
+> Les **6** modèles LLM/embeddings réellement installés sont détaillés juste en dessous.
+> `@vision` ne charge pas de modèle Ollama : il s'appuie sur RapidOCR (ONNX, moteur pip pur), voir la section dédiée ci-dessous.
 
 > Les modèles sont configurables via l'onglet **Agents** dans l'interface web.
 > Voir [AGENTS.md](AGENTS.md) pour le détail complet des profils.
 
+<p align="center">
+  <img src="docs/screenshots/agents.png" width="90%" alt="Onglet Agents — profils et modèles assignés" />
+</p>
+<p align="center"><sub>Onglet <b>Agents</b> — profils, System Prompt et modèle assigné à chacun</sub></p>
+
 ---
 
-## 🧠 Les 7 modèles — 100% HuggingFace / Ollama portable
+## 🧠 Les 6 modèles — 100% HuggingFace / Ollama portable
 
 | Modèle | Ce qu'il fait le mieux | Où il sert dans JARVIS | Poids |
 |--------|------------------------|------------------------|-------:|
@@ -158,8 +172,20 @@ Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script pyt
 | `DeepHat-V1-7B` | Offensive/Défensive, analyse de vulnérabilités, scripts de test d'intrusion | `@cyber` (sécurité offensive & défensive) | ~4,7 Go |
 | `Foundation-Sec-8B-Reasoning` | Analyse réseau, tri de logs SOC, modélisation de menaces et conformité | `@network` (infrastructure, analyse trafic & sécurité réseau) | ~8,5 Go ⚠️ |
 | `phi-4-mini-instruct-abliterated` | **Léger & rapide**, tourne en CPU pur (0 VRAM), sans filtre (*abliterated*) | Profils **devops** (automatisation, parsing, scripts rapides) | ~2,6 Go |
-| `moondream` | **Multimodal léger** : description et analyse d'images, OCR basique — tourne en CPU | `@vision` (analyse d'images et diagrammes) | ~1,4 Go |
 | `nomic-embed-text-v2-moe` | Transforme le texte en **vecteurs sémantiques** (768 dim.) | Recherche vectorielle / mémoire (RAG) — pas un agent de chat | ~0,6 Go |
+
+> 👁️ **OCR (`@vision`)** : ne fait plus partie des modèles Ollama ci-dessus. Depuis le
+> remplacement de `moondream`, l'extraction de texte est assurée par **RapidOCR**
+> (moteur ONNX déterministe, package Python pur `rapidocr` + `onnxruntime`, aucun
+> binaire externe requis). Il lit les pixels directement (détection + reconnaissance
+> de caractères) sans génération de langage — plus fiable qu'un petit LLM vision sur
+> du texte dense (documents, captures d'écran).
+
+<p align="center">
+  <img src="docs/screenshots/vision.png" width="90%" alt="Onglet Vision — extraction de texte via RapidOCR" />
+</p>
+<p align="center"><sub>Onglet <b>Vision</b> — texte extrait d'une image via RapidOCR (<code>Modele: rapidocr</code>)</sub></p>
+
 
 > ⚠️ **Modèles « abliterated » :** `phi-4-mini-instruct-abliterated` est fourni **sans
 > garde-fous de sécurité** (le filtrage du modèle d'origine a été retiré). Il sert aux
@@ -184,6 +210,11 @@ Règles injectées dynamiquement dans le contexte de l'assistant — activables/
 | 📊 Audit Qualité | développement | Audit complet du projet (code, tests, structure, docs) |
 | 🕵️ Vibe Coding Audit | développement | Détecte les décisions cachées, non testées ou non justifiées dans du code généré par IA |
 | 🔁 Loop Engineering | développement | Pilotage de boucles agentiques *(désactivé par défaut)* |
+
+<p align="center">
+  <img src="docs/screenshots/skills.png" width="90%" alt="Onglet Skills — liste des skills disponibles" />
+</p>
+<p align="center"><sub>Onglet <b>Skills</b> — activation/désactivation par toggle</sub></p>
 
 ---
 
@@ -310,7 +341,7 @@ launchers\JARVIS.bat
 
 ---
 
-### Étape 5 — Télécharger les 7 modèles d'IA (dans un 2e terminal)
+### Étape 5 — Télécharger les 6 modèles d'IA (dans un 2e terminal)
 
 Appuyez sur **Entrée** dans votre terminal PowerShell actuel pour obtenir un nouveau
 prompt, gardez la console JARVIS **ouverte** (elle fait tourner le serveur Ollama),
@@ -325,7 +356,7 @@ $env:OLLAMA_MODELS="<lettre-clé>:\Projet-JARVIS\models\ollama"
 > 💡 Ces variables ne sont valables que dans ce terminal. Fermer la fenêtre = à redéfinir au prochain pull.
 > ⚠️ Sans `$env:OLLAMA_HOST`, toute commande échoue avec « Error: Head "http://127.0.0.1:11434/": dial tcp » — le serveur ne tourne QUE sur 11436.
 
-Puis téléchargez les 7 modèles (à faire **une seule fois**, avec internet) :
+Puis téléchargez les 6 modèles (à faire **une seule fois**, avec internet) :
 
 ```powershell
 .\bin\ollama.exe pull hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
@@ -333,7 +364,6 @@ Puis téléchargez les 7 modèles (à faire **une seule fois**, avec internet) :
 .\bin\ollama.exe pull hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M
 .\bin\ollama.exe pull hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0
 .\bin\ollama.exe pull hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M
-.\bin\ollama.exe pull moondream
 .\bin\ollama.exe pull hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
 ```
 
@@ -341,12 +371,17 @@ Puis téléchargez les 7 modèles (à faire **une seule fois**, avec internet) :
 > Si un modèle est déjà présent sur la clé (liste ci-dessous), le re-pull se contente
 > de `using existing manifest` — il ne re-télécharge pas les poids déjà présents.
 
-> 🪄 **Vision (08/08/2026)** : le modèle vision historique
-> `Llama-3.2-Vision` (leafspark) est devenu **incompatible avec la version d'Ollama embarquée**.
-> Il est remplacé par **`moondream`** (1,8B, ~1,4 Go, CPU-only) :
+> 🪄 **Vision (13/08/2026)** : l'agent `@vision` ne charge plus de modèle Ollama.
+> Après `moondream` (lui-même un remplacement provisoire de `Llama-3.2-Vision`,
+> devenu incompatible avec la version d'Ollama embarquée), le pipeline vision passe
+> désormais par **RapidOCR** (moteur OCR déterministe, ONNX, package Python pur) :
+> extraction de texte directe depuis les pixels, sans génération de langage — plus
+> fiable qu'un petit LLM vision sur du texte dense (documents, captures d'écran).
+> Installé via `pip` (`rapidocr` + `onnxruntime`), pas via `ollama pull`.
+> Si un ancien modèle vision traîne encore sur votre clé, vous pouvez le supprimer :
 > ```powershell
-> .\bin\ollama.exe pull moondream
-> .\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M   # si encore présent
+> .\bin\ollama.exe rm moondream                                                      # si encore présent
+> .\bin\ollama.exe rm hf.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF:Q4_K_M       # si encore présent
 > ```
 
 > 🔧 **Historique de correction (07/08/2026, déploiement réel testé sur Windows) :**
@@ -355,12 +390,12 @@ Puis téléchargez les 7 modèles (à faire **une seule fois**, avec internet) :
 > (`ibm-granite/...-instruct-GGUF`, `mradermacher/...-i1-GGUF`,
 > `bartowski/Llama-3.2-11B-Vision-Instruct-GGUF` — bartowski n'a jamais publié ce
 > modèle vision). Remplacés par des repos à fichier unique vérifiés.
-> Les 7 repos ont été **testés en pull réel avec succès** sur ce déploiement
+> Les repos ont été **testés en pull réel avec succès** sur ce déploiement
 > (07/08/2026) : `Qwen2.5-7B-Instruct` (bartowski, 4,7 Go), `granite-4.1-8b`
 > (bartowski, 5,5 Go), `DeepHat-V1-7B` (GGUF-A-Lot, 5,3 Go),
 > `Foundation-Sec-8B-Reasoning` (fdtn-ai, en **Q8_0** — pas de Q4_K_M disponible
 > pour cette variante, d'où le poids plus élevé, 8,5 Go),
-> note ci-dessus) et `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
+> et `nomic-embed-text-v2-moe` (nomic-ai, 344 Mo).
 
 | Modèle | Ce qu'il fait le mieux | Poids |
 |---|---|---:|
@@ -369,10 +404,12 @@ Puis téléchargez les 7 modèles (à faire **une seule fois**, avec internet) :
 | `DeepHat-V1-7B` | Sécurité offensive & défensive — @cyber | ~4,7 Go |
 | `Foundation-Sec-8B-Reasoning` | Analyse réseau & conformité — @network | ~8,5 Go ⚠️ |
 | `phi-4-mini-instruct-abliterated` | Léger, tourne en CPU pur — profils devops | ~2,6 Go |
-| `moondream` | Analyse d'images (multimodal) — @vision | ~1,4 Go |
 | `nomic-embed-text-v2-moe` | Embeddings — recherche dans vos documents (RAG) | ~0,6 Go |
 
-> 📖 Détail de ce que chaque modèle sait faire le mieux : voir la section [🧠 Les 7 modèles](#-les-7-modèles--100-huggingface--ollama-portable).
+> 👁️ `@vision` (RapidOCR) est installé via `pip`, pas listé ici — voir la section
+> [🧠 Les 6 modèles](#-les-6-modèles--100-huggingface--ollama-portable) plus haut.
+
+> 📖 Détail de ce que chaque modèle sait faire le mieux : voir la section [🧠 Les 6 modèles](#-les-6-modèles--100-huggingface--ollama-portable).
 
 ---
 
@@ -400,7 +437,7 @@ Patientez ~5 secondes, puis ouvrez votre navigateur sur **http://localhost:8000*
 ### Étape 7 — Vérifier que tout fonctionne
 
 ```bash
-.\bin\ollama.exe list                    # doit lister vos 7 modèles
+.\bin\ollama.exe list                    # doit lister vos 6 modèles (RapidOCR n'apparaît pas ici, c'est un paquet pip)
 curl http://localhost:8000/api/status    # état des services JARVIS
 curl http://localhost:8000/api/agents    # liste des agents JARVIS
 ```
@@ -425,6 +462,11 @@ JARVIS embarque des binaires portables (Sysinternals, witr) pour l'analyse compo
 de la machine. Ils sont déclenchés par des **mots-clés naturels dans le chat**, ou via les
 boutons **Analyser un processus** / **État système détaillé** de l'onglet 🔧 Outils
 (qui pré-remplissent la commande dans le chat).
+
+<p align="center">
+  <img src="docs/screenshots/outils.png" width="90%" alt="Onglet Outils — diagnostic système en direct" />
+</p>
+<p align="center"><sub>Onglet <b>Outils</b> — inventaire HOST / CPU / RAM / GPU / DISK / réseau via <code>/api/diag</code></sub></p>
 
 | Outil | Déclencheur chat | Fonction |
 |-------|------------------|----------|
@@ -495,11 +537,12 @@ for m in hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
   hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M \
   hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0 \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  moondream \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/linux/ollama pull "$m"
 done
 kill %1   # stopper l'Ollama temporaire
+# @vision (RapidOCR) n'est pas un modèle Ollama : installé via pip (rapidocr + onnxruntime),
+# déjà couvert par `pip install -e .` plus haut si déclaré dans pyproject.toml.
 
 # Lancer (jarvis.py redémarre l'Ollama portable automatiquement — le télécharge
 # si besoin). Si le pull ci-dessus a échoué faute de binaire, pas de panique :
@@ -548,11 +591,11 @@ for m in hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M \
   hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M \
   hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0 \
   hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M \
-  moondream \
   hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M ; do
   OLLAMA_HOST=127.0.0.1:11436 ./bin/mac/ollama pull "$m"
 done
 kill %1
+# @vision (RapidOCR) n'est pas un modèle Ollama : installé via pip (rapidocr + onnxruntime).
 
 python3 jarvis.py            # ou ./launchers/JARVIS.sh (repli Python système sur macOS)
 ```
@@ -584,7 +627,7 @@ python3 jarvis.py            # ou ./launchers/JARVIS.sh (repli Python système s
 | `POST` | `/api/jarvis` | Envoyer une tâche |
 | `GET` | `/api/agents` | Profils des agents |
 | `POST` | `/api/agents/assign` | Assigner un modèle |
-| `POST` | `/api/vision` | Analyser une image |
+| `POST` | `/api/vision` | Extraire le texte d'une image (OCR via RapidOCR) |
 | `GET/POST` | `/api/conversations` | CRUD conversations |
 | `GET/DELETE` | `/api/conversations/{id}` | Détail / suppression d'une conversation |
 | `GET` | `/api/conversations/{id}/messages` | Messages d'une conversation |
@@ -609,6 +652,16 @@ python3 jarvis.py            # ou ./launchers/JARVIS.sh (repli Python système s
 > **Embeddings :** `/api/embed` n'expose **pas** d'endpoint public. Les embeddings
 > sont calculés en interne par `services/vector_embedder.py` (VectorService) — l'API
 > REST ne propose que la recherche sémantique (`GET /api/search`).
+
+<p align="center">
+  <img src="docs/screenshots/analytics.png" width="49%" alt="Onglet Analytics — statistiques d'usage" />
+  <img src="docs/screenshots/reglages.png" width="49%" alt="Onglet Réglages — modèle par défaut et dossiers autorisés" />
+</p>
+<p align="center">
+  <sub><b>Analytics</b> — requêtes, latence, index vectoriel (<code>/api/analytics</code>)</sub>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <sub><b>Réglages</b> — modèle par défaut, dossiers autorisés (<code>/api/settings</code>, <code>/api/files/authorize</code>)</sub>
+</p>
 
 ---
 
