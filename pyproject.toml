@@ -39,7 +39,6 @@ packages = ["agents", "config", "controllers", "graph", "models", "ports", "serv
 target-version = "py312"
 line-length = 120
 indent-width = 4
-exclude = [".github/workflows"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "N", "SIM"]
