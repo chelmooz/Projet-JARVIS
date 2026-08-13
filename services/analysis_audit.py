@@ -1,13 +1,14 @@
 """QualityAuditor — audit complet du projet : 4 axes pondérés.
 
-Importe `Analyzer` paresseusement (dans `__init__`) pour éviter l'import
-circulaire avec services.analysis (qui réexporte QualityAuditor).
+L'audit delegate vers les analyseurs spécialisés (
+services.analysis_* : SecurityAnalyzer, PerformanceAnalyzer,
+MaintainabilityAnalyzer, CodingStandardsAnalyzer, TestExistenceChecker)
+via l'analyseur unifié `Analyzer` (services.analysis).
 
 Conforme au skill clean-code : les conditionnelles complexes sont encapsulées
 dans des fonctions nommées (3.J), pas de chaînes if/elif dupliquées (DRY),
 fonctions courtes à un niveau d'abstraction (3.B).
 """
-
 from __future__ import annotations
 
 import ast
