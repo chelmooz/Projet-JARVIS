@@ -8,7 +8,7 @@
 | `@dev` | GenericAgent | `agents/generic.py` | techlead | Scripting & développement |
 | `@network` | GenericAgent | `agents/generic.py` | devops | Réseaux & connectivité |
 | `@hardware` | GenericAgent | `agents/generic.py` | orchestrateur | Matériel & diagnostics |
-| `@vision` | VisionAgent | `agents/vision.py` → OCR via `services/ocr.py` (RapidOCR) | designer *(texte uniquement ; ignoré si image)* | Extraction de texte depuis une image (OCR) |
+| `@vision` | VisionAgent | `agents/vision.py` → OCR (`services/ocr.py`, RapidOCR) puis analyse LLM (`Qwen2.5-7B`) | designer *(texte seul si pas d'image)* | Extraction de texte + analyse depuis une image |
 
 ## Backend
 
@@ -28,10 +28,12 @@ réassignation explicite via l'onglet **Agents** de l'interface web ou l'API
 | `@network` | `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` | ~4,9 Go |
 | `@hardware` | `hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` | ~4,7 Go |
 
-> 👁️ **`@vision`** n'a pas de ligne ci-dessus : quand une image est présente, il n'appelle
-> **aucun modèle Ollama**. `services/selector.py::select_vision_model()` renvoie la
-> sentinelle `"rapidocr"` (télémétrie uniquement) et `agents/vision.py` délègue à
-> **RapidOCR** (`services/ocr.py`, moteur ONNX déterministe, package `pip` pur).
+> 👁️ **`@vision`** n'a pas de ligne ci-dessus : quand une image est présente, il extrait
+> le texte via **RapidOCR** (`services/ocr.py`, moteur ONNX déterministe, package `pip`
+> pur) — étape **sans modèle Ollama** — puis délègue le texte extrait à un **LLM texte**
+> (`Qwen2.5-7B-Instruct-GGUF:Q4_K_M`, voir `VISION_ANALYSIS_MODEL` dans `agents/vision.py`)
+> qui produit la réponse analytique. `services/selector.py::select_vision_model()` renvoie
+> la sentinelle `"rapidocr"` (télémétrie de l'étape OCR uniquement).
 > Sans image (texte seul), `@vision` retombe sur le profil **designer**
 > (`hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M`), comme un agent générique classique.
 > *(Historique : ce rôle était tenu par `moondream`, ~1,4 Go, retiré car non réassigné

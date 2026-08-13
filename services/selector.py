@@ -159,6 +159,28 @@ def select_vision_model(inference: Any) -> str | None:
     return VISION_OCR_SENTINEL
 
 
+def select_vision_analysis_model(inference: Any) -> str:
+    """Modèle texte utilisé pour analyser le texte extrait par l'OCR.
+
+    RapidOCR ne fait qu'extraire du texte (pas d'analyse). Le texte brut est
+    ensuite confié à un LLM texte (généralement ``DEFAULT_FALLBACK_MODEL`` =
+    ``Qwen2.5-7B``) qui répond à la consigne de l'utilisateur — recréant le
+    comportement qu'avait ``moondream`` en un seul modèle multimodal, mais en
+    deux étapes découplées.
+
+    Args:
+        inference: Service d'inférence (pour résoudre le tag Ollama réel).
+
+    Returns:
+        Nom du modèle résolu, ou ``DEFAULT_FALLBACK_MODEL`` si indéterminable.
+    """
+    if inference is not None:
+        resolved = inference.resolve_model(DEFAULT_FALLBACK_MODEL)
+        if resolved:
+            return str(resolved)
+    return DEFAULT_FALLBACK_MODEL
+
+
 def select_model(agent_key: str, inference: Any, log_service: Any | None = None) -> str:
     """Sélectionne le meilleur modèle pour un agent donné.
 
@@ -212,5 +234,6 @@ __all__ = [
     "read_preferences",
     "fallback_models",
     "select_vision_model",
+    "select_vision_analysis_model",
     "select_model",
 ]
