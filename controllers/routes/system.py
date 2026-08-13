@@ -89,7 +89,7 @@ async def health(request: Request) -> JSONResponse:
 # =============================================================================
 
 
-async def _status_generator(request: Request, max_duration: int = 60) -> AsyncIterator[str]:
+async def _status_generator(request: Request, max_duration: int = 60) -> AsyncIterator[dict[str, Any] | str]:
     """Génère un flux SSE alimenté par le cache de statut.
 
     Envoie un ping initial (commentaire SSE) pour confirmer la connexion,

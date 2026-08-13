@@ -76,6 +76,10 @@ ignore_missing_imports = true
 module = ["brotli"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["rapidocr"]
+ignore_missing_imports = true
+
 [tool.black]
 line-length = 120
 target-version = ["py312"]

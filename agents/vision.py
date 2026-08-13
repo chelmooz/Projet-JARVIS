@@ -21,7 +21,7 @@ pas de fences de code exploitables) : ``suggested_skill`` reste ``None``.
 from __future__ import annotations
 
 import logging
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, cast
 
 from agents.base import AgentRunResult
 from agents.generic import GenericAgent
@@ -118,12 +118,10 @@ class VisionAgent(GenericAgent):
             return "⚠️ Aucun texte détecté dans l'image."
         prompt = f"Consigne : {task}\n\nTexte extrait de l'image :\n{text}"
         try:
-            return self.model_provider.query(
-                prompt, VISION_ANALYSIS_MODEL, system=VISION_ANALYSIS_SYSTEM
-            )
+            return self.model_provider.query(prompt, VISION_ANALYSIS_MODEL, system=VISION_ANALYSIS_SYSTEM)
         except Exception as e:  # noqa: BLE001 - dégradation gracieuse vers l'OCR brut
             _logger.warning("Analyse LLM échouée, repli OCR brut : %s", e)
-            return text
+            return cast(str, text)
 
     def _run_ocr(self, image_data: str) -> dict[str, Any]:
         """Extraction de texte via RapidOCR (déterministe, hors LLM)."""
