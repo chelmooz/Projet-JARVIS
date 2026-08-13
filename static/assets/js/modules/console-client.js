@@ -117,5 +117,3 @@ export async function runCommand(input, opts = {}) {
   }
   return result;
 }
-
-export const __test__ = { JARVIS_ENDPOINT, AGENTS_ENDPOINT, DEFAULT_TIMEOUT_MS };

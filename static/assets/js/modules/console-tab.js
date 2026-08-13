@@ -128,7 +128,7 @@ export class ConsoleTab {
 
   // --- Handoff Palette -> Console (MT-5) ---
   _onHandoff(detail) {
-    if (!detail) return;
+    if (!detail || !detail.agent) return;
     const tab = document.querySelector('.tab-btn[data-tab="console"]');
     if (tab) tab.click();
     const value = detail.task ? `@${detail.agent} ${detail.task}` : `@${detail.agent}`;

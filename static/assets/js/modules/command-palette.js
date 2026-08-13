@@ -2,7 +2,7 @@
 // DOM limité à l'overlay (injecté au mount). Délègue l'envoi à console-client.js.
 
 import { escHtml } from "./utils.js";
-import { fetchAgents, sendCommand, consoleStore } from "./console-client.js";
+import { fetchAgents, sendCommand, consoleStore, parseCommand } from "./console-client.js";
 
 const PALETTE_HTML = `
   <div id="command-palette" class="palette-overlay" hidden>
@@ -128,14 +128,22 @@ export class CommandPalette {
   async submit() {
     const value = this.input.value.trim();
     if (!value) return;
+
+    let parsed;
+    try {
+      parsed = parseCommand(value);
+    } catch (err) {
+      this._clearResult();
+      this.result.removeAttribute("hidden");
+      this.result.innerHTML = `<div class="palette-error">${escHtml(err.message)}</div>`;
+      return;
+    }
+
     this._clearResult();
     this.result.removeAttribute("hidden");
     this.result.innerHTML = `<span class="palette-spinner">…</span>`;
 
-    const res = await sendCommand(
-      { agent: this._agentFromInput(value), task: this._taskFromInput(value) },
-      { source: "palette" },
-    );
+    const res = await sendCommand(parsed, { source: "palette" });
 
     if (res.ok) {
       const text = res.data && res.data.response ? res.data.response : JSON.stringify(res.data);
@@ -145,22 +153,20 @@ export class CommandPalette {
     }
   }
 
-  _agentFromInput(value) {
-    const m = value.match(/^@(\w+)/);
-    return m ? m[1] : "";
-  }
-
-  _taskFromInput(value) {
-    const m = value.match(/^@\w+\s+([\s\S]+)$/);
-    return m ? m[1] : value;
-  }
-
   // --- Handoff Palette -> Console (MT-5) ---
   handoff() {
     const value = this.input.value.trim();
-    const agent = this._agentFromInput(value);
-    const task = this._taskFromInput(value);
-    if (agent && task) {
+    let agent = "";
+    let task = "";
+    try {
+      const parsed = parseCommand(value);
+      agent = parsed.agent;
+      task = parsed.task;
+    } catch {
+      const m = value.match(/^@(\w+)/);
+      if (m) agent = m[1];
+    }
+    if (agent) {
       consoleStore.setLast({ agent, task, source: "palette" });
     }
     document.dispatchEvent(new CustomEvent("jarvis:palette-handoff", { detail: { agent, task } }));

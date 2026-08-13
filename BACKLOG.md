@@ -82,3 +82,32 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 - Aucun commit sans accord explicite.
 - TDD-lite (tests focused sur logique pure).
 - Refactor > patch ; additif ; zéro nouvelle route/dépendance.
+
+## Revue & révision complète (2026-08-13, post-livraison Console v6.0)
+
+### Revue (clean-code)
+- `ruff check .` : 19 erreurs (imports morts, whitespace, trailing newline, I001, UP035, SIM105).
+  → **18 auto-fixées** (`ruff check --fix .`).
+- Incohérence DRY : `parseCommand` (`@agent tâche`) dupliqué dans `command-palette.js`
+  (`_agentFromInput`/`_taskFromInput`) et `console-tab.js` (`_onHandoff`).
+
+### Révision (refactor > patch)
+- `controllers/warmup.py` : `try/except/pass` → `contextlib.suppress(Exception)` (SIM105).
+- `command-palette.js` : supprime `_agentFromInput`/`_taskFromInput`, réutilise `parseCommand`
+  (validation explicite, erreur affichée). `parseCommand` importé depuis `console-client.js`.
+- `console-tab.js` : `_onHandoff` utilise `detail.agent`/`detail.task` (plus de duplication).
+- `console-client.js` : retire l'export mort `__test__`.
+- Résultat : `ruff check .` → **All checks passed!** ; `npx vitest run` → **40/40 pass** ;
+  imports backend OK.
+
+### README
+- Section Tests enrichie : ajout vitest frontend (40 tests) + note `ruff check .` à 0 erreur.
+- État global : v6.0, 9 onglets + Palette Ctrl/⌘+K.
+
+### Connaisseances non traitées (gaps signalés, hors périmètre de cette passe)
+- `GET /api/agents` : `agentsFromApi` renvoie `model: null` pour les clés de routage
+  (`cyber/dev/network/hardware/vision`) car `agent_model_map` est indexé par profil
+  (orchestrateur/techlead/…). Mismatch documenté dans ROADMAP_CONSOLE.md MT-0 ; à réconcilier
+  côté backend (ex. liste `agents` résolue) si besoin.
+- Revue architecture large (SOLID/skill `solid`) non faite : la base est saine, passage
+  lint/tests verts ; refactoring profond non lancé pour éviter tout risque sur la base stable.

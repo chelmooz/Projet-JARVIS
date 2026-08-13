@@ -68,11 +68,12 @@ async def _warmup_default_model(ctx: Any, default_model: str) -> None:
 
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Cycle de vie FastAPI : initialisation au démarrage, nettoyage à l'arrêt."""
+    import contextlib
+    import secrets
+    from pathlib import Path
+
     from services.diagnostics.checks import warn_low_memory
     from services.log import _configure_root_logging
-    import secrets
-    import os
-    from pathlib import Path
 
     _configure_root_logging()
     warn_low_memory()
@@ -83,12 +84,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if not token_file.exists():
         token = secrets.token_urlsafe(32)
         token_file.write_text(token)
-        # Set permissions to user-only (600 on Unix, no-op on Windows but documents intent)
-        try:
+        # chmod is no-op on Windows ; permissions gérées par le profil utilisateur.
+        # Sur Unix, on restreint le fichier à l'utilisateur (600).
+        with contextlib.suppress(Exception):
             token_file.chmod(0o600)
-        except Exception:
-            # chmod is no-op on Windows, permissions handled by user profile
-            pass
         _logger.info(f"Generated mono-user token: {token_file}")
     else:
         _logger.info(f"Using existing mono-user token: {token_file}")

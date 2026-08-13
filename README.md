@@ -724,7 +724,7 @@ Tests (vitest/jsdom) : `console-client.test.js` (16), `command-palette.test.js` 
 ## 🔬 Tests
 
 ```bash
-# Tests de régression inclus dans cette distribution
+# Tests de régression (backend, pytest)
 python -m pytest -q
 
 # Vérifie les ressources requises et l'absence de secrets/caches avant archivage
@@ -732,10 +732,17 @@ python -m pytest -q
 python scripts/verify_release.py
 
 # Contrôles statiques (environnement de développement)
-ruff check .
+ruff check .                       # lint strict (0 erreur garanti sur la base propre)
 python -m py_compile jarvis.py services/*.py controllers/*.py agents/*.py config/*.py graph/*.py models/*.py ports/*.py
+
+# Frontend (vitest/jsdom) — Console, Palette, Chat, Vision
+cd static && npm install && npx vitest run
 ```
 
+> Le frontend embarque des tests focused (non-régression) : `console-client.test.js` (16),
+> `command-palette.test.js` (9), `console-tab.test.js` (7), `chat.test.js` (3), `vision.test.js` (5)
+> — **40 tests au total**, exécutés en CI et en local (`npx vitest run`).
+>
 > Le nombre de tests affiché dans les versions de développement ne vaut pas pour
 > cette archive utilisateur. Les tests effectivement fournis sont ceux du dossier
 > `tests/` et doivent être exécutés avant toute redistribution.
