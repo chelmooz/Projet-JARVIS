@@ -77,7 +77,9 @@ class OllamaAdapter(LLMAdapter):
         sink = self._http_client._stream_sink_var.get()
         if sink is not None:
             payload["stream"] = True
-            return self._http_client._call_streaming(f"{self._http_client._base_url}/api/generate", payload, key="response")
+            return self._http_client._call_streaming(
+                f"{self._http_client._base_url}/api/generate", payload, key="response"
+            )
         data = self._http_client._call_with_retry(f"{self._http_client._base_url}/api/generate", payload)
         return str(data.get("response", ""))
 
@@ -103,7 +105,9 @@ class OllamaAdapter(LLMAdapter):
         if sink is not None:
             payload["stream"] = True
             try:
-                content = self._http_client._call_streaming(f"{self._http_client._base_url}/api/chat", payload, key="message")
+                content = self._http_client._call_streaming(
+                    f"{self._http_client._base_url}/api/chat", payload, key="message"
+                )
                 return Result.ok(data={"content": content, "role": "assistant"}, agent="system", model=model)
             except RuntimeError as e:
                 return Result.fail(error=str(e), agent="system", model=model)

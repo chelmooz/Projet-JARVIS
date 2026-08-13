@@ -155,12 +155,16 @@ def create_app() -> FastAPI:
 
     # Middleware d'authentification token mono-user
     @app.middleware("http")
-    async def verify_token_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def verify_token_middleware(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         # Skip token verification for health checks and docs
-        if request.url.path in ["/", "/api/status", "/api/backend", "/api/metrics"] or \
-           request.url.path.startswith("/docs") or \
-           request.url.path.startswith("/redoc") or \
-           request.url.path.startswith("/openapi.json"):
+        if (
+            request.url.path in ["/", "/api/status", "/api/backend", "/api/metrics"]
+            or request.url.path.startswith("/docs")
+            or request.url.path.startswith("/redoc")
+            or request.url.path.startswith("/openapi.json")
+        ):
             return await call_next(request)
 
         # Skip token verification if OpenWebUI is disabled (no CORS needed either)
@@ -170,25 +174,16 @@ def create_app() -> FastAPI:
         # Require token in header for all other routes
         token = request.headers.get("X-JARVIS-Token")
         if not token:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Missing X-JARVIS-Token header"}
-            )
+            return JSONResponse(status_code=401, content={"detail": "Missing X-JARVIS-Token header"})
 
         # Verify token
         token_file = Path(__file__).resolve().parent.parent / "memory" / ".jarvis_token"
         if not token_file.exists():
-            return JSONResponse(
-                status_code=503,
-                content={"detail": "Authentication token not available"}
-            )
+            return JSONResponse(status_code=503, content={"detail": "Authentication token not available"})
 
         valid_token = token_file.read_text().strip()
         if token != valid_token:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid X-JARVIS-Token"}
-            )
+            return JSONResponse(status_code=401, content={"detail": "Invalid X-JARVIS-Token"})
 
         return await call_next(request)
 

@@ -178,7 +178,9 @@ async def handle_request(
         agent_key = result.get("agent", "unknown")
         model_name = result.get("model", "auto")
 
-        await asyncio.to_thread(_track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source)
+        await asyncio.to_thread(
+            _track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source
+        )
         await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
 
         return result
@@ -218,7 +220,9 @@ async def _handle_request_streamed(
             result = await orchestrator.handle_request(task, image, conv_id)
             agent_key = result.get("agent", "unknown")
             model_name = result.get("model", "auto")
-            await asyncio.to_thread(_track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source)
+            await asyncio.to_thread(
+                _track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source
+            )
             await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
         except Exception as e:  # noqa: BLE001 - l'erreur part dans l'événement done
             _logger.error("handle_request streamed crashed", exc_info=True)
