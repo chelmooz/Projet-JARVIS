@@ -27,7 +27,7 @@ PROJECT_DIR: Final = ROOT  # Alias legacy, ne pas utiliser dans le nouveau code.
 # Version
 # ---------------------------------------------------------------------------
 
-VERSION: Final[str] = "5.10"
+VERSION: Final[str] = "6.0"
 
 # ---------------------------------------------------------------------------
 # Limites métier

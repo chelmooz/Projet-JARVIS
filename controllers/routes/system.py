@@ -72,7 +72,7 @@ async def health(request: Request) -> JSONResponse:
         "vector": check_service("vector", getattr(context, "vector", None)),
         "memory": check_service("memory", getattr(context, "memory", None)),
         "conversations": check_service("conversations", getattr(context, "conversations", None)),
-        "version": "5.10",  # À synchroniser avec config.constants.VERSION
+        "version": "6.0",  # À synchroniser avec config.constants.VERSION
     }
 
     # Vérifier si tout est OK

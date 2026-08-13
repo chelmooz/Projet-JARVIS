@@ -1,10 +1,10 @@
 @echo off
-title JARVIS Portable Edition v5.10
+title JARVIS Portable Edition v6.0
 cd /d "%~dp0.."
 
 :: Read version from pyproject.toml
 for /f "delims=" %%a in ('python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])" 2^>nul') do set "JARVIS_VERSION=%%a"
-if "%JARVIS_VERSION%"=="" set "JARVIS_VERSION=5.10"
+if "%JARVIS_VERSION%"=="" set "JARVIS_VERSION=6.0"
 
 echo ===================================================
 echo   JARVIS Portable Edition v%JARVIS_VERSION%

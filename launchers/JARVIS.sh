@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# JARVIS Portable Edition v5.10 — Lanceur 100% portable
+# JARVIS Portable Edition v6.0 — Lanceur 100% portable
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 # Read version from pyproject.toml
-JARVIS_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])" 2>/dev/null || echo "5.10")
+JARVIS_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])" 2>/dev/null || echo "6.0")
 
 OS="$(uname -s)"
 ARCH="$(uname -m)"

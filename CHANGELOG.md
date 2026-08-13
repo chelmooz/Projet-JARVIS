@@ -1,6 +1,6 @@
 # Changelog — JARVIS Portable Edition
 
-## [5.11] — 2026-08-13
+## [6.0] — 2026-08-13
 
 ### Console Tab + Command Palette (Ctrl+K)
 - **9ᵉ onglet « Console »** : saisie directe de commandes `@agent tâche`

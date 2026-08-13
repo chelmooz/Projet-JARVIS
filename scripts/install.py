@@ -48,7 +48,7 @@ def header():
     # les terminaux modernes Windows 10+/Linux/macOS).
     print("\033[2J\033[H", end="")
     print(cyan("====================================================="))
-    print(cyan("  JARVIS Portable Edition v5.9"))
+    print(cyan("  JARVIS Portable Edition v6.0"))
     print(cyan("  Installateur multi-OS"))
     print(cyan("====================================================="))
     print(f"  Systeme : {SYSTEM} / {ARCH}")
