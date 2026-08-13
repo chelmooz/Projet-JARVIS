@@ -8,7 +8,7 @@ Mapping clé → profil (single source of truth du registre d'agents) :
   - dev      → GenericAgent (profil techlead)
   - network  → GenericAgent (profil devops)
   - hardware → GenericAgent (profil orchestrateur)
-  - vision   → VisionAgent  (profil designer, multimodal)
+  - vision   → VisionAgent  (profil designer texte ; image → OCR RapidOCR, pas de LLM multimodal)
 
 NOTE (dette métier, non corrigée ici) : les ``domain_prompt`` courts passés
 aux GenericAgent court-circuitent le ``system_prompt`` riche du profil JSON
@@ -23,7 +23,7 @@ structurel → laissé tel quel, signalé pour traçabilité.
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from agents.base import BaseAgent
 from agents.cyber import CyberAgent
@@ -32,8 +32,10 @@ from agents.vision import VisionAgent
 
 # ---------------------------------------------------------------------------
 # Contrats structurels des services injectés (ISP).
-# Union des sous-ensembels réellement consommés par les 3 classes d'agents
-# (query + get_active_backend pour tous ; query_multimodal pour VisionAgent).
+# Union des sous-ensembles réellement consommés par les 3 classes d'agents
+# (query + get_active_backend pour tous). VisionAgent n'a plus besoin de
+# query_multimodal : l'image passe par RapidOCR (services/ocr.py), pas par
+# l'inférence LLM.
 # ---------------------------------------------------------------------------
 
 
@@ -41,7 +43,6 @@ class _InferenceLike(Protocol):
     """Sous-ensemble d'inférence requis pour construire les 5 agents."""
 
     def query(self, prompt: str, model: str, system: str | None = None) -> str: ...
-    def query_multimodal(self, model: str, prompt: str, image_base64: str) -> dict[str, Any] | str: ...
     def get_active_backend(self) -> str: ...
 
 

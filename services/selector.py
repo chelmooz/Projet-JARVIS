@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import threading
-from collections.abc import Sequence
 from typing import Any
 
 from config.constants import PROJECT_DIR
@@ -18,7 +17,11 @@ PREFERENCES_PATH = os.path.join(PROJECT_DIR, "config", "model_preferences.json")
 MODEL_SIZES_PATH = os.path.join(PROJECT_DIR, "config", "model_sizes.json")
 
 VISION_KEY = "vision"
-VISION_MODELS = ["moondream"]
+# RapidOCR (services/ocr.py) gère désormais l'extraction de texte depuis une
+# image : ce n'est plus un modèle Ollama, donc plus besoin de résoudre/pull un
+# modèle vision. La sentinelle ci-dessous sert uniquement à la télémétrie
+# (logs, métriques) — elle n'est jamais passée à Ollama.
+VISION_OCR_SENTINEL = "rapidocr"
 DEFAULT_FALLBACK_MODEL = "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
 RAM_HEADROOM_RATIO = 0.8  # 20% de marge de sécurité pour éviter les OOM
 
@@ -137,22 +140,23 @@ def fallback_models() -> dict[str, str]:
         "dev": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
         "network": "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0",
         "hardware": DEFAULT_FALLBACK_MODEL,
-        VISION_KEY: VISION_MODELS[0],
+        VISION_KEY: VISION_OCR_SENTINEL,
     }
 
 
-def _first_available(inference: Any, models: Sequence[str]) -> str | None:
-    """Retourne le premier modèle disponible dans la liste."""
-    for model in models:
-        resolved = inference.resolve_model(model)
-        if resolved:
-            return str(resolved)
-    return None
-
-
 def select_vision_model(inference: Any) -> str | None:
-    """Sélectionne le premier modèle vision disponible."""
-    return _first_available(inference, VISION_MODELS)
+    """Renvoie la sentinelle RapidOCR (jamais ``None``).
+
+    Historique : cherchait auparavant un modèle Ollama vision (``moondream``)
+    via ``inference.resolve_model()``. Ce modèle n'est plus installé/assigné,
+    ce qui faisait échouer silencieusement toute image droppée dans le chat
+    (``select_model("vision", ...)`` renvoyait ``""``). RapidOCR ne dépendant
+    pas d'Ollama, cette fonction ne peut plus échouer faute de modèle absent.
+    Le paramètre ``inference`` est conservé pour compatibilité de signature
+    (appelants existants : ``services/orchestrator.py``, ``controllers/di.py``).
+    """
+    del inference  # non utilisé : RapidOCR ne passe pas par Ollama
+    return VISION_OCR_SENTINEL
 
 
 def select_model(agent_key: str, inference: Any, log_service: Any | None = None) -> str:
@@ -180,7 +184,7 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
     model_map = prefs.get("model_map", fallback_models())
 
     # Construit la liste des candidats : modèle spécifique à l'agent + modèles génériques
-    generic_values = [m for m in model_map.values() if m not in VISION_MODELS]
+    generic_values = [m for m in model_map.values() if m != VISION_OCR_SENTINEL]
     candidates = [model_map.get(agent_key)] + generic_values
 
     seen = set()

@@ -1,10 +1,17 @@
-"""Agent spécialisé en analyse d'images et vision par ordinateur.
+"""Agent spécialisé en extraction de texte depuis une image (OCR).
 
 Hérite de :class:`GenericAgent` : en l'absence d'image, il se comporte comme
 un agent texte classique (profil ``designer``). En présence d'une image dans
-le contexte, il bascule sur l'appel multimodal du fournisseur d'inférence.
+le contexte, il délègue à **RapidOCR** (``services/ocr.py``) — moteur OCR
+déterministe (ONNX), pas un modèle de langage multimodal.
 
-Aucune skill n'est jamais suggérée pour la vision (le rendu visuel ne contient
+Historique : cet agent appelait auparavant ``query_multimodal()`` sur un
+modèle vision Ollama (``moondream``). Ce modèle n'est plus installé/assigné
+(voir ``services/ocr.py`` pour le détail du remplacement) ; router l'image
+vers RapidOCR ici évite de dépendre d'un modèle absent — le même moteur
+alimente aussi l'onglet Vision dédié (``POST /api/vision``).
+
+Aucune skill n'est jamais suggérée pour la vision (le rendu OCR ne contient
 pas de fences de code exploitables) : ``suggested_skill`` reste ``None``.
 """
 
@@ -15,6 +22,8 @@ from typing import Any, Final, Protocol
 
 from agents.base import AgentRunResult
 from agents.generic import GenericAgent
+from services.ocr import run_ocr
+from services.sanitize import strip_data_uri
 
 _logger = logging.getLogger("jarvis.agents.vision")
 
@@ -25,6 +34,7 @@ _logger = logging.getLogger("jarvis.agents.vision")
 
 PROFILE_KEY: Final[str] = "designer"
 VISION_DOMAIN_PROMPT: Final[str] = "Tu es un expert en analyse visuelle."
+OCR_BACKEND_NAME: Final[str] = "rapidocr"
 
 # Clé du contexte portant l'image encodée (cohérent avec JarvisRequest.image
 # et l'injection effectuée par le graph). Ne pas renommer sans migration.
@@ -32,21 +42,20 @@ _IMAGE_CONTEXT_KEY: Final[str] = "image"
 
 
 # ---------------------------------------------------------------------------
-# Contrat du fournisseur d'inférence (ISP : ajoute query_multimodal au
-# sous-ensemble requis par GenericAgent).
+# Contrat du fournisseur d'inférence (texte uniquement désormais : le
+# multimodal n'est plus utilisé, l'image passe par RapidOCR).
 # ---------------------------------------------------------------------------
 
 
 class _VisionModelProvider(Protocol):
-    """Sous-ensemble d'inférence requis par l'agent vision (texte + image)."""
+    """Sous-ensemble d'inférence requis par l'agent vision (texte uniquement)."""
 
     def query(self, prompt: str, model: str, system: str | None = None) -> str: ...
-    def query_multimodal(self, model: str, prompt: str, image_base64: str) -> dict[str, Any] | str: ...
     def get_active_backend(self) -> str: ...
 
 
 class VisionAgent(GenericAgent):
-    """Agent vision : multimodal si image présente, texte sinon."""
+    """Agent vision : OCR (RapidOCR) si image présente, texte sinon."""
 
     def __init__(
         self,
@@ -62,13 +71,20 @@ class VisionAgent(GenericAgent):
         self.model_provider: _VisionModelProvider = model_provider
 
     def run(self, task: str, model: str, context: dict[str, Any]) -> AgentRunResult:
-        """Analyse l'image du contexte, ou traite la tâche en mode texte."""
+        """Extrait le texte de l'image du contexte (OCR), ou traite la tâche en mode texte."""
         image_data = context.get(_IMAGE_CONTEXT_KEY)
-        response = self._run_multimodal(model, task, image_data) if image_data else self._run_text(model, task, context)
+        if image_data:
+            response = self._run_ocr(image_data)
+            backend = OCR_BACKEND_NAME
+            model_out = OCR_BACKEND_NAME
+        else:
+            response = self._run_text(model, task, context)
+            backend = self.model_provider.get_active_backend()
+            model_out = model
         return {
             "agent": self._profile_key,
-            "model": model,
-            "backend": self.model_provider.get_active_backend(),
+            "model": model_out,
+            "backend": backend,
             "response": response,
             "suggested_skill": None,
         }
@@ -77,10 +93,15 @@ class VisionAgent(GenericAgent):
     # Branches d'exécution
     # ------------------------------------------------------------------
 
-    def _run_multimodal(self, model: str, task: str, image_data: str) -> str:
-        """Appel multimodal ; extrait la chaîne de réponse du payload."""
-        result = self.model_provider.query_multimodal(model, task, image_data)
-        return self._extract_response(result)
+    def _run_ocr(self, image_data: str) -> str:
+        """Extraction de texte via RapidOCR (déterministe, hors LLM)."""
+        image_b64 = strip_data_uri(image_data)
+        result = run_ocr(image_b64)
+        if result["error"]:
+            _logger.warning("OCR échoué : %s", result["error"])
+            return f"⚠️ {result['error']}"
+        text = result["text"]
+        return text if text.strip() else "⚠️ Aucun texte détecté dans l'image."
 
     def _run_text(
         self,
@@ -97,36 +118,5 @@ class VisionAgent(GenericAgent):
         )
         return self.model_provider.query(user, model, system=system)
 
-    # ------------------------------------------------------------------
-    # Normalisation du payload multimodal
-    # ------------------------------------------------------------------
 
-    @staticmethod
-    def _extract_response(result: dict[str, Any] | str) -> str:
-        """Extrait la réponse d'un payload multimodal (dict ``{"content": ...}`` ou str).
-
-        Le backend renvoie soit un dict (``{"content", "model", "role"}``), soit
-        directement une chaîne selon la version d'Ollama : on normalise les deux.
-        Un payload inattendu dégénère en chaîne vide mais est loggé en warning
-        (dégradation observable, pas muette).
-        """
-        if isinstance(result, dict):
-            content = result.get("content")
-            if isinstance(content, str):
-                return content
-            _logger.warning(
-                "Payload multimodal : 'content' non-str (%s)",
-                type(content).__name__,
-            )
-            return ""
-        if isinstance(result, str):
-            return result
-        # Garde-fou runtime : le backend Ollama n'est pas typé statiquement.
-        _logger.warning(
-            "Payload multimodal inattendu (%s), réponse vide",
-            type(result).__name__,
-        )
-        return ""
-
-
-__all__ = ["VisionAgent", "PROFILE_KEY", "VISION_DOMAIN_PROMPT"]
+__all__ = ["VisionAgent", "PROFILE_KEY", "VISION_DOMAIN_PROMPT", "OCR_BACKEND_NAME"]
