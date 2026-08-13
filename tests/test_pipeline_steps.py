@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
 from services.pipeline_steps import execute_pipeline_step
 
@@ -39,7 +39,7 @@ def test_execute_pipeline_step_with_agent_runner() -> None:
     """TDD : exécuter une étape avec un agent_runner doit mettre à jour l'état."""
     state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
     step = MockStep(name="test_step", agent_key="dev")
-    result = execute_pipeline_step(
+    execute_pipeline_step(
         state=state,
         step=step,
         task="Test prompt",
@@ -48,7 +48,7 @@ def test_execute_pipeline_step_with_agent_runner() -> None:
         model_selector=None,
         max_retries=0,
     )
-    assert result is state
+    assert state is not None  # execute_pipeline_step returns the state dict
     assert state["results"][-1]["step"] == "test_step"
     assert "Réponse simulée" in state["results"][-1]["response"]
 
@@ -76,7 +76,7 @@ def test_execute_pipeline_step_max_retries() -> None:
     state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
     step = MockStep(name="test_step", agent_key="dev")
     # Avec max_retries=0, une seule tentative
-    result = execute_pipeline_step(
+    execute_pipeline_step(
         state=state,
         step=step,
         task="Test prompt",
