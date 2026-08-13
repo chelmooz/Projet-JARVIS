@@ -1,0 +1,92 @@
+# ADR-005 — Pipeline RAG pour runbooks
+
+- **Statut :** Partiellement obsolète (corrigé le 24/07/2026)
+- **Date :** 2026-07-01
+- **Auteur :** Data/Secu/Docs (JARVIS)
+
+> ⚠️ **Correctif du 24/07/2026 :** deux points ci-dessous ne correspondent
+> plus (ou n'ont jamais correspondu) au code réel. Voir les notes inline
+> `[CORRECTIF]` : (1) aucun `FileWatcher` n'existe dans le dépôt, l'ingestion
+> est déclenchée manuellement (`POST /api/ingest`, `POST
+> /api/vectorize/conversations`) ; (2) le fallback histogramme a été
+> supprimé, voir [ADR-009](ADR-009-fail-fast-embedding-sans-fallback.md).
+
+---
+
+## Contexte
+
+Le systeme JARVIS doit permettre une recherche semantique dans les runbooks (collection de documents Markdown). Les besoins sont :
+
+1. Interrogation en langage naturel sur le contenu des runbooks
+2. Indexation incrementale sans re-indexation complete a chaque ajout
+3. Fonctionnement degrade si le backend d'embedding (Ollama) est indisponible
+
+Le service VectorService existe deja dans le codebase et assure la gestion des embeddings et de la recherche cosinus. Aucun nouveau service n'est requis.
+
+---
+
+## Decision
+
+### Architecture
+
+```
+[User] -> /api/search -> VectorService.search() -> [Response]
+                                |
+[Déclenchement manuel] -> POST /api/ingest ou POST /api/vectorize/conversations
+                        -> VectorService.add() -> hash dedup -> vector_index.json
+```
+
+> **[CORRECTIF 24/07/2026]** Le schéma d'origine mentionnait un `FileWatcher`
+> déclenchant automatiquement l'ingestion. Aucune classe `FileWatcher`
+> n'existe dans le dépôt (vérifié par recherche exhaustive) : l'ingestion est
+> toujours déclenchée manuellement, via un appel API (bouton "vectoriser"
+> côté UI, ou `POST /api/ingest` direct).
+
+### Composants utilises
+
+| Composant | Role | Fichier |
+|---|---|---|
+| VectorService | Embedding + stockage vectoriel + recherche cosinus | `services/vector.py` |
+| clean_text | Troncature a 20K caracteres | `services/sanitize.py` |
+
+### Pipeline detaillee
+
+#### Ingestion
+1. Déclenchement manuel (POST `/api/ingest` ou bouton "Vectoriser" UI)
+2. `SHA256(content)` calcule le hash du document
+3. VectorService verifie si le hash existe deja dans `vector_index.json`
+   - Si oui : ignore (ingestion incrementale)
+   - Si non : genere l'embedding via Ollama, ajoute a l'index, persiste
+
+#### Recherche
+1. Requete utilisateur → POST `/api/search`
+2. VectorService convertit la requete en embedding via Ollama
+3. Similarite cosinus contre tous les vecteurs de l'index
+4. Top-K resultats (configurable, defaut 5)
+
+#### Comportement sans Ollama
+- L'embedding est **Fail-Fast** : si Ollama est indisponible, la route retourne une erreur 503 (voir [ADR-009](ADR-009-fail-fast-embedding-sans-fallback.md)).
+
+---
+
+## Consequences
+
+### Positives
+
+- **Recherche vectorielle** : comprehension semantique, pas de simple keyword matching
+- **Ingestion incrementale** : le hash SHA256 evite de re-indexer les documents deja connus
+- **Pas de nouveau service** : VectorService est reutilise, maintenance centralisee
+
+### Negatives
+
+- **Dependance Ollama** : l'embedding necessite Ollama disponible et reactif
+- **Stockage disque** : `vector_index.json` contient les vecteurs en clair
+
+---
+
+## Voir aussi
+
+- **ADR-001** — Architecture generale de JARVIS
+- **ADR-009** — Fail-Fast embedding (remplace le fallback histogramme)
+- **Skill runbook-rag** — Guide d'utilisation et de test de la pipeline
+- **Audit securite RAG** — Analyse des risques secu (`docs/archive/audit-securite-rag.md`)
