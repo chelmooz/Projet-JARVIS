@@ -55,6 +55,7 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = ["."]
 addopts = ["--basetemp=.pytest-temp"]
 asyncio_mode = "auto"
 

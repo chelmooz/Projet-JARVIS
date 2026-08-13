@@ -64,7 +64,7 @@ class AgentRouter:
 
     def select_agent(self, task_text: str | Task) -> str:
         """Retourne la clé agent la plus pertinente pour la tâche donnée."""
-        text = task_text.text or "" if isinstance(task_text, Task) else task_text
+        text = task_text.task or "" if isinstance(task_text, Task) else task_text
         lower = text.lower().strip()
         if not lower:
             return self._config.fallback
