@@ -94,7 +94,7 @@ def _setup_middlewares(app: FastAPI) -> None:
     externes pour rejeter au plus tôt, avant tout traitement métier.
     """
     local_port = f"http://localhost:{JARVIS_PORT}"
-    
+
     # Add CORS middleware only if OpenWebUI is enabled
     if os.environ.get("JARVIS_ENABLE_OPENWEBUI", "0") == "1":
         app.add_middleware(

@@ -19,8 +19,9 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -161,11 +162,11 @@ def create_app() -> FastAPI:
            request.url.path.startswith("/redoc") or \
            request.url.path.startswith("/openapi.json"):
             return await call_next(request)
-        
+
         # Skip token verification if OpenWebUI is disabled (no CORS needed either)
         if os.environ.get("JARVIS_ENABLE_OPENWEBUI", "0") != "1":
             return await call_next(request)
-        
+
         # Require token in header for all other routes
         token = request.headers.get("X-JARVIS-Token")
         if not token:
@@ -173,7 +174,7 @@ def create_app() -> FastAPI:
                 status_code=401,
                 content={"detail": "Missing X-JARVIS-Token header"}
             )
-        
+
         # Verify token
         token_file = Path(__file__).resolve().parent.parent / "memory" / ".jarvis_token"
         if not token_file.exists():
@@ -181,14 +182,14 @@ def create_app() -> FastAPI:
                 status_code=503,
                 content={"detail": "Authentication token not available"}
             )
-        
+
         valid_token = token_file.read_text().strip()
         if token != valid_token:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Invalid X-JARVIS-Token"}
             )
-        
+
         return await call_next(request)
 
     # Lazy import des sous-routeurs (désenchevêtrement 15.8)

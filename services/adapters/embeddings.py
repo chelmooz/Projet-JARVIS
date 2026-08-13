@@ -5,7 +5,6 @@ et du registre de modèles pour embed() et embed_batch().
 """
 
 import logging
-from typing import Any
 
 from services.adapters.http import OllamaHTTPClient
 from services.adapters.models import ModelRegistry

@@ -10,13 +10,11 @@ Surface publique inchangée : mêmes méthodes, signatures, exceptions.
 
 import logging
 import os
-import threading
 from typing import Any
 
 import httpx
 
-from config.constants import AGENT_TIMEOUT_SECONDS, DEFAULT_MODEL, PROJECT_DIR
-from config.paths import OLLAMA_PORT
+from config.constants import PROJECT_DIR
 from models import Result
 from services.adapters.embeddings import EmbeddingsClient
 from services.adapters.http import BudgetExceededError, OllamaHTTPClient
