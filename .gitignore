@@ -7,6 +7,9 @@ logs/
 __pycache__/
 *.pyc
 
+node_modules/
+.pytest-temp/
+
 lib/
 
 memory/.jarvis_token

@@ -20,13 +20,16 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
+from agents.vision import VISION_ANALYSIS_SYSTEM
 from config.paths import CONFIG_DIR, PROFILES_FILE
 from controllers.context import _ctx, get_app_context
 from controllers.di import AppContext
 from controllers.responses import fail, ok
 from models.schemas import AssignRequest, VisionRequest
 from services.ocr import run_ocr
+from services.router import load_routing_config
 from services.sanitize import safe_model_name, strip_data_uri
+from services.selector import select_vision_analysis_model
 
 _logger = logging.getLogger(__name__)
 
@@ -47,6 +50,8 @@ PROFILE_TO_ROUTING = {
     "designer": "vision",
     "datasecu": "cyber",
 }
+
+ROUTING_PREFIXES = list(load_routing_config().prefix_map.keys())
 
 
 def _sync_agent_model_to_preferences(profile_key: str, model_name: str) -> None:
@@ -78,6 +83,7 @@ def list_profiles() -> Any:
         {
             "profiles": profiles.get("profiles", {}),
             "agent_model_map": profiles.get("agent_model_map", {}),
+            "routing_prefixes": ROUTING_PREFIXES,
         }
     )
 
@@ -117,12 +123,17 @@ async def vision_info() -> dict[str, Any]:
 
 @router.post("/api/vision")
 def handle_vision(body: VisionRequest, context: AppContext = Depends(get_app_context)) -> Any:
-    """Extrait le texte d'une image via OCR déterministe (RapidOCR, I/O CPU → threadpool FastAPI)."""
+    """Extrait le texte d'une image (OCR) puis l'analyse via LLM texte (Qwen2.5)."""
     image = body.image
     task = body.task
     start = time.time()
     if not image:
         return JSONResponse({"error": "Aucune image fournie", "agent": "vision"}, status_code=400)
+
+    assert context.inference is not None
+    assert context.memory is not None
+    assert context.analytics is not None
+    assert context.log is not None
 
     image_b64 = strip_data_uri(image)
     ocr_result = run_ocr(image_b64)
@@ -130,30 +141,38 @@ def handle_vision(body: VisionRequest, context: AppContext = Depends(get_app_con
         return JSONResponse({"error": ocr_result["error"], "agent": "vision"}, status_code=500)
 
     text = ocr_result["text"]
-    response_text = text if text.strip() else "⚠️ Aucun texte détecté dans l'image."
+    analysis_model = select_vision_analysis_model(context.inference)
+    backend = context.inference.get_active_backend()
+
+    if not text.strip():
+        response_text = "⚠️ Aucun texte détecté dans l'image."
+    else:
+        prompt = f"Consigne : {task}\n\nTexte extrait de l'image :\n{text}"
+        try:
+            response_text = context.inference.query(prompt, analysis_model, system=VISION_ANALYSIS_SYSTEM)
+        except Exception as e:  # noqa: BLE001 - dégradation gracieuse vers l'OCR brut
+            _logger.warning("Analyse LLM échouée, repli OCR brut : %s", e)
+            response_text = text
 
     result = {
         "response": response_text,
         "agent": "vision",
-        "model": "rapidocr",
-        "backend": "rapidocr",
+        "model": analysis_model,
+        "backend": backend,
         "error": None,
     }
 
-    assert context.memory is not None
-    assert context.analytics is not None
-    assert context.log is not None
     context.memory.update_habits({"task": task, "agent": "vision"})
     latency = round((time.time() - start) * 1000, 1)
     context.analytics.track_query(
         agent="vision",
-        model="rapidocr",
+        model=analysis_model,
         tokens_in=len(task) // TOKEN_ESTIMATE_DIVISOR,
         tokens_out=len(response_text) // TOKEN_ESTIMATE_DIVISOR,
         latency_ms=latency,
         success=True,
     )
-    context.log.log("INFO", f"agent=vision model=rapidocr lines={ocr_result['lines']}")
+    context.log.log("INFO", f"agent=vision model={analysis_model} lines={ocr_result['lines']}")
     return result
 
 

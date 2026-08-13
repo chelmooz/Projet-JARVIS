@@ -60,6 +60,7 @@ def _track_query(
     start: float,
     analytics_svc: Any,
     task: str = "",
+    source: str = "chat",
 ) -> None:
     """Enregistre les métriques d'une requête.
 
@@ -74,6 +75,7 @@ def _track_query(
         tokens_out=len(str(result.get("response", ""))) // 4,
         latency_ms=latency,
         success=result.get("error") is None,
+        source=source,
     )
 
 
@@ -154,6 +156,7 @@ async def handle_request(
         if conv_id:
             conv_id = conv_id.strip()[:TRUNCATE_CONV_ID]
 
+        source = body.source
         start = time.time()
         loop = asyncio.get_running_loop()
         wants_stream = "text/event-stream" in request.headers.get("accept", "")
@@ -167,6 +170,7 @@ async def handle_request(
                 image,
                 conv_id,
                 start,
+                source,
             )
 
         result = await orchestrator.handle_request(task, image, conv_id)
@@ -174,7 +178,7 @@ async def handle_request(
         agent_key = result.get("agent", "unknown")
         model_name = result.get("model", "auto")
 
-        await asyncio.to_thread(_track_query, agent_key, model_name, result, start, context.analytics, task=task)
+        await asyncio.to_thread(_track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source)
         await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
 
         return result
@@ -195,6 +199,7 @@ async def _handle_request_streamed(
     image: str | None,
     conv_id: str | None,
     start: float,
+    source: str = "chat",
 ) -> StreamingResponse:
     """Exécute le pipeline et renvoie un flux SSE des tokens du modèle.
 
@@ -213,7 +218,7 @@ async def _handle_request_streamed(
             result = await orchestrator.handle_request(task, image, conv_id)
             agent_key = result.get("agent", "unknown")
             model_name = result.get("model", "auto")
-            await asyncio.to_thread(_track_query, agent_key, model_name, result, start, context.analytics, task=task)
+            await asyncio.to_thread(_track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source)
             await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
         except Exception as e:  # noqa: BLE001 - l'erreur part dans l'événement done
             _logger.error("handle_request streamed crashed", exc_info=True)

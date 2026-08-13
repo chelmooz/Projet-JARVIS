@@ -74,6 +74,7 @@ class AnalyticsService(AnalyticsPort):
         tokens_out: int = 0,
         latency_ms: float = 0.0,
         success: bool = True,
+        source: str = "chat",
     ) -> None:
         """Enregistre une requête dans les stats (agent, modèle, métriques)."""
         with _lock:
@@ -86,6 +87,7 @@ class AnalyticsService(AnalyticsPort):
                     "tokens_out": tokens_out,
                     "latency_ms": latency_ms,
                     "success": success,
+                    "source": source,
                     "ts": time.time(),
                 }
             )

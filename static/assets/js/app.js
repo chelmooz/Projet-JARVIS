@@ -53,6 +53,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             analytics.refreshAnalytics();
         }
         if (btn.dataset.tab === 'conversations') conversations.loadConvs('conv-list-main');
+        if (btn.dataset.tab === 'console') {
+            const ci = document.getElementById('console-input');
+            if (ci) ci.focus();
+        }
     });
 });
 

@@ -11,6 +11,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2313161f'/%3E%3Cpath d='M9 11h14M11 11v9a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-9' fill='none' stroke='%2338bdf8' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='12.5' cy='17' r='1.6' fill='%23818cf8'/%3E%3Ccircle cx='19.5' cy='17' r='1.6' fill='%23818cf8'/%3E%3C/svg%3E">
 <title>JARVIS Portable</title>
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/console.css">
 </head>
 <body>
 <noscript>
@@ -52,6 +53,9 @@
     </button>
     <button class="tab-btn" data-tab="settings" aria-label="Réglages" title="Paramètres">
       <span class="icon" aria-hidden="true">⚙️</span> Réglages
+    </button>
+    <button class="tab-btn" data-tab="console" aria-label="Console" title="Console de commandes">
+      <span class="icon" aria-hidden="true">🖥️</span> Console
     </button>
   </nav>
   <div class="sidebar-convs" id="sidebar-convs">
@@ -219,6 +223,22 @@
         </div>
         <div id="fp-feedback" class="fp-feedback"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- CONSOLE TAB -->
+  <div class="tab-content" id="tab-console">
+    <div class="header">
+      <span class="label">Console JARVIS</span>
+      <span class="badge" id="console-conn">—</span>
+      <span class="console-hint">Commandes : <code>@agent votre tâche</code> · ↑/↓ historique · Ctrl/⌘+K partout</span>
+    </div>
+    <div class="console-scrollback" id="console-scrollback" role="log" aria-live="polite"></div>
+    <div class="input-area console-input-area">
+      <div class="input-wrap">
+        <textarea id="console-input" rows="1" placeholder="@cyber scan le firewall…" maxlength="10000" aria-label="Commande console"></textarea>
+      </div>
+      <button id="console-send-btn" aria-label="Exécuter la commande">Exécuter</button>
     </div>
   </div>
 

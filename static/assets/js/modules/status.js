@@ -22,6 +22,7 @@ export function connectStatusSSE() {
             setSide('st-ollama', s.ollama ? 'OK' : 'HS', s.ollama ? 'ok' : 'err');
             setSide('st-memory', s.memory ? 'OK' : 'ERR', s.memory ? 'ok' : 'err');
             setSide('st-vector', s.vector ? 'OK' : 'ERR', s.vector ? 'ok' : 'err');
+            document.dispatchEvent(new CustomEvent('jarvis:status-updated', { detail: s }));
         } catch (e) {
             console.warn('SSE status parse error:', e);
         }

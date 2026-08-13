@@ -5,6 +5,8 @@
 
 import { VisionUploader } from './vision.js';
 import { ChatImage } from './chat.js';
+import { palette } from './command-palette.js';
+import { consoleTab } from './console-tab.js';
 
 function bootstrapVision(zoneId, fileId, onAnalyze) {
   const zone = document.getElementById(zoneId);
@@ -30,3 +32,18 @@ bootstrapVision('upload-zone', 'vision-file', (dataUrl, file, err) => {
   const handler = window.handleVisionDataUrl;
   if (handler) handler(dataUrl, file, err);
 });
+
+// --- Console Tab + Command Palette (Ctrl+K) ---
+// Listener unique Ctrl+K / Cmd+K monté une fois, actif sur tout le document.
+consoleTab.mount();
+palette.mount();
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    palette.toggle();
+  }
+});
+
+window.__jarvisPalette = palette;
+window.__jarvisConsole = consoleTab;

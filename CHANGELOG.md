@@ -1,5 +1,37 @@
 # Changelog — JARVIS Portable Edition
 
+## [Unreleased]
+
+### Console Tab + Command Palette (Ctrl+K)
+- **9ᵉ onglet « Console »** : saisie directe de commandes `@agent tâche`
+  (ex. `@cyber scan le firewall`), scrollback append-only, badge agent par ligne,
+  historique des commandes (↑/↓, persistant `localStorage` `jarvis_console_history`,
+  max 50, réponses jamais persistées), indicateur de connexion (event
+  `jarvis:status-updated`).
+- **Palette globale (Ctrl/⌘+K)** : overlay partout, autocomplétion des agents
+  (préfixes `@…` issus de `config/agent_routing.yaml` via `GET /api/agents`
+  → `routing_prefixes`), exécution inline (`source: 'palette'`), touche Échap
+  pour fermer.
+- **Handoff Palette → Console** : bouton « Ouvrir en Console » ou bascule d'onglet
+  avec pré-remplissage (event `jarvis:palette-handoff`).
+- Backend : `JarvisRequest.source` (`chat`/`console`/`palette`, défaut `chat`,
+  non-breaking) propagé aux analytics ; `GET /api/agents` expose désormais
+  `routing_prefixes` (DRY, lecture `agent_routing.yaml`).
+- Fichiers : `static/assets/js/modules/console-client.js`, `command-palette.js`,
+  `console-tab.js`, `static/assets/css/console.css`, onglet `index.html`.
+- Tests focused (vitest/jsdom) : `console-client.test.js` (16), `command-palette.test.js` (9),
+  `console-tab.test.js` (7).
+
+### Vision — OCR + analyse LLM (ADR-010)
+- Pipeline image en deux étapes : extraction `RapidOCR` puis analyse par le LLM
+  texte `Qwen2.5-7B` (plus de modèle multimodal unique type `moondream`/`llava`).
+- `agents/vision.py` (`VisionAgent.run`) et `POST /api/vision` (`handle_vision`)
+  renvoient désormais une analyse de la consigne, pas le texte OCR brut.
+- Dégradation gracieuse vers le texte OCR brut si l'analyse LLM échoue.
+- `services/selector.py` : ajout de `select_vision_analysis_model()`.
+- `AGENTS.md` et `README.md` (ADR-010) mis à jour pour refléter le nouveau
+  comportement.
+
 ## [5.6] — 2026-07-26
 
 - Mise à jour de version 5.4 → 5.6 (tous les fichiers)
