@@ -1,0 +1,44 @@
+# Configuration du logging JARVIS
+# Chargee au demarrage par LogService
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    datefmt: "%H:%M:%S"
+  json:
+    format: '{"ts": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "msg": "%(message)s"}'
+    datefmt: "%Y-%m-%dT%H:%M:%S"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: json
+    filename: "{{ LOG_FILE }}"
+    encoding: utf-8
+    mode: "a"
+
+root:
+  level: "{{ LOG_LEVEL }}"
+  handlers: [console, file]
+
+loggers:
+  jarvis:
+    level: "{{ LOG_LEVEL }}"
+    handlers: [console, file]
+    propagate: false
+  uvicorn:
+    level: WARNING
+    handlers: [console]
+    propagate: false
+  httpx:
+    level: WARNING
+    handlers: [console]
+    propagate: false

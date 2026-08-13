@@ -1,0 +1,9 @@
+{
+  "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M":              {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 4.7, "cpu_only": false},
+  "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M":   {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 4.9, "cpu_only": false},
+  "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M":         {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 4.7, "cpu_only": false},
+  "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0":   {"ram_min_gb": 8,  "vram_min_gb": 4,  "disk_gb": 4.9, "cpu_only": false},
+  "hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M": {"ram_min_gb": 2, "vram_min_gb": 0, "disk_gb": 2.6, "cpu_only": true},
+  "moondream":                                           {"ram_min_gb": 2,  "vram_min_gb": 0,  "disk_gb": 1.4, "cpu_only": true,  "vision": true},
+  "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M":       {"ram_min_gb": 2, "vram_min_gb": 0, "disk_gb": 0.6, "cpu_only": true, "embedding": true}
+}

@@ -1,0 +1,17 @@
+pipeline:
+  id: network_triage
+  on_error: abort
+  description: "Analyse un probleme reseau → diagnostic → script de correction"
+  steps:
+    - name: analyze_network
+      agent_key: network
+      prompt_template: "Analyse ce probleme reseau et identifie la cause racine : {task}"
+      on_error: abort
+    - name: fix_script
+      agent_key: dev
+      prompt_template: "Ecris un script de correction pour ce probleme reseau : {task}"
+      on_error: skip
+    - name: verify_steps
+      agent_key: network
+      prompt_template: "Verifie que le script de correction resout bien le probleme : {task}"
+      on_error: skip

@@ -1,0 +1,116 @@
+# Diagnostic Tools — Configuration des outils externes pour DiagnosticExtService
+# Chaque outil décrit le binaire, timeout, plateforme, arguments et checksum SHA256.
+# Plateformes supportées : win32, linux, darwin
+# Platform-specific keys : binary/args/sha256 (win32), linux_binary/linux_args/linux_sha256 (linux), darwin_binary/darwin_args/darwin_sha256 (darwin)
+# Si sha256 est vide, la vérification est ignorée.
+# Résolution du hash attendu par plateforme : win32 → sha256 ; sinon → {platform}_sha256, repli sur sha256.
+---
+tools:
+  smartctl:
+    binary: smartctl.exe
+    linux_binary: smartctl
+    darwin_binary: smartctl
+    description: "SMART disk health (temperature, reallocated sectors, power-on hours)"
+    timeout: 15
+    platforms: [win32, linux, darwin]
+    args: ["-a", "{device}"]
+    linux_args: ["-a", "{device}"]
+    darwin_args: ["-a", "{device}"]
+    sha256: E38945652D86A4B0CDFEE8A63EE2737F2026A68D4C164A3B7C78EDC10B807507
+    linux_sha256: ""
+    darwin_sha256: ""
+
+  psinfo:
+    binary: PsInfo64.exe
+    linux_binary: uname
+    darwin_binary: uname
+    description: "System information (OS, kernel, hardware)"
+    timeout: 10
+    platforms: [win32, linux, darwin]
+    args: ["-s", "-d", "-c"]
+    linux_args: ["-a"]
+    darwin_args: ["-a"]
+    sha256: DE73B73EEB156F877DE61F4A6975D06759292ED69F31AAF06C9811F3311E03E7
+    linux_sha256: ""
+    darwin_sha256: ""
+
+  psloglist:
+    binary: psloglist64.exe
+    linux_binary: journalctl
+    description: "System log dumper"
+    timeout: 20
+    platforms: [win32, linux]
+    args: ["-s", "{log_name}"]
+    linux_args: ["-n", "50", "--no-pager", "-u", "{log_name}"]
+    sha256: 5E55B4CAF47A248A10ABD009617684E969DBE5C448D087EE8178262AAAB68636
+    linux_sha256: ""
+
+  handle:
+    binary: handle64.exe
+    linux_binary: lsof
+    darwin_binary: lsof
+    description: "List open file handles by process or name"
+    timeout: 10
+    platforms: [win32, linux, darwin]
+    args: ["-accepteula", "{pattern}"]
+    linux_args: ["{pattern}"]
+    darwin_args: ["{pattern}"]
+    sha256: 24BAFCC570CC9BBB6B6E6652A57A519E0464E3996891AABA6F55299CCE20B04F
+    linux_sha256: ""
+    darwin_sha256: ""
+
+  psping:
+    binary: psping64.exe
+    linux_binary: ping
+    darwin_binary: ping
+    description: "Network latency and connectivity test"
+    timeout: 15
+    platforms: [win32, linux, darwin]
+    args: ["-n", "{count}", "{target}"]
+    linux_args: ["-c", "{count}", "{target}"]
+    darwin_args: ["-c", "{count}", "{target}"]
+    sha256: D1F718D219930E57794BDADF9DDA61406294B0759038CEF282F7544B44B92285
+    linux_sha256: ""
+    darwin_sha256: ""
+
+  psservice:
+    binary: PsService64.exe
+    linux_binary: systemctl
+    description: "Service status and management"
+    timeout: 10
+    platforms: [win32, linux]
+    args: ["query", "{service_name}"]
+    linux_args: ["status", "{service_name}"]
+    sha256: 554F523914CDBAED8B17527170502199C185BD69A41C81102C50DBB0E5E5A78D
+    linux_sha256: ""
+
+  witr:
+    binary: witr.exe
+    linux_binary: witr
+    darwin_binary: witr
+    description: "Explique pourquoi un processus/port/service tourne (ancestry chain, JSON)"
+    timeout: 10
+    platforms: [win32, linux, darwin]
+    output_format: json
+    args: ["--json", "{target}"]
+    # Template port : witr traite les positionnels comme des noms → --port
+    # obligatoire pour une requête numérique (flags identiques toutes plateformes).
+    port_args: ["--json", "--port", "{port}"]
+    linux_args: ["--json", "{target}"]
+    darwin_args: ["--json", "{target}"]
+    allowed_params: ["target", "port"]
+    # witr exit 1 = trouvé avec warnings (ex: listening on public interface) →
+    # considérer comme succès pour l'agent, warnings préservés dans data.
+    success_exit_codes: [0, 1]
+    # SHA256 par plateforme (vérifiés contre SHA256SUMS officiel en T1.2).
+    # darwin_sha256 = hash du witr déployé par défaut (arm64) ; le binaire
+    # darwin-amd64 (39934f6a…) n'est pas référencé par la config.
+    sha256: 1500DC0ED76E27C5C0ACD95A8AA34D33ABEA5E7A4F1A512D18375BD4EC187494
+    linux_sha256: 08fc46e3f80a374476f71d0d6e6579477cd98c6df5cc59d98224adf948f5ebf5
+    darwin_sha256: d05b51825604d608da8757e549a1f5322549a350f8336c593429f3f2cd507927
+
+# Répertoire des binaires (relatif à PROJECT_DIR)
+bin_dir: bin/diagnostic
+
+# Emplacement du fichier de consentement (relatif à PROJECT_DIR)
+consent_file: config/.diagnostic_consent

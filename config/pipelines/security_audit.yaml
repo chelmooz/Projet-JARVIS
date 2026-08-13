@@ -1,0 +1,12 @@
+pipeline:
+  id: security_audit
+  on_error: abort
+  steps:
+    - name: analyze_logs
+      agent_key: cyber
+      prompt_template: "Analyse ces logs de securite : {task}"
+      on_error: abort
+    - name: generate_report
+      agent_key: dev
+      prompt_template: "Genere un rapport pour : {task}"
+      on_error: skip

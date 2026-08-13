@@ -1,0 +1,14 @@
+{
+  "name": "jarvis-portable-frontend",
+  "version": "5.10.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0",
+    "vitest": "^2.1.0"
+  }
+}

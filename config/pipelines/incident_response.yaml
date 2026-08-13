@@ -1,0 +1,21 @@
+pipeline:
+  id: incident_response
+  on_error: abort
+  description: "Reponse a incident de securite → analyse → remediation → post-mortem"
+  steps:
+    - name: triage
+      agent_key: cyber
+      prompt_template: "Triage cet incident de securite : {task}"
+      on_error: abort
+    - name: containment
+      agent_key: network
+      prompt_template: "Propose des mesures de confinement reseau : {task}"
+      on_error: skip
+    - name: remediation
+      agent_key: dev
+      prompt_template: "Ecris les scripts de remediation : {task}"
+      on_error: skip
+    - name: post_mortem
+      agent_key: dev
+      prompt_template: "Redige le rapport post-mortem : {task}"
+      on_error: skip

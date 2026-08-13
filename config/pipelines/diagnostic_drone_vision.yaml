@@ -1,0 +1,17 @@
+pipeline:
+  id: diagnostic_drone_vision
+  on_error: abort
+  description: "Analyse une image drone → diagnostique materiel → rapport"
+  steps:
+    - name: analyze_image
+      agent_key: vision
+      prompt_template: "Decris en detail cette image de materiel : {task}"
+      on_error: abort
+    - name: hardware_diagnostic
+      agent_key: hardware
+      prompt_template: "A partir de cette description, diagnostique l'etat du materiel : {task}"
+      on_error: abort
+    - name: generate_report
+      agent_key: dev
+      prompt_template: "Genere un rapport structure pour : {task}"
+      on_error: skip

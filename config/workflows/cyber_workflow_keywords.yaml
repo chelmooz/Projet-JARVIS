@@ -1,0 +1,50 @@
+# Mots-clés de détection des workflows CyberAgent
+# Chaque workflow associe un nom de workflow (clé) à une liste de patterns regex.
+# Les patterns sont mis en correspondance (insensible à la casse) avec la tâche entrante.
+workflow_keywords:
+  CISA_KNOWN_EXPLOITED_VULNS:
+    - "\\bcisa\\b"
+    - "\\bkev\\b"
+    - "\\bknown exploited\\b"
+    - "\\bvuln\\b"
+  DETECT_EDR:
+    - "\\bedr\\b"
+    - "\\bantivirus\\b"
+    - "\\bdefense\\b"
+    - "\\bsecurity product\\b"
+  EDR_TELEMETRY_GAPS:
+    - "\\btelemetry\\b"
+    - "\\bgap\\b"
+    - "\\bedr lacune\\b"
+  TTP_REPORT_ANALYSIS:
+    - "\\bttp\\b"
+    - "\\bmitre\\b"
+    - "\\batt&ck\\b"
+    - "\\breport\\b"
+    - "\\badversaire\\b"
+  PRIVILEGE_AUDIT:
+    - "\\bprivilege\\b"
+    - "\\bwhoami\\b"
+    - "\\badmin\\b"
+    - "\\belevation\\b"
+  CALDERA_INTEL:
+    - "\\bcaldera\\b"
+    - "\\boperation\\b"
+  HELLO_CALDERA:
+    - "\\bcaldera message\\b"
+    - "\\bpopup\\b"
+    - "\\bmessage box\\b"
+  FORENSIC_COLLECT:
+    - "\\bforensic\\b"
+    - "\\bcollecte\\b"
+    - "\\bincident response\\b"
+  NETWORK_SCAN:
+    - "\\bscan\\b"
+    - "\\bnetwork\\b"
+    - "\\bport\\b"
+    - "\\bdecouvrir\\b"
+  LOG_ANALYSIS:
+    - "\\blog\\b"
+    - "\\bevenement\\b"
+    - "\\bevent\\b"
+    - "\\bsecurity log\\b"
