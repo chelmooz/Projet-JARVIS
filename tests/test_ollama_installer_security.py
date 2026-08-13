@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from services import ollama_installer
+from services import ollama_download, ollama_installer
 
 
 def _logger(events: list[tuple[str, str, bool | None]]):
@@ -24,7 +24,7 @@ def test_verification_refuse_archive_when_manifest_sha256_indisponible(
     archive = tmp_path / "ollama.zip"
     archive.write_bytes(b"contenu quelconque")
     events: list[tuple[str, str, bool | None]] = []
-    monkeypatch.setattr(ollama_installer, "_expected_ollama_sha256", lambda _asset, _log: None)
+    monkeypatch.setattr(ollama_download, "_expected_ollama_sha256", lambda _asset, _log: None)
 
     assert not ollama_installer._verify_ollama_binary(str(archive), "ollama.zip", _logger(events))
     assert any("Installation refusée" in message for _, message, _ in events)
@@ -36,9 +36,9 @@ def test_verification_accepte_archive_avec_sha256_correspondant(
     """Une empreinte SHA-256 correcte est acceptée."""
     archive = tmp_path / "ollama.zip"
     archive.write_bytes(b"archive saine")
-    expected = ollama_installer._sha256_of(str(archive))
+    expected = ollama_download._sha256_of(str(archive))
     events: list[tuple[str, str, bool | None]] = []
-    monkeypatch.setattr(ollama_installer, "_expected_ollama_sha256", lambda _asset, _log: expected)
+    monkeypatch.setattr(ollama_download, "_expected_ollama_sha256", lambda _asset, _log: expected)
 
     assert ollama_installer._verify_ollama_binary(str(archive), "ollama.zip", _logger(events))
     assert any("Intégrité SHA256 vérifiée" in message for _, message, _ in events)

@@ -13,14 +13,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from services.ollama_installer import (
+from services.ollama_download import (
     _download_file,
     _expected_ollama_sha256,
+    _sha256_of,
+    _verify_ollama_binary,
+)
+from services.ollama_installer import (
     _extract_tar_zst,
     _is_real_ollama,
     _safe_extract_zip,
-    _sha256_of,
-    _verify_ollama_binary,
     ensure_ollama_binary,
 )
 
@@ -130,7 +132,7 @@ def test_verify_ollama_binary_ok(tmp_path: Path) -> None:
     def log(msg: str, detail: str, success: bool | None) -> None:
         log_calls.append((msg, detail, success))
 
-    with patch("services.ollama_installer._expected_ollama_sha256", return_value=expected):
+    with patch("services.ollama_download._expected_ollama_sha256", return_value=expected):
         result = _verify_ollama_binary(str(f), "ollama-linux-amd64.tar.zst", log)
 
     assert result is True
@@ -147,7 +149,7 @@ def test_verify_ollama_binary_mismatch_fails(tmp_path: Path) -> None:
         log_calls.append((msg, detail, success))
 
     with patch(
-        "services.ollama_installer._expected_ollama_sha256",
+        "services.ollama_download._expected_ollama_sha256",
         return_value="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     ):
         result = _verify_ollama_binary(str(f), "ollama-linux-amd64.tar.zst", log)
@@ -165,7 +167,7 @@ def test_verify_ollama_binary_missing_expected_refuses(tmp_path: Path) -> None:
     def log(msg: str, detail: str, success: bool | None) -> None:
         log_calls.append((msg, detail, success))
 
-    with patch("services.ollama_installer._expected_ollama_sha256", return_value=None):
+    with patch("services.ollama_download._expected_ollama_sha256", return_value=None):
         result = _verify_ollama_binary(str(f), "ollama-linux-amd64.tar.zst", log)
 
     assert result is False
