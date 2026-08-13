@@ -2,10 +2,12 @@
 models/
 portable_python/
 build/
+dist/
 logs/
 *.egg-info/
 __pycache__/
 *.pyc
+.coverage
 
 node_modules/
 .pytest-temp/

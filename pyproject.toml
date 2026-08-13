@@ -64,6 +64,7 @@ python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 files = ["services", "controllers", "agents", "graph", "ports", "config", "models"]
+exclude = ["build", "node_modules", "\\.venv", "dist"]
 
 [[tool.mypy.overrides]]
 module = ["psutil"]
@@ -92,5 +93,6 @@ relative_files = true
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-# Cible de couverture : temporairement 0, remontée par paliers (mesuré - 2) au fil des lots TDD.
-fail_under = 0
+# Cible de couverture : guard anti-régression. Valeur = couverture mesurée - 2,
+# remontée par paliers à chaque lot TDD (mesuré = 48 % au Lot 3.2 -> 46).
+fail_under = 46
