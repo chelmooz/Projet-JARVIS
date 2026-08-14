@@ -103,10 +103,7 @@ class AppContext:
         self.agent_supervisor = AgentSupervisor()
 
         # 7. Pipeline (dépend de inference, memory)
-        # agent_runner=None : inference suffit — agent_runner reste un point
-        # d'extension non câblé (ticket di.py:107 FERMÉ, voir BACKLOG MT-T5a-1.4).
         self.pipeline = PipelineService(
-            agent_runner=None,
             inference=self.inference,
             memory=self.memory,
             model_selector=select_model,

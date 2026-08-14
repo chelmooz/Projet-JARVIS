@@ -259,23 +259,23 @@ def _register_middlewares(app: FastAPI) -> None:
         ):
             return await call_next(request)
 
-        # Skip token verification if OpenWebUI is disabled (no CORS needed either)
+# Skip token verification if OpenWebUI is disabled (no CORS needed either)
         if os.environ.get("JARVIS_ENABLE_OPENWEBUI", "0") != "1":
             return await call_next(request)
 
         # Require token in header for all other routes
         token = request.headers.get("X-JARVIS-Token")
         if not token:
-            return JSONResponse(status_code=401, content={"detail": "Missing X-JARVIS-Token header"}
+            return JSONResponse(status_code=401, content={"detail": "Missing X-JARVIS-Token header"})
 
         # Verify token
         token_file = Path(__file__).resolve().parent.parent / "memory" / ".jarvis_token"
         if not token_file.exists():
-            return JSONResponse(status_code=503, content={"detail": "Authentication token not available"}
+            return JSONResponse(status_code=503, content={"detail": "Authentication token not available"})
 
         valid_token = token_file.read_text().strip()
         if token != valid_token:
-            return JSONResponse(status_code=401, content={"detail": "Invalid X-JARVIS-Token"}
+            return JSONResponse(status_code=401, content={"detail": "Invalid X-JARVIS-Token"})
 
         return await call_next(request)
 
