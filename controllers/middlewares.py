@@ -1,11 +1,9 @@
 """Middlewares FastAPI : CORS, profilage, audit, sécurité, quota, limite de body.
 
-Dettes signalées (non corrigées ici) :
-- CSP : ``'unsafe-inline'`` sur script-src/style-src affaiblit la politique
-  (nécessaire au JS inline de l'UI locale). Cible : nonce ou hash CSP.
-- ``_setup_middlewares`` est préfixé ``_`` mais importé par ``controllers/context.py``
-  (symbole privé exporté). Cible : renommer en ``setup_middlewares`` (public)
-  et mettre à jour l'import dans context.py (fichier déjà commité → coordination).
+Politique de sécurité :
+- CSP ``default-src 'self'`` sans ``'unsafe-inline'`` ; les scripts/styles
+  inline exigent un nonce par requête (``request.state.csp_nonce``). L'UI
+  locale ne contient pas de JS inline (modules externes uniquement).
 """
 
 from __future__ import annotations
