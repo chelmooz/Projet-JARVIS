@@ -427,4 +427,18 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - `fail_under` final : 50 (couverture 52,57 % − 2, inchangé)
 - `coverage-badge.json` : 52,6 % (orange, inchangé)
 - Gates : 4 vertes (ruff · format · mypy 124 src · pytest 194/1, 52,57 % ≥ 50)
-- Commit `docs(backlog): T5a — Lot 4 clos, gates vertes`
+- Commit `docs(backlog): T5a — Lot 4 clos, gates vertes`  
+### MT-Lot8-A -- Lot A : Depot debloque (2026-08-14)  
+- Probleme : models/ ignore par .gitignore - ne collectait pas (ImportError Result)  
+- Fix : .gitignore ligne 2 models/ - + models/ollama/manifests/ (poids uniquement)  
+- models/__init__.py committe (DTO Result, Pipeline, PipeStep, Task, AgentProfile, Conversation, Message, Document, OnError)  
+- tests/test_import_contract.py : 5 tests (contrat d'import models, ports, services.pipeline, services.router, controllers.router) - CI (A7)  
+- pyproject.toml : fail_under=46 (mesure 48,66% - 2)  
+- coverage-badge.json : 48,7% (baseline mesuree)  
+- Gates : ruff check . ok . ruff format --check . ok . mypy ok (pre-existant scripts/schedule_backup.py) . pytest --cov ok (52,57%  
+- Commit 8bfacf900 : fix(models): unblock repo by tracking models package (A1-A6) 
+  
+### MT-Lot8-B -- Lot B : Docs + Cartographie (2026-08-14)  
+- B1 : ROADMAP.md corrige (ollama_download.py committ� en 1e648d996, note non committ� fausse)  
+- B2 : test_ollama_installer_security.py imports deja OK (ruff clean)  
+- B3 : Hotspots git (30 plus modifies) : pyproject.toml 13, BACKLOG.md 13, ROADMAP.md 9, README.md 9, .gitignore 6, pipeline_steps.py 6, test_pipeline_steps.py 6, ollama_installer.py 5, test_ollama_installer.py 5, CHANGELOG.md 5, middlewares.py 5, pipeline.py 4, selector.py 4, vision.py 4, index.html 4, coverage-badge.json 3, di.py 3, install.py 3, analysis_audit.py 3, context.py 3, warmup.py 3, test_analysis_audit.py 3, conftest.py 3, system.py 3, router.py 3, jarvis.py 3, ollama_adapter.py 3, package-lock.json 3, package.json 3, test_pipeline_characterization.py 2 

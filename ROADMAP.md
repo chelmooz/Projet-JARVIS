@@ -53,7 +53,7 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 - [x] 4.2b Suppression de la copie parallèle (~150 l. : `_execute_step`, `_run_via_agent`, `_run_via_inference`, `_extract_response`, `_execute_with_retry`, `_record_step_*`) au profit de `pipeline_steps.execute_pipeline_step` (dé-orpheliné) — cible `pipeline.py` < 300 l. ; conditions d'entrée : 3 TODO `agent_runner` fermés (T5a MT-1.1/1.3) — plan T5a Phase 2
 - [x] 4.3 `services/analysis_audit.py` (427) → reventiler vers `analysis_*` (tests d'audit AVANT ; couverture 18 %) — **architecturalement déjà fait** à la base (`QualityAuditor` agrège via `Analyzer` = `analysis.py`, feuilles `analysis_security/performance/maintainability/standards/core`) ; imports directs `analysis_core` ajoutés (`e89f3826`) + `ruff format` (`c5bca40d`), gates vertes
 - [x] 4.4 `services/ollama_installer.py` (330 → 263) — découpe en cours :
-      - [x] 4.4a Extraction `services/ollama_download.py` (download atomique, SHA256, `_verify_ollama_binary`) — **non committé** (rattrapé par T1)
+      - [x] 4.4a Extraction `services/ollama_download.py` (download atomique, SHA256, `_verify_ollama_binary`) — committé (`1e648d996`)
       - [x] 4.4b Tests de caractérisation `test_ollama_installer.py` (commit `5a0ef4ad`) + `test_ollama_installer_security.py` (imports à re-trier, rattrapé par T1)
       - [x] 4.4c Extraction des 5 installateurs (`_install_linux_apt`, `_install_linux_tar`, `_install_windows_zip`, `_install_mac_brew`, `_install_mac_script`) vers `services/ollama_install_{linux,windows,mac}.py` ; `ollama_installer.py` = sélecteur < 100 l. + ré-exports `__all__` (surface `scripts/install.py` préservée) ; 5 tests de caractérisation obligatoires (plan T5a Phase 3)
 
