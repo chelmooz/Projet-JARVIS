@@ -34,4 +34,13 @@ jobs:
       - name: Mypy
         run: mypy
       - name: Tests
-        run: pytest --cov
+        run: pytest --cov --cov-report=json
+      - name: Coverage badge (doit être committé)
+        run: |
+          python scripts/coverage_badge.py
+          if git diff --exit-code -- coverage-badge.json; then
+            echo "Badge de couverture à jour."
+          else
+            echo "::error::coverage-badge.json est périmé — exécutez python scripts/coverage_badge.py et committez."
+            exit 1
+          fi

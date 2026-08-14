@@ -8,6 +8,7 @@ logs/
 __pycache__/
 *.pyc
 .coverage
+coverage.json
 
 node_modules/
 .pytest-temp/
