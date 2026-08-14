@@ -123,6 +123,55 @@ def test_execute_pipeline_step_runner_two_params_without_model() -> None:
     assert len(calls[0]) == 2
 
 
+class CountingRunner:
+    """Runner qui échoue toujours, avec compteur d'appels."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, agent_key: str, prompt: str) -> str:
+        self.calls += 1
+        raise RuntimeError("boom")
+
+
+def test_execute_pipeline_step_retry_conditionnel_retry(monkeypatch: Any) -> None:
+    """Parité production : on_error="retry" réessaie jusqu'à max_retries."""
+    monkeypatch.setattr("services.pipeline_steps.time.sleep", lambda _: None)
+    runner = CountingRunner()
+    state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
+    step = MockStep(name="test_step", agent_key="dev", on_error="retry")
+    execute_pipeline_step(
+        state=state,
+        step=step,
+        task="Test prompt",
+        agent_runner=runner,
+        inference=None,
+        model_selector=None,
+        max_retries=2,
+    )
+    assert runner.calls == 3  # 1 tentative + 2 retries
+    assert state["results"][-1]["error"]
+
+
+def test_execute_pipeline_step_retry_conditionnel_abort(monkeypatch: Any) -> None:
+    """Parité production : on_error="abort" → pas de retry, une seule tentative."""
+    monkeypatch.setattr("services.pipeline_steps.time.sleep", lambda _: None)
+    runner = CountingRunner()
+    state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
+    step = MockStep(name="test_step", agent_key="dev", on_error="abort")
+    execute_pipeline_step(
+        state=state,
+        step=step,
+        task="Test prompt",
+        agent_runner=runner,
+        inference=None,
+        model_selector=None,
+        max_retries=2,
+    )
+    assert runner.calls == 1
+    assert state["results"][-1]["error"]
+
+
 def test_execute_pipeline_step_non_callable_runner() -> None:
     """TDD : un agent_runner non callable produit une erreur typée, pas un repr."""
     from services.pipeline_steps import NonCallableRunnerError

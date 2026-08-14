@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import inspect
 import logging
+import time
 from collections.abc import Mapping
 from typing import Any
 
 from config.agent_profiles import model_for_agent
 
 _logger = logging.getLogger("jarvis.pipeline_steps")
+
+RETRY_DELAY = 0.5
+MAX_ERROR_LENGTH = 200
+
+
+def _should_retry(step: Any, attempt: int, max_retries: int) -> bool:
+    """Retry conditionnel (parité production pipeline.py) : on_error == "retry"."""
+    return step.on_error == "retry" and attempt < max_retries
+
+
+def _wait_before_retry(attempt: int, max_retries: int, step_name: str) -> None:
+    delay = RETRY_DELAY * (attempt + 1)
+    _logger.warning("Retry %d/%d pour '%s'", attempt + 1, max_retries, step_name)
+    time.sleep(delay)
 
 
 class NonCallableRunnerError(Exception):
@@ -249,19 +264,20 @@ def execute_pipeline_step(
                 successful_result = result
                 successful_error = None
                 break
-            else:
-                # Sinon, on mémorise l'erreur et on continue si on peut encore réessayer
-                successful_error = error
-                if attempt >= max_retries:
-                    # On a épuisé nos réessais
-                    break
-                # Sinon, on continue à la prochaine itération
+            # Sinon, on mémorise l'erreur et on réessaie si la politique le permet
+            successful_error = error
+            if _should_retry(step, attempt, max_retries):
+                _wait_before_retry(attempt, max_retries, step.name)
+                continue
+            break
 
         except Exception as e:
             # Exception inattendue lors de l'exécution
-            successful_error = str(e)
-            if attempt >= max_retries:
-                break
+            successful_error = str(e)[:MAX_ERROR_LENGTH]
+            if _should_retry(step, attempt, max_retries):
+                _wait_before_retry(attempt, max_retries, step.name)
+                continue
+            break
 
     # Traiter le résultat final
     if successful_error is not None:
