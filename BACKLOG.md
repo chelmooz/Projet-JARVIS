@@ -439,7 +439,7 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - Commit 8bfacf900 : fix(models): unblock repo by tracking models package (A1-A6) 
   
 ### MT-Lot8-B -- Lot B : Docs + Cartographie (2026-08-14)  
-- B1 : ROADMAP.md corrige (ollama_download.py committ� en 1e648d996, note non committ� fausse)  
+- B1 : ROADMAP.md corrige (ollama_download.py committ� en 1e648d996, note non committ� fausse)  
 - B2 : test_ollama_installer_security.py imports deja OK (ruff clean)  
 - B3 : Hotspots git (30 plus modifies) : pyproject.toml 13, BACKLOG.md 13, ROADMAP.md 9, README.md 9, .gitignore 6, pipeline_steps.py 6, test_pipeline_steps.py 6, ollama_installer.py 5, test_ollama_installer.py 5, CHANGELOG.md 5, middlewares.py 5, pipeline.py 4, selector.py 4, vision.py 4, index.html 4, coverage-badge.json 3, di.py 3, install.py 3, analysis_audit.py 3, context.py 3, warmup.py 3, test_analysis_audit.py 3, conftest.py 3, system.py 3, router.py 3, jarvis.py 3, ollama_adapter.py 3, package-lock.json 3, package.json 3, test_pipeline_characterization.py 2 
   
@@ -453,6 +453,45 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - Commit 40e58505e : refactor(pipeline): single source of truth via PipelineService (C1-C4) 
   
 ### MT-Lot8-D1 -- Lot D1 : OrchestratorService TDD (2026-08-14)  
-- test_orchestrator.py : 16 tests (routage nominal, fallback, vision, metrics, analytics, logs, habits, injection DIP)  
-- Couverture orchestrator.py : 45% - apres commit  
+- test_orchestrator.py : 16 tests (routage nominal, fallback, vision, metrics, analytics, logs, habits, injection DIP)
+- Couverture orchestrator.py : 45% - apres commit
 - Gates : ruff ok . format ok . mypy ok . pytest --cov ok (53,11% 
+
+### MT-T5a-D0 — Poussée de branche (2026-08-14) ✅
+- `tests/test_orchestrator.py` et `tests/test_conversation.py` visibles sur remote, CI déclenchée
+- Commit `1b1439600` : ajout des tests orchestrator + conversation
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
+
+### MT-T5a-H2 — Mypy explicit_package_bases (2026-08-14) ✅
+- `pyproject.toml` : ajouté `explicit_package_bases = true` dans `[tool.mypy]`
+- `services/pipeline.py:232` : corrigé le type `cast` manquant
+- Gate mypy : 124 sources vérifiées, zéro erreur dans services/controllers/agents/graph/ports/config/models
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
+
+### MT-T5a-D2-fmt — Formatage des tests (2026-08-14) ✅
+- `ruff format --check .` PASS sur l'ensemble du projet
+- `tests/test_conversation.py` reformatté
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
+
+### MT-T5a-D3 — Tests toolbox API (2026-08-14) ✅
+- `tests/test_toolbox.py` : 15 tests couvrant l'API publique :
+  `is_enabled` off/on, `describe_tools`, `auto_execute` (triggers fichier/diagnostic, pas de trigger → dict vide,
+  cible absente → erreur, exception capturée, `tool_results_to_prompt` succès/erreur),
+  `_extract_target` et `_fold_accents` en fonctions pures
+- Tous les tests passent (15/15)
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
+
+### MT-T5a-D4 — Tests vector search (2026-08-14) ✅
+- `tests/test_vector_search.py` : 9 tests via FakeVector/FakeEmbedding :
+  requête vide → [], corpus vide → [], hit de cache, top_k respecté,
+  palier 1 suffisant, palier 2 après filtrage insuffisant,
+  fallback non borné + warning journalisé
+- Tous les tests passent (9/9)
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
+
+### MT-T5a-D5 — Refactor search & toolbox (2026-08-14) ✅
+- `services/vector.py` : extrait `_run_bounded_search` de la méthode `search` (SRP)
+  — la boucle bornée avec relance plafonnée est désormais une méthode à part entière
+  — assertions intactes, comportement externe inchangé
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
+- Commit à venir : `refactor(vector): extraction _run_bounded_search dans search`

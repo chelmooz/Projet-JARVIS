@@ -476,7 +476,12 @@ class VectorService(VectorPort):
             _logger.error("Échec calcul embedding requête : %s", e)
             return []
 
-        # Recherche par similarité cosinus avec bornage et relance
+        return self._run_bounded_search(query, query_vec, top_k, now)
+
+    def _run_bounded_search(
+        self, query: str, query_vec: np.ndarray, top_k: int, now: float
+    ) -> list[dict[str, Any]]:
+        """Exécute la boucle de recherche bornée avec relance plafonnée (max 3 tentatives)."""
         with self._lock:
             docs = self._data["documents"]
             max_docs = len(docs)
@@ -485,7 +490,7 @@ class VectorService(VectorPort):
             # Borne initiale : min(len(docs), max(top_k*5, 50))
             bound = min(max_docs, max(top_k * 5, 50))
 
-            results = []
+            results: list[dict[str, Any]] = []
             attempts = 0
             max_attempts = 3
 
