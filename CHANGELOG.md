@@ -2,6 +2,14 @@
 
 ## [6.0] — 2026-08-13
 
+### Livraison corrigée — sécurité de distribution
+- **Intégrité des téléchargements** : l'installation d'Ollama est refusée si la somme SHA-256 officielle est indisponible ou différente — aucun binaire sans empreinte vérifiable n'est accepté.
+- **Extraction d'archives** : ZIP contrôlées avant extraction (chemins sortant de la destination et liens symboliques refusés) — protection contre l'écriture hors du répertoire temporaire.
+- **Portabilité** : les installateurs système automatiques ne sont plus sélectionnés sur Linux ; `curl | sh` désactivé sur macOS — la promesse de ne pas modifier le poste hôte est respectée.
+- **Tests de régression** : suite pytest couvrant le refus d'une empreinte absente, la validation d'une empreinte correcte et les archives ZIP malveillantes.
+- **Pré-livraison** : `scripts/verify_release.py` contrôle les ressources essentielles et l'absence de secrets/configurations locales avant archivage (voir Lot 6.5 pour la cohérence des versions).
+- **Documentation** : le README ne présente plus l'absence de SHA-256 comme un comportement acceptable.
+
 ### Console Tab + Command Palette (Ctrl+K)
 - **9ᵉ onglet « Console »** : saisie directe de commandes `@agent tâche`
   (ex. `@cyber scan le firewall`), scrollback append-only, badge agent par ligne,
