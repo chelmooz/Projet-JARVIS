@@ -63,6 +63,7 @@ asyncio_mode = "auto"
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+explicit_package_bases = true
 files = ["services", "controllers", "agents", "graph", "ports", "config", "models"]
 exclude = ["build", "node_modules", "\\.venv", "dist"]
 

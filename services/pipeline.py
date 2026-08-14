@@ -6,7 +6,7 @@ import logging
 import os
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -229,7 +229,7 @@ class PipelineService(PipelinePort):
             if state["results"] and state["results"][-1]["error"] is None:
                 self._record_habits(task, pipeline.id, step)
 
-        return state["results"]
+        return cast("list[dict[str, Any]]", state["results"])
 
     def _execute_single_step(self, state: dict[str, Any], step: Any, task: str) -> dict[str, Any]:
         """Exécute une étape unique avec gestion des réessais (logique inline depuis pipeline_steps)."""

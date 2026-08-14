@@ -136,6 +136,7 @@ class TestConversationAddMessage:
         with tempfile.TemporaryDirectory() as tmp:
             # On doit patcher la constante avant import
             import config.constants as constants
+
             original_max = constants.MAX_CONVERSATION_MESSAGES
             try:
                 constants.MAX_CONVERSATION_MESSAGES = 3
@@ -143,6 +144,7 @@ class TestConversationAddMessage:
                 import importlib
 
                 import services.conversation as conv_module
+
                 importlib.reload(conv_module)
                 conversation_service = conv_module.ConversationService
 
@@ -358,6 +360,7 @@ class TestConversationHooks:
             conv_id = service.create("Test")
 
             calls = []
+
             def callback(*args):
                 calls.append(args)
 
