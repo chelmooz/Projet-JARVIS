@@ -94,5 +94,5 @@ relative_files = true
 show_missing = true
 skip_covered = true
 # Cible de couverture : guard anti-régression. Valeur = couverture mesurée - 2,
-# remontée par paliers à chaque lot TDD (mesuré = 50,26 % au T5a -> 48).
-fail_under = 48
+# remontée par paliers à chaque lot TDD (mesuré = 52,57 % au T5a -> 50).
+fail_under = 50

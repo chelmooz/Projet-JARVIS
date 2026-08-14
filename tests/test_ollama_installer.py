@@ -404,11 +404,11 @@ def test_install_windows_zip_full_flow(tmp_path: Path) -> None:
 
     with (
         patch.dict("os.environ", {"TEMP": str(tmp_path)}),
-        patch("services.ollama_installer.BIN_DIR", str(bin_dir)),
-        patch("services.ollama_installer.BASE_DIR", str(base_dir)),
-        patch("services.ollama_installer._download_file"),
-        patch("services.ollama_installer._verify_ollama_binary", return_value=True),
-        patch("services.ollama_installer._safe_extract_zip", side_effect=fake_extract),
+        patch("services.ollama_install_windows.BIN_DIR", str(bin_dir)),
+        patch("services.ollama_install_windows.BASE_DIR", str(base_dir)),
+        patch("services.ollama_install_windows._download_file"),
+        patch("services.ollama_install_windows._verify_ollama_binary", return_value=True),
+        patch("services.ollama_install_windows._safe_extract_zip", side_effect=fake_extract),
     ):
         result = _install_windows_zip(log)
 

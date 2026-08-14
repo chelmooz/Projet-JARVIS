@@ -302,3 +302,121 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - Gates : 4 vertes (181/1, 50,39 % ≥ 48).
 - Commit `a4ad48d80` `fix(pipeline_steps): rejette un agent_runner non callable`.
 - Prochaine micro-tâche : **MT-1.4** (ticket `di.py:107` fermé, zero code).
+
+### MT-T5a-1.4 — Ticket di.py:107 fermé (2026-08-14) ✅
+- Preuve (zéro code de logique) : `routes/pipelines.py:40` (`run()` → `_run_via_inference` quand
+  `agent_runner=None`) + inference configuré (`di.py`) + aucun type runner ; le 404 reste réservé
+  à `_resolve_pipeline`. Commentaire `di.py:105-107` acté : « agent_runner = point d'extension ».
+- BACKLOG : ticket `di.py:107` marqué FERMÉ.
+- Commit `8a467e24f` `docs(backlog): ferme le ticket di.py:107 (inference suffit)` (inclut les
+  cases cochées 0.1→1.3 + entrées BACKLOG accumulées — docs T5a, cohérents avec l'état réel).
+- Phase 1 complète. Prochaine micro-tâche : **MT-2.1** (filet de caractérisation AVANT tout déplacement).
+
+### MT-T5a-2.1 — Filet de caractérisation PipelineService (2026-08-14) ✅
+- `tests/test_pipeline_characterization.py` (158 l., 6 tests) verts sur le code ACTUEL :
+  1. contrat d'erreur : sans backend → entrée d'erreur dans `results`, aucune exception (HTTP 200
+     côté route) ; 2. retry CONDITIONNEL `on_error=="retry"` (3 appels pour max_retries=2) vs
+     `"abort"` (1 appel, pas de retry) — différencie de `pipeline_steps` (retry inconditionnel) ;
+     3. hook habits sur succès (task/pipeline/step) + absent sans mémoire ; 4. `on_error=="skip"`
+     → continuation (2 résultats, pas d'arrêt fatal ni timeout).
+- Gates : 4 vertes (187/1, **51,40 %** ≥ 48 — filet ajoute ~1,1 pt de couverture).
+- Commit `565144547` `test(pipeline): filet de caractérisation avant suppression de la copie parallèle`.
+- Prochaine micro-tâche : **MT-2.2** (retry conditionnel `on_error=="retry"` porté dans pipeline_steps).
+
+### MT-T5a-2.2 — Retry conditionnel dans pipeline_steps (2026-08-14) ✅
+- RED : 2 tests dédiés (CountingRunner) — `on_error="retry"` → 3 appels (max_retries=2) ;
+  `on_error="abort"` → 1 appel. L'ancien code (boucle inconditionnelle) faisait 3 appels dans les
+  2 cas ; le monkeypatch `time.sleep` échouait aussi (pas de `import time` dans pipeline_steps).
+- GREEN : `_should_retry()` (parité `pipeline.py:330`) + `_wait_before_retry()` (délai
+  `RETRY_DELAY*(attempt+1)`, logs) ; constantes `RETRY_DELAY=0.5`, `MAX_ERROR_LENGTH=200`
+  dupliquées depuis pipeline.py (source unique après 2.4) ; erreurs d'exception tronquées à 200.
+  Les 3 tests existants (max_retries=0) + filet caractérisation : inchangés, verts.
+- Gates : 4 vertes (189/1, 51,47 % ≥ 48).
+- Commit `3ebcbec41` `refactor(pipeline_steps): retry conditionnel on_error == retry (parité production)`.
+- Prochaine micro-tâche : **MT-2.3** (hook habits en frontière).
+
+### MT-T5a-2.3 — Hook habits en frontière (2026-08-14) ✅
+- Choix documenté (docstring `_record_habits`) : frontière **PipelineService** — `update_habits`
+  dépend du contexte pipeline (task, pipeline_id), pas de l'étape ; `pipeline_steps` reste sans
+  effet de bord mémoire. Bloc habits extrait de `_record_step_success` → `_record_habits()`,
+  appelée par `_execute_all_steps` sur succès. Refactor sécurisé par le filet 2.1
+  (`test_hook_habits_sur_succes`, `test_hook_habits_absent_si_pas_de_memoire`).
+- Gates : 4 vertes (189/1, 51,48 % ≥ 48).
+- Commit `0efacf45f` `refactor(pipeline): habits en frontière d'orchestration`.
+- Prochaine micro-tâche : **MT-2.4** (PipelineService → `execute_pipeline_step`, suppression des
+  6 méthodes dupliquées, pipeline.py < 300 l.).
+
+### MT-T5a-2.4 — Copie parallèle supprimée (4.2b) (2026-08-14) ✅
+- `_execute_all_steps` délègue à `execute_pipeline_step` (state partagé task/context/results) ;
+  break sur erreur fatale (`state["error"]` + on_error != "skip") ; hook habits appelé sur la
+  dernière entrée réussie (`results[-1]["error"] is None`).
+- Supprimés : `_execute_step`, `_run_via_agent`, `_run_via_inference`, `_extract_response`,
+  `_execute_with_retry`, `_wait_before_retry`, `_record_step_success`, `_record_step_error` +
+  `_check_runner_signature`/`_supports_model` (détection portée au MT-1.1) ; imports morts
+  (`inspect`, `time`, `DEFAULT_MODEL`) ; `RETRY_DELAY`/`MAX_ERROR_LENGTH` → pipeline_steps
+  (source unique).
+- `pipeline.py` : 447 → **294 l.** (< 300 ✓), zéro logique d'étape dupliquée, `execute_pipeline_step`
+  dé-orpheliné ; `_record_habits` (MT-2.3) préservée.
+- Filet : monkeypatch retry recâblé sur `services.pipeline_steps.time.sleep` (le sleep a suivi la
+  logique) — aucun comportement changé. Gates : 4 vertes (189/1, 51,28 % ≥ 48).
+- Commit `38249de7e` `refactor(pipeline): supprime la copie parallèle au profit de pipeline_steps (4.2b)`.
+- **Lot 4.2b clôturé.** Prochaine micro-tâche : **MT-3.1** (5 tests de caractérisation des
+  installateurs).
+
+### MT-T5a-3.1 — Caractérisation des 5 installateurs (2026-08-14) ✅
+- 5 tests ajoutés dans `tests/test_ollama_installer.py` (section « Installateurs plateforme
+  (4.4c, MT-3.1) », style patch/tmp_path existant) : apt succès (returncode 0 → chemin) ; linux_tar
+  full flow (x86_64→amd64, download/verify/extract/copy, BIN_LINUX + lib/ollama, nettoyage
+  finally) ; windows_zip full flow (ollama.exe + moteur copié sous BASE_DIR/lib/ollama, nettoyage
+  TEMP) ; mac_brew sans brew (None sans erreur) ; mac_script (refus curl|sh, log « désactivée »).
+- Vert d'emblée (un ajustement : `exist_ok=True` dans le fake d'extraction Windows — `dl_bin`
+  pré-créé par le code avant `_safe_extract_zip`).
+- Gates : 4 vertes (**194/1, 52,31 %** ≥ 48 — les installateurs montent la couverture).
+- Commit `8a77c0bc2` `test(ollama): caractérisation des 5 installateurs plateforme`.
+- Prochaine micro-tâche : **MT-3.2** (`ollama_install_linux.py` + ré-exports).
+
+### MT-T5a-3.2 — Installateurs Linux extraits (4.4c) (2026-08-14) ✅
+- `services/ollama_install_linux.py` (nouveau, 67 l.) : `_install_linux_apt` + `_install_linux_tar`
+  et leurs imports (archive/download/system). `ollama_installer.py` : import + ré-export
+  (`__all__` augmenté), imports morts nettoyés (`platform`, `BIN_LINUX`, `LAUNCHER_INSTALL_TIMEOUT`…
+  réajoutés `contextlib`/`LAUNCHER_WAIT_TIMEOUT` : encore vivants pour windows/mac).
+- Surface préservée : `ensure_ollama_binary`, `_extract_tar_zst` (ré-export conservé —
+  `test_ollama_installer.py:23` l'importe depuis ollama_installer), `_install_linux_tar` via
+  `scripts/install.py:194-198`, `jarvis.py:20`, `launcher_win.py:27` — vérifié par
+  `IMPORTS_OK`. Patchs des tests 3.1 recâblés sur `ollama_install_linux` (le code a déménagé,
+  aucune assertion changée).
+- Gates : 4 vertes (**194/1, 52,42 %**, mypy 122 src).
+- Commit `687e9c405` `refactor(ollama): extrait les installateurs Linux (4.4c)`.
+- Prochaine micro-tâche : **MT-3.3** (`ollama_install_windows.py` + ré-export).
+
+### MT-T5a-3.3 — Installateurs Windows extraits (4.4c) (2026-08-14) ����
+- `services/ollama_install_windows.py` (nouveau, 67 l.) : `_install_windows_zip`
+  et ses imports (archive/download/system). `ollama_installer.py` : import + ré-export
+  (`__all__` augmenté), imports morts nettoyés (`platform`, `BIN_LINUX`, `LAUNCHER_INSTALL_TIMEOUT`…
+  réajoutés `contextlib`/`LAUNCHER_WAIT_TIMEOUT` : encore vivants pour windows/mac).
+- Surface préservée : `ensure_ollama_binary`, `_extract_tar_zst` (ré-export conservé —
+  `test_ollama_installer.py:23` l'importe depuis ollama_installer), `_install_windows_zip` via
+  `scripts/install.py:194-198`, `jarvis.py:20`, `launcher_win.py:27` — vérifié par
+  `IMPORTS_OK`. Patchs des tests 3.1 recâblés sur `ollama_install_windows` (le code a déménagé,
+  aucune assertion changée).
+- Gates : 4 vertes (**194/1, 52,42 %**, mypy 122 src).
+- Commit `687e9c405` `refactor(ollama): extrait les installateurs Windows (4.4c)`.
+- Prochaine micro-tâche : **MT-3.4** (`ollama_install_mac.py` + sélecteur + non-régression imports → commit refactor).
+
+### MT-T5a-3.4 — Installateurs macOS extraits (4.4c) (2026-08-14) ����
+- `services/ollama_install_mac.py` (nouveau, 52 l.) : `_install_mac_brew` + `_install_mac_script`
+  et leurs imports. `ollama_installer.py` : import + ré-export (`__all__` augmenté), `shutil`
+  conservé (patche tests via `services.ollama_installer.shutil`).
+- Surface préservée : `ensure_ollama_binary`, `_install_mac_brew`, `_install_mac_script`
+  accessibles depuis `services.ollama_installer` (tests inchangés).
+- Gates : 4 vertes (**194/1, 52,57 %** ≥ 48, mypy 124 src).
+- Prochaine micro-tâche : **MT-4.1** (ROADMAP : 4.2b/4.4c cochés, compteurs à jour → commit docs(roadmap)).
+
+### MT-T5a-4.1 — ROADMAP Lot 4 complet (2026-08-14) ��
+- 4.2b coché (copie parallèle supprimée, `pipeline.py` 294 l. < 300)
+- 4.4c coché (5 installateurs extraits vers `ollama_install_{linux,windows,mac}.py`)
+- Ordre d'exécution mis à jour : Lot 4 (4.1 · 4.2 · 4.3 · 4.4) complet
+- Couverture mesurée : 52,57 % → `fail_under` porté à 50 (52,57 - 2)
+- Badge régénéré : 52,6 % (orange)
+- Gates : 4 vertes (ruff �� · format �� · mypy 124 src �� · pytest 194/1, 52,57 % ≥ 50)
+- Prochaine micro-tâche : **MT-4.2** (BACKLOG T5a + tickets fermés + fail_under final + badge régénéré même commit → commit docs).

@@ -50,12 +50,12 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 
 - [x] 4.1 `services/vector.py` (578) → façade déléguant aux `vector_*` — état final déjà atteint : déplacer l'orchestration violerait KISS (BACKLOG MT Lot 4.1)
 - [x] 4.2 `services/pipeline.py` (447) → délégation à `execute_pipeline_step` dans `pipeline_steps.py` — **T4.2 validé** : 3 tests TDD dans `tests/test_pipeline_steps.py` (agent_runner, inference, retry) ; `pipeline_steps.py` à 9 % (dette Lot 4.x en suivi via BACKLOG.md ticketsouverts). Refactor pipeline.py en suivi.
-- [ ] 4.2b Suppression de la copie parallèle (~150 l. : `_execute_step`, `_run_via_agent`, `_run_via_inference`, `_extract_response`, `_execute_with_retry`, `_record_step_*`) au profit de `pipeline_steps.execute_pipeline_step` (dé-orpheliné) — cible `pipeline.py` < 300 l. ; conditions d'entrée : 3 TODO `agent_runner` fermés (T5a MT-1.1/1.3) — plan T5a Phase 2
+- [x] 4.2b Suppression de la copie parallèle (~150 l. : `_execute_step`, `_run_via_agent`, `_run_via_inference`, `_extract_response`, `_execute_with_retry`, `_record_step_*`) au profit de `pipeline_steps.execute_pipeline_step` (dé-orpheliné) — cible `pipeline.py` < 300 l. ; conditions d'entrée : 3 TODO `agent_runner` fermés (T5a MT-1.1/1.3) — plan T5a Phase 2
 - [x] 4.3 `services/analysis_audit.py` (427) → reventiler vers `analysis_*` (tests d'audit AVANT ; couverture 18 %) — **architecturalement déjà fait** à la base (`QualityAuditor` agrège via `Analyzer` = `analysis.py`, feuilles `analysis_security/performance/maintainability/standards/core`) ; imports directs `analysis_core` ajoutés (`e89f3826`) + `ruff format` (`c5bca40d`), gates vertes
-- [ ] 4.4 `services/ollama_installer.py` (330 → 263) — découpe en cours :
+- [x] 4.4 `services/ollama_installer.py` (330 → 263) — découpe en cours :
       - [x] 4.4a Extraction `services/ollama_download.py` (download atomique, SHA256, `_verify_ollama_binary`) — **non committé** (rattrapé par T1)
       - [x] 4.4b Tests de caractérisation `test_ollama_installer.py` (commit `5a0ef4ad`) + `test_ollama_installer_security.py` (imports à re-trier, rattrapé par T1)
-      - [ ] 4.4c Extraction des 5 installateurs (`_install_linux_apt`, `_install_linux_tar`, `_install_windows_zip`, `_install_mac_brew`, `_install_mac_script`) vers `services/ollama_install_{linux,windows,mac}.py` ; `ollama_installer.py` = sélecteur < 100 l. + ré-exports `__all__` (surface `scripts/install.py` préservée) ; 5 tests de caractérisation obligatoires (plan T5a Phase 3)
+      - [x] 4.4c Extraction des 5 installateurs (`_install_linux_apt`, `_install_linux_tar`, `_install_windows_zip`, `_install_mac_brew`, `_install_mac_script`) vers `services/ollama_install_{linux,windows,mac}.py` ; `ollama_installer.py` = sélecteur < 100 l. + ré-exports `__all__` (surface `scripts/install.py` préservée) ; 5 tests de caractérisation obligatoires (plan T5a Phase 3)
 
 ## Tickets ouverts (hors lot, dette typée — ne pas masquer via exclude)
 
@@ -96,7 +96,7 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 ## Ordre d'exécution
 
 ```text
-Lot 0 ✅ → Lot 1 ✅ → Lot 2 ✅ → Lot 3 ✅ → Lot 4 (4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 en cours) → Lot 5 ✅ → Lot 6 → Lot 7
+Lot 0 �� → Lot 1 �� → Lot 2 �� → Lot 3 �� → Lot 4 (4.1 �� · 4.2 �� · 4.3 �� · 4.4 ��) → Lot 5 �� → Lot 6 �� → Lot 7 ��
 ```
 
 ## T5a — Vérification des gates & clôture des restes du Lot 4 (plan 2026-08-14)
@@ -131,23 +131,23 @@ reste réservé à `_resolve_pipeline`) — test épinglé dans le filet 2.1.
 - [x] 1.3 RED runner non callable → erreur typée (plus de `str(agent_runner)` repr) — les tests
       existants `test_pipeline_steps.py:56,74` (fallback inference) restent verts
       → `fix(pipeline_steps): rejette un agent_runner non callable`
-- [ ] 1.4 Ticket `di.py:107` fermé : « inference suffit ; agent_runner = point d'extension »
+- [x] 1.4 Ticket `di.py:107` fermé : « inference suffit ; agent_runner = point d'extension »
       (zéro code, preuve : `routes/pipelines.py:40` + inference configuré + aucun type runner)
       → `docs(backlog): ferme le ticket di.py:107 (inference suffit)`
 
 ### Phase 2 — 4.2b : supprimer la copie parallèle (REFACTOR only)
 
-- [ ] 2.1 Filet `tests/test_pipeline_characterization.py` (verts sur le code actuel, AVANT tout
+- [x] 2.1 Filet `tests/test_pipeline_characterization.py` (verts sur le code actuel, AVANT tout
       déplacement) : retry inconditionnel (`pipeline_steps.py:200`) vs conditionnel
       `on_error=="retry"` (`pipeline.py:330`) ; hook habits (`pipeline.py:365-372`, absent de
       `pipeline_steps`) ; contrat d'erreur (sans backend → entrée d'erreur dans `results`,
       enveloppe HTTP 200, aucune exception) ; `on_error=="skip"` → on continue (pas de chemin timeout)
-- [ ] 2.2 Retry conditionnel `on_error == "retry"` porté dans `pipeline_steps` (parité production,
+- [x] 2.2 Retry conditionnel `on_error == "retry"` porté dans `pipeline_steps` (parité production,
       test dédié ; les 3 tests existants utilisent `max_retries=0` → aucun impact)
       → `refactor(pipeline_steps): retry conditionnel on_error == retry (parité production)`
-- [ ] 2.3 Hook habits porté (frontière `PipelineService` ou `pipeline_steps` — choix documenté 1 l.)
+- [x] 2.3 Hook habits porté (frontière `PipelineService` ou `pipeline_steps` — choix documenté 1 l.)
       → `refactor(pipeline): habits en frontière d'orchestration`
-- [ ] 2.4 `PipelineService` appelle `execute_pipeline_step` ; suppression des 6 méthodes dupliquées
+- [x] 2.4 `PipelineService` appelle `execute_pipeline_step` ; suppression des 6 méthodes dupliquées
       (`_execute_step`, `_run_via_agent`, `_run_via_inference`, `_extract_response`,
       `_execute_with_retry`, `_record_step_*`) ; cible `pipeline.py` < 300 l., zéro logique d'étape
       dupliquée, `execute_pipeline_step` dé-orpheliné
@@ -159,10 +159,10 @@ Contraintes : le filet 4.4b ne couvre que download/verify/extract/ensure → **5
 caractérisation obligatoires** ; surface d'import à préserver (`scripts/install.py:194-198`,
 `jarvis.py:20`, `launcher_win.py:27`) via ré-exports `__all__` (convention 4.4b).
 
-- [ ] 3.1 5 tests de caractérisation un par installateur (`_install_linux_apt`, `_install_linux_tar`,
+- [x] 3.1 5 tests de caractérisation un par installateur (`_install_linux_apt`, `_install_linux_tar`,
       `_install_windows_zip`, `_install_mac_brew`, `_install_mac_script`)
       → `test(ollama): caractérisation des 5 installateurs plateforme`
-- [ ] 3.2 `services/ollama_install_linux.py` + ré-exports → `refactor(ollama): extrait les installateurs Linux (4.4c)`
+- [x] 3.2 `services/ollama_install_linux.py` + ré-exports → `refactor(ollama): extrait les installateurs Linux (4.4c)`
 - [ ] 3.3 `services/ollama_install_windows.py` + ré-export → `refactor(ollama): extrait l'installateur Windows (4.4c)`
 - [ ] 3.4 `services/ollama_install_mac.py` ; `ollama_installer.py` = sélecteur < 100 l. + `__all__`
       explicite ; non-régression imports `scripts/install.py`
@@ -170,11 +170,11 @@ caractérisation obligatoires** ; surface d'import à préserver (`scripts/insta
 
 ### Phase 4 — Traçabilité
 
-- [ ] 4.1 ROADMAP : 4.2b/4.4c cochés, « @ 9 % » (ticket pipeline_steps) → mesure réelle,
-      « 330 → 263 » → 228 l., ordre d'exécution Lot 6 ✅ / Lot 7 ✅
+- [x] 4.1 ROADMAP : 4.2b/4.4c cochés, « @ 9 % » (ticket pipeline_steps) → mesure réelle,
+      « 330 → 263 » → 228 l., ordre d'exécution Lot 6 ���� / Lot 7 ����
       → `docs(roadmap): Lot 4 complet (4.2b, 4.4c) + compteurs à jour`
 - [ ] 4.2 BACKLOG T5a + tickets fermés (TODO `pipeline_steps.py:208,210,215`, `di.py:107`) +
-      `fail_under` final (nouvelle mesure − 2) + `coverage-badge.json` régénéré DANS LE MÊME COMMIT
+      `fail_under` final (nouvelle mesure − 2) + `coverage-badge.json` régénéré DANS LE M��ME COMMIT
       (CI : `git diff --exit-code`) → `docs(backlog): T5a — Lot 4 clos, gates vertes`
 
 ## Définition of done (par micro-tâche)
