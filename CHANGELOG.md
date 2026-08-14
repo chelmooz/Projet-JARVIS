@@ -1,5 +1,43 @@
 # Changelog — JARVIS Portable Edition
 
+## [Non publié] — Lot 0.6 : rapatriement de tests orphelins depuis fix/perf-audit-2026-08
+
+Investigation du commit `dd5def7` (11/08, suppression de 100 fichiers de tests /
+9359 lignes en un seul commit "chore: sync local state"). 35/37 modules importés
+par les tests supprimés existent toujours dans le code actuel ; la majorité était
+effectivement couverte par ailleurs (`context.py`, `di.py`, `router.py`,
+`metrics.py` restent bien testés). Mais 4 modules de production — dont 3 importés
+directement par `jarvis.py` au démarrage — se sont retrouvés à **0% de test
+actuel**, aucun fichier de `tests/` ne les important plus :
+
+- `services/launcher.py` (`ProcessManager`, 215 lignes) — gestion des process au
+  démarrage
+- `services/port_manager.py` (87 lignes) — libération/attente de ports
+- `services/dependency_bootstrap.py` (52 lignes) — bootstrap des dépendances
+- `services/trace_sidecar.py` (`JsonlTraceStore`, 28 lignes) — non importé
+  ailleurs dans le code actuel, mais toujours un module autonome fonctionnel
+
+Les 5 fichiers de test correspondants existent sur la branche distante
+`fix/perf-audit-2026-08` (jamais mergée sur `main`), avec un code de production
+strictement identique (0 diff sur `launcher.py`/`port_manager.py`/
+`dependency_bootstrap.py`, divergence cosmétique de typage sur `trace_sidecar.py`).
+Rapatriés tels quels plutôt que réécrits :
+
+- `tests/test_launcher.py`, `tests/test_launcher_fd_leak.py`,
+  `tests/test_port_manager.py`, `tests/test_dependency_bootstrap.py`,
+  `tests/test_trace_sidecar.py` (19 tests)
+
+Vérifié contre `main` (HEAD `84f0688`) : 19/19 passent sans modification, suite
+complète 294 passed / 1 skipped / 0 failed (stable sur 3 runs), mypy périmètre CI
+(`services`/`controllers`/`agents`/`graph`/`ports`/`config`/`models`) toujours
+vert. Couverture : `launcher.py` 0%→63%, `port_manager.py` 0%→72%,
+`dependency_bootstrap.py` 0%→100%, `trace_sidecar.py` 0%→100%.
+
+Point non résolu : `test_diagnostic_ext_charact.py` et `test_diagnostic_ext.py`
+n'existent sur aucune des deux branches latérales (`fix/perf-audit-2026-08`,
+`quality/refactoring`) — le gap `diagnostic_ext/*` (24-28% de couverture) reste
+entier, à traiter en Lot 4.3 par écriture de tests neufs, pas par rapatriement.
+
 ## [Non publié] — Lot 0 : suite de tests rendue déterministe
 
 Condition préalable au refacto TDD (Lots 1-4) posée par l'audit du 2026-08-14 :
