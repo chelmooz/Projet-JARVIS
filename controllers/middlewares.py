@@ -25,7 +25,7 @@ from starlette.responses import Response
 
 from config.constants import CORS_ORIGIN, JARVIS_PORT, MAX_BODY_SIZE
 from services import profiling
-from services.ratelimit import MAX_REQUESTS, check_rate_limit
+from services.ratelimit import MAX_REQUESTS, WINDOW, check_rate_limit
 
 _logger = logging.getLogger(__name__)
 
@@ -158,9 +158,9 @@ def _setup_middlewares(app: FastAPI) -> None:
         allowed, remaining = check_rate_limit(client_ip)
         if not allowed:
             return JSONResponse(
-                {"error": "Too many requests", "retry_after": 60},
+                {"error": "Too many requests", "retry_after": WINDOW},
                 status_code=429,
-                headers={"Retry-After": "60"},  # conformité HTTP 429 (header standard)
+                headers={"Retry-After": str(WINDOW)},  # conformité HTTP 429 (header standard)
             )
         resp = await call_next(request)
         resp.headers["X-RateLimit-Limit"] = str(MAX_REQUESTS)

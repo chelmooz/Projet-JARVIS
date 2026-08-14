@@ -47,3 +47,16 @@ def test_429_after_limit_with_coherent_retry_after(client: TestClient) -> None:
     assert "retry_after" in body
     # Cohérence corps <-> en-tête (audit : retry_after dérivé de la fenêtre réelle).
     assert resp.headers["Retry-After"] == str(body["retry_after"])
+
+
+def test_429_retry_after_derived_from_ratelimit_window(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Lot 5.1 : retry_after dérivé de services.ratelimit.WINDOW (source unique
+    # de vérité), plus de 60 codé en dur. WINDOW patché à 3 -> 429 avec 3.
+    monkeypatch.setattr(ratelimit, "WINDOW", 3)
+    monkeypatch.setattr("controllers.middlewares.WINDOW", 3)
+    assert client.get("/api/status").status_code == 200
+    assert client.get("/api/status").status_code == 200
+    resp = client.get("/api/status")
+    assert resp.status_code == 429
+    assert resp.json()["retry_after"] == 3
+    assert resp.headers["Retry-After"] == "3"
