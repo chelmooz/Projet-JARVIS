@@ -50,7 +50,7 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 
 - [x] 4.1 `services/vector.py` (578) → façade déléguant aux `vector_*` — état final déjà atteint : déplacer l'orchestration violerait KISS (BACKLOG MT Lot 4.1)
 - [x] 4.2 `services/pipeline.py` (447) → délégation à `execute_pipeline_step` dans `pipeline_steps.py` — **T4.2 validé** : 3 tests TDD dans `tests/test_pipeline_steps.py` (agent_runner, inference, retry) ; `pipeline_steps.py` à 9 % (dette Lot 4.x en suivi via BACKLOG.md ticketsouverts). Refactor pipeline.py en suivi.
-- [ ] 4.3 `services/analysis_audit.py` (427) → reventiler vers `analysis_*` (tests d'audit AVANT ; couverture 18 %)
+- [x] 4.3 `services/analysis_audit.py` (427) → reventiler vers `analysis_*` (tests d'audit AVANT ; couverture 18 %) — **architecturalement déjà fait** à la base (`QualityAuditor` agrège via `Analyzer` = `analysis.py`, feuilles `analysis_security/performance/maintainability/standards/core`) ; imports directs `analysis_core` ajoutés (`e89f3826`) + `ruff format` (`c5bca40d`), gates vertes
 - [ ] 4.4 `services/ollama_installer.py` (330 → 263) — découpe en cours :
       - [x] 4.4a Extraction `services/ollama_download.py` (download atomique, SHA256, `_verify_ollama_binary`) — **non committé** (rattrapé par T1)
       - [x] 4.4b Tests de caractérisation `test_ollama_installer.py` (commit `5a0ef4ad`) + `test_ollama_installer_security.py` (imports à re-trier, rattrapé par T1)
@@ -90,7 +90,7 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 ## Ordre d'exécution
 
 ```text
-Lot 0 ✅ → Lot 1 ✅ → Lot 2 ✅ → Lot 3 ✅ → Lot 4 (4.1 ✅ · 4.2 ✅ · 4.4 en cours) → Lot 5 ✅ → Lot 6 → Lot 7
+Lot 0 ✅ → Lot 1 ✅ → Lot 2 ✅ → Lot 3 ✅ → Lot 4 (4.1 ✅ · 4.2 ✅ · 4.3 ✅ · 4.4 en cours) → Lot 5 ✅ → Lot 6 → Lot 7
 ```
 
 ## Définition of done (par micro-tâche)

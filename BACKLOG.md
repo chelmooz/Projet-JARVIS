@@ -208,3 +208,11 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - **5.5** : 3 TODO basculés en tickets ci-dessus.
 - **5.6** : références aux tests fantômes nettoyées (`context.py`, `file_system.py`).
 - Gates (post-5.6) : `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓ (120 src) · `pytest --cov` ✓ (178 pass / 1 skip, 50,15 % ≥ 46 %) · `fail_under` inchangé (palier suivant 47 selon ROADMAP).
+
+### MT-4 — Lot 4.3 analysis_audit reventilation (finalisée)  � ✅ 2026-08-14
+- La reventilation était **architecturalement déjà en place** à la base : `QualityAuditor` (services/analysis_audit.py) agrège via `Analyzer` (services/analysis.py), qui dispatche vers les feuilles `analysis_security/performance/maintainability/standards/core`. Commit `e89f3826` avait ajouté les imports directs `analysis_core` (`_PROJECT_ROOT`, `_SOURCE_DIRS`, `_TEST_DIR`, `_WEIGHTS`, `_count_lines`, `_py_files`) + noqa E402.
+- Restait : `ruff format` de `analysis_audit.py` (1 blank line, commit `c5bca40d`). Gates vertes : ruff ✓ · format ✓ · mypy ✓ (121 src) · pytest ✓ (178/1, cov 50,26 % ≥ 46 %). ROADMAP : Lot 4.3 coché.
+
+### MT-5 — T4 extraction archives (Lot 4.4b)  � ✅ 2026-08-14
+- `services/ollama_archive.py` créé (65 l.) : `_extract_tar_zst` + `_safe_extract_zip` coupés-collés à l'identique depuis `ollama_installer.py`. Imports réels : os, subprocess, zipfile, stat, logging, Callable, `LAUNCHER_WAIT_TIMEOUT` (config.constants). `_LogFn` dupliqué (convention du dépôt : alias par module, cf. ollama_download.py).
+- `ollama_installer.py` : imports morts `zipfile`/`stat` retirés ; ré-export `from services.ollama_archive import _extract_tar_zst, _safe_extract_zip` ajouté à `__all__` (ruff voit le ré-export volontaire, tests inchangés). Aucun doublon de `def` (vérifié). Commit `e677d10e`.
