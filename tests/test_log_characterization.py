@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 import services.log as log_module
-from services.log import LogService
+from services.log import LogService, _recover_json_objects, _rotate
 
 
 @pytest.fixture
@@ -39,6 +39,40 @@ def service(log_path: Path, monkeypatch: pytest.MonkeyPatch) -> LogService:
     """Service avec niveau par défaut (INFO, pas de JARVIS_LOG_LEVEL)."""
     monkeypatch.delenv("JARVIS_LOG_LEVEL", raising=False)
     return LogService()
+
+
+class TestRecoverJsonObjectsPure:
+    """Tests directs du parseur de récupération extrait en Lot F4 (fonction pure)."""
+
+    def test_concatenated_objects(self) -> None:
+        content = '{"a": 1}{"b": 2}'
+        assert _recover_json_objects(content) == [{"a": 1}, {"b": 2}]
+
+    def test_non_dict_fragment_skipped(self) -> None:
+        content = '[{"a": 1}, 42, {"b": 2}'
+        assert _recover_json_objects(content) == [{"a": 1}, {"b": 2}]
+
+    def test_empty_content_returns_empty_list(self) -> None:
+        assert _recover_json_objects("") == []
+
+    def test_no_object_present_returns_empty_list(self) -> None:
+        assert _recover_json_objects("not json at all") == []
+
+
+class TestRotatePure:
+    """Tests directs de la rotation extraite en Lot F4 (fonction pure)."""
+
+    def test_under_limit_returns_unchanged(self) -> None:
+        logs = [{"i": i} for i in range(3)]
+        assert _rotate(logs, 10) == logs
+
+    def test_over_limit_keeps_last_n(self) -> None:
+        logs = [{"i": i} for i in range(5)]
+        assert _rotate(logs, 3) == [{"i": 2}, {"i": 3}, {"i": 4}]
+
+    def test_exactly_at_limit_returns_unchanged(self) -> None:
+        logs = [{"i": i} for i in range(3)]
+        assert _rotate(logs, 3) == logs
 
 
 class TestLoadLogsFileAbsent:

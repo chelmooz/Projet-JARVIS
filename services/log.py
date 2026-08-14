@@ -46,6 +46,47 @@ def _configure_root_logging() -> None:
     root.setLevel(logging.INFO)
 
 
+def _recover_json_objects(content: str) -> list[dict[str, Any]]:
+    """Récupère par ``raw_decode`` itératif les objets JSON top-level valides
+    d'un contenu corrompu (fonction pure, aucune I/O).
+
+    Gère le format ``indent=2`` (une entrée sur plusieurs lignes) ainsi que
+    les objets concaténés sans séparateur de tableau valide. Tout fragment
+    non-dict ou invalide est ignoré.
+    """
+    recovered: list[dict[str, Any]] = []
+    decoder = json.JSONDecoder()
+    i = 0
+    length = len(content)
+
+    while i < length:
+        # Sauter les espaces et séparateurs
+        while i < length and content[i] in " \t\n\r,":
+            i += 1
+        if i >= length:
+            break
+
+        if content[i] == "{":
+            try:
+                obj, end = decoder.raw_decode(content, i)
+                if isinstance(obj, dict):
+                    recovered.append(obj)
+                i = end
+            except json.JSONDecodeError:
+                i += 1
+        else:
+            i += 1
+
+    return recovered
+
+
+def _rotate(logs: list[dict[str, Any]], max_entries: int) -> list[dict[str, Any]]:
+    """Borne la liste de logs aux ``max_entries`` plus récentes (fonction pure)."""
+    if len(logs) > max_entries:
+        return logs[-max_entries:]
+    return logs
+
+
 class LogService(LogPort):
     """Service de persistance des logs applicatifs au format JSON."""
 
@@ -70,8 +111,7 @@ class LogService(LogPort):
         with _lock:
             logs = self._load_logs()
             logs.append(entry)
-            if len(logs) > MAX_LOG_ENTRIES:
-                logs = logs[-MAX_LOG_ENTRIES:]
+            logs = _rotate(logs, MAX_LOG_ENTRIES)
             write_json_atomic(LOG_PATH, logs, indent=2)
 
     def _load_logs(self) -> list[dict[str, Any]]:
@@ -89,34 +129,13 @@ class LogService(LogPort):
         except (OSError, json.JSONDecodeError) as e:
             _logger.warning("Lecture JSON du log échouée (%s) — tentative de réparation", e)
 
-        recovered: list[dict[str, Any]] = []
         try:
             with open(LOG_PATH, encoding="utf-8") as f:
                 content = f.read()
-
-            decoder = json.JSONDecoder()
-            i = 0
-            length = len(content)
-
-            while i < length:
-                # Sauter les espaces et séparateurs
-                while i < length and content[i] in " \t\n\r,":
-                    i += 1
-                if i >= length:
-                    break
-
-                if content[i] == "{":
-                    try:
-                        obj, end = decoder.raw_decode(content, i)
-                        if isinstance(obj, dict):
-                            recovered.append(obj)
-                        i = end
-                    except json.JSONDecodeError:
-                        i += 1
-                else:
-                    i += 1
         except OSError:
             return []
+
+        recovered = _recover_json_objects(content)
 
         if recovered:
             _logger.info("Log réparé : %d entrées récupérées sur fichier corrompu", len(recovered))
