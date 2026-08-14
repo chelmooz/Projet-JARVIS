@@ -1,5 +1,7 @@
 .env
-models/
+# Model weights (Ollama blobs/manifests) — keep Python package models/
+models/ollama/blobs/
+models/ollama/manifests/
 portable_python/
 build/
 dist/
