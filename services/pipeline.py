@@ -276,6 +276,7 @@ class PipelineService(PipelinePort):
                     break
             elif result is not None:
                 self._record_step_success(step, result, results, ctx, task, pipeline.id)
+                self._record_habits(task, pipeline.id, step)
 
         return results
 
@@ -362,6 +363,8 @@ class PipelineService(PipelinePort):
         )
         ctx[step.name] = result
 
+    def _record_habits(self, task: str, pipeline_id: str, step: PipeStep) -> None:
+        """Hook habits en frontière d'orchestration (dépend du contexte pipeline, pas de l'étape)."""
         if self._memory:
             self._memory.update_habits(
                 {
