@@ -69,7 +69,7 @@ def test_contrat_erreur_sans_backend() -> None:
 
 def test_retry_conditionnel_on_error_retry(monkeypatch: Any) -> None:
     """on_error="retry" : le runner est rappelé max_retries+1 fois."""
-    monkeypatch.setattr("services.pipeline.time.sleep", lambda _: None)
+    monkeypatch.setattr("services.pipeline_steps.time.sleep", lambda _: None)
     runner = FailingRunner()
     service = build_service(runner=runner, max_retries=2)
     service.register(
@@ -92,7 +92,7 @@ def test_retry_conditionnel_on_error_retry(monkeypatch: Any) -> None:
 
 def test_retry_conditionnel_on_error_abort(monkeypatch: Any) -> None:
     """on_error="abort" : pas de retry, une seule tentative."""
-    monkeypatch.setattr("services.pipeline.time.sleep", lambda _: None)
+    monkeypatch.setattr("services.pipeline_steps.time.sleep", lambda _: None)
     runner = FailingRunner()
     service = build_service(runner=runner, max_retries=2)
     service.register(Pipeline(id="p", steps=(PipeStep(name="s1", agent_key="dev", prompt_template="{task}"),)))

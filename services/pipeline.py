@@ -2,28 +2,25 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
 import os
-import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 import yaml
 
-from config.constants import DEFAULT_MODEL, MAX_ADAPTIVE_ATTEMPTS, PROJECT_DIR
+from config.constants import MAX_ADAPTIVE_ATTEMPTS, PROJECT_DIR
 from models import Pipeline, PipeStep
 from ports.pipeline import PipelinePort
 from services.adapters.protocols import IResponseJudge, ITraceStore, IVectorSearch, TraceRecord
 from services.pipeline_helpers import build_failure, build_hyde_query, has_fatal_error, is_stagnant
+from services.pipeline_steps import execute_pipeline_step
 from services.rag_judge import JUDGE_THRESHOLD
 
 _logger = logging.getLogger("jarvis.pipeline")
 
 PIPELINES_DIR = os.path.join(PROJECT_DIR, "config", "pipelines")
-RETRY_DELAY = 0.5
-MAX_ERROR_LENGTH = 200
 DEFAULT_TOP_K = 3
 
 
@@ -32,11 +29,7 @@ class PipelineError(Exception):
 
 
 class PipelineService(PipelinePort):
-    """Moteur d'exécution de pipelines multi-étapes.
-
-    Chaque pipeline est défini dans un fichier YAML sous ``config/pipelines/``.
-    Supporte les politiques d'erreur par étape : abort (défaut), skip, retry.
-    """
+    """Moteur d'exécution de pipelines multi-étapes YAML (politiques abort/skip/retry)."""
 
     def __init__(
         self,
@@ -59,21 +52,7 @@ class PipelineService(PipelinePort):
         self._max_retries = max_retries
         self._pipelines: dict[str, Pipeline] = {}
 
-        self._supports_model = self._check_runner_signature()
-
         self._load_pipelines()
-
-    # ─── Initialisation ───────────────────────────────────────────────
-
-    def _check_runner_signature(self) -> bool:
-        """Vérifie si l'agent_runner accepte un 3e argument 'model'."""
-        if self._agent_runner is None:
-            return False
-        try:
-            sig = inspect.signature(self._agent_runner)
-            return len(sig.parameters) >= 3
-        except (ValueError, TypeError):
-            return False
 
     def _load_pipelines(self) -> None:
         """Charge les pipelines depuis le répertoire de configuration."""
@@ -100,19 +79,11 @@ class PipelineService(PipelinePort):
             pid = pipeline_data["id"]
 
             if pid in seen_ids:
-                _logger.warning(
-                    "ID de pipeline dupliqué '%s' dans %s — écrase le précédent",
-                    pid,
-                    fname,
-                )
+                _logger.warning("ID de pipeline dupliqué '%s' dans %s — écrase le précédent", pid, fname)
 
             seen_ids.add(pid)
             steps = [PipeStep(**s) for s in pipeline_data.get("steps", [])]
-            self._pipelines[pid] = Pipeline(
-                id=pid,
-                steps=tuple(steps),
-                on_error=pipeline_data.get("on_error", "abort"),
-            )
+            self._pipelines[pid] = Pipeline(id=pid, steps=tuple(steps), on_error=pipeline_data.get("on_error", "abort"))
         except Exception as e:
             _logger.exception("Erreur chargement pipeline %s: %s", fname, e)
 
@@ -135,24 +106,15 @@ class PipelineService(PipelinePort):
         pipeline = self._resolve_pipeline(pipeline_id)
         ctx = {**(context or {})}
 
-        if self._judge:
-            return self._run_adaptive(pipeline, task, ctx)
-
-        return self._run_legacy(pipeline, task, ctx)
+        return self._run_adaptive(pipeline, task, ctx) if self._judge else self._run_legacy(pipeline, task, ctx)
 
     def _build_success(self, pipeline_id: str, results: list[dict[str, Any]]) -> dict[str, Any]:
         """Construit le dict de réponse en cas de succès."""
-        return {
-            "pipeline": pipeline_id,
-            "steps": len(results),
-            "results": results,
-            "error": None,
-        }
+        return {"pipeline": pipeline_id, "steps": len(results), "results": results, "error": None}
 
     def _run_legacy(self, pipeline: Pipeline, task: str, ctx: dict[str, Any]) -> dict[str, Any]:
         """Exécution simple sans juge (backward compat)."""
-        similar_cases = self._retrieve_similar_cases(task)
-        if similar_cases:
+        if similar_cases := self._retrieve_similar_cases(task):
             ctx["similar_cases"] = similar_cases
 
         results = self._execute_all_steps(pipeline, task, ctx)
@@ -185,14 +147,7 @@ class PipelineService(PipelinePort):
             reason = judge_result.get("reason", "")
 
             if score >= JUDGE_THRESHOLD or is_stagnant(reason, last_reason, attempt):
-                self._capitalize_trace(
-                    pipeline.id,
-                    query,
-                    similar_cases,
-                    final_response,
-                    score,
-                    reason,
-                )
+                self._capitalize_trace(pipeline.id, query, similar_cases, final_response, score, reason)
                 return self._build_success(pipeline.id, results)
 
             last_reason = reason
@@ -209,20 +164,13 @@ class PipelineService(PipelinePort):
         return self._build_success(pipeline.id, results)
 
     def _run_attempt(
-        self,
-        pipeline: Pipeline,
-        query: str,
-        ctx: dict[str, Any],
-        attempt: int,
+        self, pipeline: Pipeline, query: str, ctx: dict[str, Any], attempt: int
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Exécute une tentative unique : checkpoint + retrieval + étapes."""
         self._write_checkpoint(pipeline.id, query, attempt)
         similar_cases = self._retrieve_similar_cases(query)
-        attempt_ctx = {**ctx}
-        if similar_cases:
-            attempt_ctx["similar_cases"] = similar_cases
-        results = self._execute_all_steps(pipeline, query, attempt_ctx)
-        return similar_cases, results
+        attempt_ctx = {**ctx, **({"similar_cases": similar_cases} if similar_cases else {})}
+        return similar_cases, self._execute_all_steps(pipeline, query, attempt_ctx)
 
     def _write_checkpoint(self, pipeline_id: str, query: str, attempt: int) -> None:
         """Écrit un checkpoint sidecar avant chaque tentative (loop-engineering.md)."""
@@ -264,128 +212,32 @@ class PipelineService(PipelinePort):
     # ─── Exécution des étapes ─────────────────────────────────────────
 
     def _execute_all_steps(self, pipeline: Pipeline, task: str, ctx: dict[str, Any]) -> list[dict[str, Any]]:
-        """Parcourt les étapes séquentiellement, retourne la liste des résultats."""
-        results: list[dict[str, Any]] = []
+        """Parcourt les étapes séquentiellement via pipeline_steps, retourne les résultats."""
+        state: dict[str, Any] = {"task": task, "context": ctx, "results": []}
 
         for step in pipeline.steps:
-            result, error = self._execute_with_retry(step, task, ctx)
-
-            if error is not None:
-                self._record_step_error(step, error, results)
-                if step.on_error != "skip":
-                    break
-            elif result is not None:
-                self._record_step_success(step, result, results, ctx, task, pipeline.id)
+            execute_pipeline_step(
+                state=state,
+                step=step,
+                task=task,
+                agent_runner=self._agent_runner,
+                inference=self._inference,
+                model_selector=self._model_selector,
+                max_retries=self._max_retries,
+            )
+            if state.get("error") is not None and step.on_error != "skip":
+                break
+            if state["results"] and state["results"][-1]["error"] is None:
                 self._record_habits(task, pipeline.id, step)
 
+        results: list[dict[str, Any]] = state["results"]
         return results
-
-    def _execute_step(self, step: PipeStep, task: str, context: dict[str, Any]) -> str:
-        """Exécute une étape unique via agent_runner ou inference."""
-        prompt = step.prompt_template.format(task=task, **context)
-
-        runner = self._agent_runner
-        if runner is not None and step.agent_key:
-            return self._run_via_agent(runner, step, prompt, task)
-
-        inference = self._inference
-        if inference is not None:
-            return self._run_via_inference(inference, step, prompt, task)
-
-        raise PipelineError("Aucun agent_runner ni inference configuré")
-
-    def _run_via_agent(self, runner: Any, step: PipeStep, prompt: str, task: str) -> str:
-        """Délègue l'exécution à l'agent_runner."""
-        selector = self._model_selector
-        model = selector(step.agent_key, self._inference) if selector is not None else None
-        if self._supports_model:
-            return str(runner(step.agent_key, prompt, model))
-        return str(runner(step.agent_key, prompt))
-
-    def _run_via_inference(self, inference: Any, step: PipeStep, prompt: str, task: str) -> str:
-        """Délègue l'exécution au service d'inférence."""
-        selector = self._model_selector
-        model = selector(step.agent_key, inference) if selector is not None else DEFAULT_MODEL
-        raw = inference.query(prompt, model)
-        return self._extract_response(raw)
-
-    def _extract_response(self, raw: Any) -> str:
-        """Extrait la chaîne de réponse d'un résultat d'inférence."""
-        if hasattr(raw, "data") and isinstance(raw.data, dict):
-            return str(raw.data.get("response", str(raw)))
-        if isinstance(raw, dict):
-            return str(raw.get("response", str(raw)))
-        return str(raw)
-
-    # ─── Retry ────────────────────────────────────────────────────────
-
-    def _execute_with_retry(self, step: PipeStep, task: str, ctx: dict[str, Any]) -> tuple[str | None, str | None]:
-        """Exécute une étape avec retry jusqu'à _max_retries tentatives."""
-        for attempt in range(self._max_retries + 1):
-            try:
-                result = self._execute_step(step, task, ctx)
-                return result, None
-            except Exception as e:
-                _logger.exception("Erreur étape '%s'", step.name)
-
-                if step.on_error == "retry" and attempt < self._max_retries:
-                    self._wait_before_retry(attempt, step.name)
-                else:
-                    return None, str(e)[:MAX_ERROR_LENGTH]
-
-        return None, "Limite de retry atteinte"
-
-    def _wait_before_retry(self, attempt: int, step_name: str) -> None:
-        """Attend avant une nouvelle tentative de retry."""
-        delay = RETRY_DELAY * (attempt + 1)
-        _logger.warning("Retry %d/%d pour '%s'", attempt + 1, self._max_retries, step_name)
-        time.sleep(delay)
-
-    # ─── Enregistrement des résultats d'étape ─────────────────────────
-
-    def _record_step_success(
-        self,
-        step: PipeStep,
-        result: str,
-        results: list[dict[str, Any]],
-        ctx: dict[str, Any],
-        task: str,
-        pipeline_id: str,
-    ) -> None:
-        """Enregistre un succès d'étape et met à jour le contexte."""
-        results.append(
-            {
-                "step": step.name,
-                "agent": step.agent_key,
-                "response": result,
-                "error": None,
-            }
-        )
-        ctx[step.name] = result
 
     def _record_habits(self, task: str, pipeline_id: str, step: PipeStep) -> None:
         """Hook habits en frontière d'orchestration (dépend du contexte pipeline, pas de l'étape)."""
         if self._memory:
-            self._memory.update_habits(
-                {
-                    "task": task,
-                    "pipeline": pipeline_id,
-                    "step": step.name,
-                }
-            )
-
-    def _record_step_error(self, step: PipeStep, error_msg: str, results: list[dict[str, Any]]) -> None:
-        """Enregistre une erreur d'étape dans la liste des résultats."""
-        results.append(
-            {
-                "step": step.name,
-                "agent": step.agent_key,
-                "response": None,
-                "error": error_msg,
-            }
-        )
-
-    # ─── Construction de la réponse ───────────────────────────────────
+            entry = {"task": task, "pipeline": pipeline_id, "step": step.name}
+            self._memory.update_habits(entry)
 
     # ─── Capitalisation (MT 7.1) ──────────────────────────────────────
 
@@ -402,14 +254,7 @@ class PipelineService(PipelinePort):
         if not self._trace_store:
             return
         try:
-            record = self._build_trace_record(
-                pipeline_id,
-                task,
-                chunks,
-                response,
-                judge_score,
-                judge_reason,
-            )
+            record = self._build_trace_record(pipeline_id, task, chunks, response, judge_score, judge_reason)
             self._trace_store.append(record)
         except Exception:
             _logger.exception("Échec capitalisation trace pipeline='%s'", pipeline_id)
@@ -445,6 +290,5 @@ class PipelineService(PipelinePort):
 
 # Alias backward-compat
 PipelineEngine = PipelineService
-
 
 __all__ = ["PipelineError", "PipelineService", "PipelineEngine"]
