@@ -14,9 +14,7 @@ import logging
 import os
 import platform
 import shutil
-import stat
 import subprocess
-import zipfile
 from collections.abc import Callable
 
 from config.constants import (
@@ -24,6 +22,7 @@ from config.constants import (
     LAUNCHER_WAIT_TIMEOUT,
     OLLAMA_VERSION,
 )
+from services.ollama_archive import _extract_tar_zst, _safe_extract_zip
 from services.ollama_download import (
     _download_file,
     _verify_ollama_binary,
@@ -49,22 +48,6 @@ def _install_linux_apt(log: _LogFn) -> str | None:
         log("Ollama", "apt introuvable ou échec", False)
         _logger.debug("Échec apt install ollama : %s", e)
     return None
-
-
-def _extract_tar_zst(archive: str, dest_dir: str, log: _LogFn) -> None:
-    """Extrait une archive .tar.zst.
-
-    `tar --zstd` nécessite le binaire externe `zstd`, absent sur une Debian/
-    Ubuntu minimale (clé USB bootable). Si l'option échoue faute de binaire,
-    on retombe sur `tar -xf` : les `tar` récents (libarchive/liblzma) savent
-    souvent auto-détecter zstd sans dépendance externe.
-    """
-    try:
-        subprocess.run(["tar", "--zstd", "xf", archive, "-C", dest_dir], check=True, timeout=LAUNCHER_WAIT_TIMEOUT)
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        log("Ollama", "tar --zstd indisponible (binaire zstd manquant ?), fallback tar -xf", False)
-        _logger.debug("Échec tar --zstd : %s", e)
-        subprocess.run(["tar", "-xf", archive, "-C", dest_dir], check=True, timeout=LAUNCHER_WAIT_TIMEOUT)
 
 
 def _install_linux_tar(log: _LogFn) -> str | None:
@@ -121,27 +104,6 @@ def _install_linux_tar(log: _LogFn) -> str | None:
                 os.remove(dl)
 
     return result
-
-
-def _safe_extract_zip(archive: str, dest_dir: str) -> None:
-    """Extrait une archive ZIP sans autoriser de sortie du répertoire cible.
-
-    Les archives ZIP malveillantes peuvent contenir des chemins ``../`` ou des
-    liens symboliques. Ces entrées sont refusées avant toute écriture pour
-    préserver le support portable et le poste hôte.
-    """
-    destination = os.path.realpath(dest_dir)
-    with zipfile.ZipFile(archive, "r") as zf:
-        for entry in zf.infolist():
-            target = os.path.realpath(os.path.join(destination, entry.filename))
-            try:
-                is_within_destination = os.path.commonpath([destination, target]) == destination
-            except ValueError:
-                is_within_destination = False
-            is_symlink = stat.S_ISLNK(entry.external_attr >> 16)
-            if not is_within_destination or is_symlink:
-                raise ValueError(f"Entrée ZIP non sûre refusée : {entry.filename}")
-        zf.extractall(destination)
 
 
 def _install_windows_zip(log: _LogFn) -> str | None:
@@ -260,4 +222,7 @@ def ensure_ollama_binary(log: _LogFn) -> str | None:
     return None
 
 
-__all__ = ["ensure_ollama_binary"]
+# Ré-export volontaire : les tests (test_ollama_installer.py,
+# test_ollama_installer_security.py) accèdent aux fonctions d'extraction via
+# services.ollama_installer — ce ré-export doit rester valide.
+__all__ = ["ensure_ollama_binary", "_extract_tar_zst", "_safe_extract_zip"]
