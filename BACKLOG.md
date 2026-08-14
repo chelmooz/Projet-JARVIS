@@ -198,7 +198,9 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.5 :
 - **supervisor.py:57** `TODO(refacto-SOLID)` : ajout propriété publique `name` sur `BaseAgent` — supprimer le getattr multi-conventions (`_profile_key`/`PROFILE_KEY`) dans `_agent_display_name`.
 - **supervisor.py:153** `TODO(refacto-SOLID)` : modéliser un union type `RunOutcome = AgentRunResult | TimeoutResult` au lieu du champ de contrôle `timeout` ajouté au dict nominal.
-- **di.py:107** `TODO` : `agent_runner=None` passé à `PipelineService` — décider du câblage (cf. tickets pipeline_steps agent_runner).
+- ~~**di.py:107**~~ **FERMÉ (MT-T5a-1.4, 2026-08-14)** : `agent_runner=None` est définitif — inference suffit
+  (`routes/pipelines.py:40` → `run()` → branche inference quand `agent_runner=None` ; inference
+  configuré dans `di.py` ; aucun type runner) — agent_runner = point d'extension non câblé.
 
 ### LOT 5 — Dettes ciblées livrées (2026-08-14)
 - **5.1** (`fix(middlewares)`) : `retry_after` dérivé de `services.ratelimit.WINDOW` (source unique de vérité) — test `test_429_retry_after_derived_from_ratelimit_window` (RED→GREEN).
@@ -232,3 +234,71 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - **7.3** `RELEASE_NOTES_CORRECTED.md` fusionné dans CHANGELOG.md comme sous-section « Livraison corrigée — sécurité de distribution » du `[6.0]` puis fichier supprimé (artefact de travail). Commit `9961003b2`.
 - **7.4** Badge de couverture : `scripts/coverage_badge.py` lit `coverage.json` (pytest --cov-report=json) → écrit `coverage-badge.json` (endpoint shields.io, couleur par seuil). Versionné ; `coverage.json` ajouté au `.gitignore`. CI : step « Coverage badge » régénère + `git diff --exit-code` échoue si périmé (badge honnête, jamais de valeur fausse). README : `img.shields.io/endpoint?url=raw.../coverage-badge.json`. Coverage mesurée : 50,3 %. Commit `2c503510a`.
 - Gates Lot 7 : ruff ✓ · pytest 178/1 ✓ · mypy ✓.
+
+### MT-T5a-plan — Plan T5a écrit dans ROADMAP.md (2026-08-14)  � ⏳ exécution à venir
+- ROADMAP.md : section « T5a — Vérification des gates & clôture des restes du Lot 4 » (16 micro-tâches
+  en cases à cocher : 0.1→4.2) + tickets ouverts **4.2b** (suppression copie parallèle pipeline.py,
+  condition d'entrée : TODO `agent_runner` fermés) et **4.4c** (extraction des 5 installateurs vers
+  `ollama_install_{linux,windows,mac}.py`) ajoutés sous le Lot 4. L.37 aligné sur `fail_under=48`.
+- État vérifié (HEAD `d79b1b152`) : format gate **ROUGE** (`tests/test_pipeline_steps.py` non formaté),
+  cov 50,26 % ≥ 46 %, badge 50,3 % à jour, mypy 121 src ✅.
+- Décisions actées dans le plan : contrat d'erreur state partout (pas de raise frontière) ;
+  `di.py:107` fermé « inference suffit » ; `pipeline_steps.py:24` non touché (vivante via AgentGraph) ;
+  fix `model_selector` sur 2 call sites dont `:307` vivant.
+- Prochaine session : exécuter depuis **MT-0.1** (gates vertes + 1 commit atomique par micro-tâche).
+- Aucun commit (conforme AGENTS.md).
+
+### MT-T5a-0.1 — Gate format débloquée (2026-08-14) ✅
+- `ruff format tests/test_pipeline_steps.py` (1 fichier reformatté, 7+/2-) → 4 gates vertes
+  (ruff check · format --check · mypy 121 src · pytest 178/1, 50,26 % ≥ 46).
+- Commit `17c7a5a1c` `style: ruff format tests/test_pipeline_steps.py` ; BACKLOG/ROADMAP restent
+  non commités (docs T5a, fusionnés dans les commits docs 4.1/4.2).
+- Prochaine micro-tâche : **MT-0.2** (fail_under 46 → 48 + vérif « Required test coverage of
+  48.0% reached »).
+
+### MT-T5a-0.2 — fail_under 48 (2026-08-14) ✅
+- `pyproject.toml` : `fail_under = 48` (50,26 % mesuré − 2) + commentaire mis à jour
+  (mesuré 50,26 % au T5a). ROADMAP L.37 déjà aligné. Vérif : « Required test coverage of
+  48.0% reached. Total coverage: 50.26% » (178 passed, 1 skipped).
+- Commit `1e20f4f21` `chore(coverage): fail_under 46 -> 48 (mesuré 50,26 %)`.
+- Prochaine micro-tâche : **MT-1.1** (RED propagation du modèle au runner, GREEN
+  `inspect.signature`).
+
+### MT-T5a-1.1 — Modèle propagé au runner (2026-08-14) ✅
+- RED : 5 tests (1 échoue) — `test_execute_pipeline_step_runner_three_params_receives_model`
+  (appel 3 params → TypeError → état d'erreur) ; 2e test documentaire : runner 2 params appelé
+  sans modèle.
+- GREEN : `_runner_supports_model()` (détection `inspect.signature`, portée de
+  `pipeline.py:68-76`) + branche runner : `model_selector(agent_key, inference)` (convention MT-1.2
+  déjà appliquée ici : inference, pas la tâche) ; aucun paramètre nouveau ; `model_selector=None`
+  sûr (→ `model=None`).
+- Gates : 4 vertes (180 passed / 1 skip, 50,31 % ≥ 48).
+- Commit `55f60e18c` `feat(pipeline_steps): propage le modèle au runner (parité _run_via_agent)`.
+- Prochaine micro-tâche : **MT-1.2** (fix `model_selector` sur `pipeline.py:299` et `:307`).
+
+### MT-T5a-1.2 — model_selector corrigé (2026-08-14) ✅
+- Contrat vérifié : `services/selector.py:184` `select_model(agent_key, inference, log_service=None)`
+  — les 2 call sites passaient la **tâche** au 2e paramètre.
+- Fix `pipeline.py:299` (`_run_via_agent`) → `self._inference` ; `pipeline.py:307`
+  (`_run_via_inference`) → le paramètre `inference` de la méthode (vivant via
+  `routes/pipelines.py:40` POST /run).
+- `select_model(agent_key, None)` n'était PAS sûr (AttributeError sur `resolve_model`) → garde
+  ajoutée : `inference is None → ""` (conforme docstring « chaîne vide si aucun modèle, l'appelant
+  gère l'erreur ») ; vérifié par `select_model('dev', None)` → `''`. `pipeline_steps.py:24` NON
+  touché (vivant via AgentGraph).
+- Gates : 4 vertes (180/1, 50,31 %).
+- Commit `ea0602672` `fix(pipeline): model_selector reçoit inference et non la tâche (2 call sites)`.
+- Note collision de nom (2 `select_model`) : `pipeline_steps.select_model(agent_key, model,
+  provider)` ≠ `selector.select_model(agent_key, inference, log_service)` — documentée ici,
+  réassignées par injection distincte.
+- Prochaine micro-tâche : **MT-1.3** (RED runner non callable → erreur typée).
+
+### MT-T5a-1.3 — Runner non callable rejeté (2026-08-14) ✅
+- RED : `test_execute_pipeline_step_non_callable_runner` échoue (ancien comportement :
+  `str(agent_runner)` comme réponse de succès).
+- GREEN : `NonCallableRunnerError` (exception typée dans `pipeline_steps.py`) levée à la place du
+  repr ; capturée par la boucle retry existante → entrée d'erreur dans `results` + `state["error"]`,
+  **aucun raise frontière** (contrat d'erreur state, conforme filet 2.1 à venir).
+- Gates : 4 vertes (181/1, 50,39 % ≥ 48).
+- Commit `a4ad48d80` `fix(pipeline_steps): rejette un agent_runner non callable`.
+- Prochaine micro-tâche : **MT-1.4** (ticket `di.py:107` fermé, zero code).
