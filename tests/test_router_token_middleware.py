@@ -6,21 +6,27 @@ Couverture des 4 branches du middleware :
 - token invalide → 401
 - token valide → passe
 """
+
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from httpx import AsyncClient, ASGITransport
-
 import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 from controllers.router import _register_middlewares
 
-# Force token verification en définissant OpenWebUI activé
-os.environ["JARVIS_ENABLE_OPENWEBUI"] = "1"
+
+@pytest.fixture(autouse=True)
+def _force_openwebui_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force la vérification de token en activant OpenWebUI (Lot 0.1).
+
+    Portée strictement locale au test via ``monkeypatch`` (annulé automatiquement
+    en fin de test), au lieu d'une écriture globale de ``os.environ`` au niveau
+    module qui polluait tous les tests suivants dans la même session pytest.
+    """
+    monkeypatch.setenv("JARVIS_ENABLE_OPENWEBUI", "1")
 
 
 def _make_app() -> FastAPI:

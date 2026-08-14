@@ -1,5 +1,47 @@
 # Changelog — JARVIS Portable Edition
 
+## [Non publié] — Lot 0 : suite de tests rendue déterministe
+
+Condition préalable au refacto TDD (Lots 1-4) posée par l'audit du 2026-08-14 :
+la suite échouait de façon non déterministe sur clone propre (23/279 échecs),
+uniquement liée à l'ordre d'exécution et à l'OS, pas à un bug fonctionnel.
+
+- **0.1** `tests/test_router_token_middleware.py` : l'activation globale
+  `os.environ["JARVIS_ENABLE_OPENWEBUI"] = "1"` au niveau module (exécutée une
+  fois à la collecte pytest, jamais nettoyée) polluait tous les tests API
+  suivants dans la même session, qui recevaient alors 401 au lieu du code
+  attendu (`test_api_agents`, `test_api_chat`, `test_api_rag`, `test_api_health`,
+  `test_api_files`, `test_router_e1` — 22 échecs). Remplacé par une fixture
+  `autouse` locale au module utilisant `monkeypatch.setenv`, annulée
+  automatiquement en fin de test.
+- **0.2** `tests/conftest.py` : ajout d'une fixture `autouse` de snapshot/restore
+  de `os.environ` autour de chaque test, filet de sécurité contre une future
+  mutation d'environnement non nettoyée par un test qui ne l'aurait pas fait
+  lui-même via `monkeypatch`.
+- **0.3** `tests/test_file_system.py::test_authorize_windows_separators` :
+  marqué `skipif(os.name != "nt")` — le test vérifie la résolution de chemins
+  à séparateurs `\`, un comportement propre à Windows (pathlib ne les traite
+  pas comme séparateurs sous POSIX). 1 échec résolu, suite désormais verte
+  aussi bien sous Linux que sous Windows.
+- **0.4** Ajout de `pytest-randomly>=3.15` aux dépendances `dev` : ordonne les
+  tests aléatoirement à chaque run (seed affiché dans les logs) pour détecter
+  toute future dépendance à l'ordre d'exécution avant qu'elle ne devienne un
+  bug de production.
+- **0.5** Badge de couverture régénéré : 52,4 % → 56,3 % (mesure sur le
+  périmètre global `pytest --cov`, 279 tests collectés, 278 passed + 1 skipped
+  après correctifs 0.1/0.3 — la hausse vs. les 54,37 % mesurés avant Lot 0
+  vient des chemins de code désormais réellement exercés par les tests qui
+  échouaient prématurément sur 401, pas d'un changement de périmètre).
+- **Point ouvert, non traité dans ce lot** (tâche 0.6 du TOC) : le commit
+  `dd5def7` (11/08) a supprimé 100 fichiers de tests / 9359 lignes en un seul
+  commit "chore: sync local state — retire 90 tests obsolètes/redondants",
+  dont `tests/test_diagnostic_ext_charact.py` (677 lignes) et
+  `tests/test_diagnostic_ext.py` (217 lignes). Le message de commit ne détaille
+  pas fichier par fichier ce qui était réellement redondant vs. une perte de
+  couverture masquée. À auditer en détail (diff complet, pas `--stat`) avant
+  toute décision de rapatriement, notamment pour `diagnostic_ext/*` qui reste
+  aujourd'hui sous 30 % de couverture.
+
 ## [6.0] — 2026-08-13
 
 ### Livraison corrigée — sécurité de distribution

@@ -17,6 +17,23 @@ from models import Result
 from ports import ChatPort, EmbeddingPort, VectorPort
 
 
+@pytest.fixture(autouse=True)
+def _isolate_environ() -> Iterator[None]:
+    """Snapshot/restore ``os.environ`` autour de chaque test (Lot 0.2).
+
+    Empêche qu'un test qui mute ``os.environ`` (directement ou via un module
+    important une variable au chargement) ne pollue les tests suivants dans
+    la même session pytest. Filet de sécurité en complément de ``monkeypatch``,
+    qui ne couvre pas les mutations faites au niveau module (import-time).
+    """
+    before = dict(os.environ)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(before)
+
+
 @pytest.fixture
 def sandbox_root(tmp_path: Path) -> Iterator[Path]:
     """Positionne ``JARVIS_FILES_SANDBOX_ROOT`` sur ``tmp_path`` et restaure après le test.

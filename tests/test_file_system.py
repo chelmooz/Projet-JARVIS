@@ -29,6 +29,10 @@ def test_authorize_rejects_outside_sandbox(fs: FileSystemService, sandbox_root: 
     assert fs.authorize_path("C:\\Windows") is False
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="Séparateurs backslash non résolus en chemin par pathlib sous POSIX (Lot 0.3)",
+)
 def test_authorize_windows_separators(fs: FileSystemService, sandbox_root: Path) -> None:
     target = sandbox_root / "sub"
     target.mkdir()
