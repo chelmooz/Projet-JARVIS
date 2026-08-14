@@ -25,7 +25,7 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
-from services.adapters.http import BudgetExceededError, OllamaHTTPClient
+from services.adapters.http import BudgetExceededError, OllamaHTTPClient, is_retryable
 
 
 class FakeResponse:
@@ -141,6 +141,27 @@ class TestCallWithRetryCancellation:
             client._call_with_retry("/api/generate", {"model": "x"})
 
         assert client._http.post.call_count == 1
+
+
+class TestIsRetryable:
+    """Tests directs de la fonction pure extraite en Lot F2 (politique inchangée)."""
+
+    def test_read_timeout_is_not_retryable(self) -> None:
+        assert is_retryable(httpx.ReadTimeout("blocked")) is False
+
+    def test_connect_error_is_retryable(self) -> None:
+        assert is_retryable(httpx.ConnectError("refused")) is True
+
+    def test_http_status_error_is_retryable(self) -> None:
+        err = httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock())
+        assert is_retryable(err) is True
+
+    def test_connect_timeout_is_retryable(self) -> None:
+        """``ConnectTimeout`` est un ``TimeoutException`` mais pas un ``ReadTimeout``."""
+        assert is_retryable(httpx.ConnectTimeout("slow")) is True
+
+    def test_unrelated_exception_is_not_retryable(self) -> None:
+        assert is_retryable(ValueError("not an httpx error")) is False
 
 
 class TestCallWithRetryBackoff:

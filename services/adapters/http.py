@@ -25,6 +25,21 @@ class BudgetExceededError(RuntimeError):
     """Budget de temps global épuisé avant la fin des tentatives."""
 
 
+def is_retryable(error: Exception) -> bool:
+    """Détermine si une erreur d'appel HTTP autorise une nouvelle tentative.
+
+    Politique actuelle (Lot F2, extraite sans changement de comportement) :
+    - ``httpx.ReadTimeout`` : jamais retryable — le modèle est considéré bloqué,
+      échec immédiat sans consommer de tentative.
+    - ``httpx.HTTPStatusError`` / ``httpx.RequestError`` (et ses sous-types,
+      dont ``httpx.TimeoutException``) : retryable.
+    - toute autre exception : non retryable (propagée telle quelle par l'appelant).
+    """
+    if isinstance(error, httpx.ReadTimeout):
+        return False
+    return isinstance(error, (httpx.HTTPStatusError, httpx.RequestError))
+
+
 class OllamaHTTPClient:
     """Client HTTP Ollama avec pool partagé + clients dédiés par thread d'inférence.
 
@@ -210,9 +225,11 @@ class OllamaHTTPClient:
                 r.raise_for_status()
                 data: Any = r.json()
                 return dict(data)
-            except httpx.ReadTimeout as e:
-                raise RuntimeError(f"Ollama {endpoint} en lecture timeout (modèle bloqué), pas de retry: {e}") from e
-            except (httpx.HTTPStatusError, httpx.RequestError, httpx.TimeoutException) as e:
+            except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                if not is_retryable(e):
+                    raise RuntimeError(
+                        f"Ollama {endpoint} en lecture timeout (modèle bloqué), pas de retry: {e}"
+                    ) from e
                 last_error = e
                 budget_remaining -= time.monotonic() - start
                 if tid in self._cancelled_threads:

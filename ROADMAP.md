@@ -67,17 +67,17 @@ caractérisation. Décision actée dans `ADR-013-pipeline-source-unique.md`.
 - [x] D4 `tests/test_vector_search.py` : 9 tests (FakeVector/FakeEmbedding)
 - [x] D5 `services/vector.py` : extraction `_run_bounded_search` (SRP)
 
-### Lot E — God functions des contrôleurs 🟡 EN COURS
+### Lot E — God functions des contrôleurs ✅ CLOS
 - [x] E1 `tests/test_router_e1.py` : 10 tests sur `create_app()` (routes, middlewares, contenu)
-- [x] E2 `create_app` → déjà découpé en `_register_middlewares` + `_register_routes` (vérifié dans `controllers/router.py`) — **à documenter/clore formellement** (pas de tâche de code restante, juste cocher après relecture)
-- [ ] **E3** `controllers/warmup.py:lifespan` (178 l.) : filet de caractérisation — démarrage dégradé sans Ollama, fermeture propre, échec journalisé sans lever
-- [ ] **E4** `lifespan` → extraire `_startup_sequence` / `_shutdown_sequence`, chaque étape testable seule (aucun test dédié aujourd'hui)
-- [ ] **E5** `controllers/routes/jarvis.py:handle_request` (77 l.) : filet — streaming, non-streaming, erreur agent, payload rejeté
-- [ ] **E6** `handle_request` → isoler parsing / appel orchestrateur / construction de réponse ; codes 4xx-5xx et format JSON préservés
+- [x] E2 `create_app` → déjà découpé en `_register_middlewares` + `_register_routes` (vérifié dans `controllers/router.py`)
+- [x] E3 `controllers/warmup.py:lifespan` (178 l.) : filet de caractérisation — démarrage dégradé sans Ollama, fermeture propre, échec journalisé sans lever → commit `4b506f9`
+- [x] E4 `lifespan` → extrait en `_startup_sequence` / `_shutdown_sequence`, chaque étape testable seule → commit `f78d69a`
+- [x] E5 `controllers/routes/jarvis.py:handle_request` (77 l.) : filet — offline, 503, 500, image invalide, SSE (88%) → commit `cf30d39`
+- [x] E6 `handle_request` → parsing / appel orchestrateur / construction de réponse isolés ; codes 4xx-5xx et format JSON préservés (69+/37-) → commit `449cd12`
 
-### Lot F — HTTP et logs 🔴 À FAIRE
-- [ ] **F1** `services/adapters/http.py:_call_with_retry` : filet avec transport httpx factice — succès immédiat, retry puis succès, timeout, exception réseau, code non retryable, backoff borné
-- [ ] **F2** Extraire une fonction pure `is_retryable(...)`, politique inchangée
+### Lot F — HTTP et logs 🟡 EN COURS
+- [x] F1 `services/adapters/http.py:_call_with_retry` : filet avec transport httpx factice — succès immédiat, retry puis succès, timeout, exception réseau, code non retryable, backoff borné → `tests/test_adapters_http_retry.py`, 10 tests, 4 gates vertes (pytest/ruff check/ruff format/mypy) — **à committer**
+- [x] F2 Extrait `is_retryable(error)` (fonction pure) : `ReadTimeout` non retryable, `HTTPStatusError`/`RequestError` retryables, reste non retryable — politique inchangée, comportement vérifié par les 10 tests F1 + 5 tests directs sur `is_retryable` (services/adapters/http.py +20/-3) — **à committer**
 - [ ] **F3** `services/log.py:_load_logs` : filet — fichier absent, JSON invalide, rotation, filtre de niveau, entrée partiellement malformée
 - [ ] **F4** Extraire un parseur de ligne pur ; séparer lecture / rotation / filtrage
 
@@ -102,11 +102,10 @@ Priorité aux fonctions pures, aux événements et aux contrats réseau simulés
 ## Ordre d'exécution restant
 
 ```text
-E (E3 → E6) → F (F1 → F4) → G (G1 → G6) → H (H1 → H4)
+F3 → F4 → G (G1 → G6) → H (H1 → H4)
 ```
 
-`Lot 8 / A, B, C, D` sont clos. `E2` ne demande qu'une vérification/relecture pour
-être coché formellement — pas de nouveau code.
+`Lot 8 / A, B, C, D, E` sont clos.
 
 ## Definition of done (par micro-tâche)
 
