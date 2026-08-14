@@ -163,17 +163,17 @@ caractérisation obligatoires** ; surface d'import à préserver (`scripts/insta
       `_install_windows_zip`, `_install_mac_brew`, `_install_mac_script`)
       → `test(ollama): caractérisation des 5 installateurs plateforme`
 - [x] 3.2 `services/ollama_install_linux.py` + ré-exports → `refactor(ollama): extrait les installateurs Linux (4.4c)`
-- [ ] 3.3 `services/ollama_install_windows.py` + ré-export → `refactor(ollama): extrait l'installateur Windows (4.4c)`
-- [ ] 3.4 `services/ollama_install_mac.py` ; `ollama_installer.py` = sélecteur < 100 l. + `__all__`
+- [x] 3.3 `services/ollama_install_windows.py` + ré-export → `refactor(ollama): extrait l'installateur Windows (4.4c)`
+- [x] 3.4 `services/ollama_install_mac.py` ; `ollama_installer.py` = sélecteur < 100 l. + `__all__`
       explicite ; non-régression imports `scripts/install.py`
       → `refactor(ollama): extrait macOS + sélecteur de plateforme (4.4c)` → Lot 4.4 coché
 
 ### Phase 4 — Traçabilité
 
 - [x] 4.1 ROADMAP : 4.2b/4.4c cochés, « @ 9 % » (ticket pipeline_steps) → mesure réelle,
-      « 330 → 263 » → 228 l., ordre d'exécution Lot 6 ���� / Lot 7 ����
+      « 330 → 263 » → 228 l., ordre d'exécution Lot 6 ������ / Lot 7 ������
       → `docs(roadmap): Lot 4 complet (4.2b, 4.4c) + compteurs à jour`
-- [ ] 4.2 BACKLOG T5a + tickets fermés (TODO `pipeline_steps.py:208,210,215`, `di.py:107`) +
+- [x] 4.2 BACKLOG T5a + tickets fermés (TODO `pipeline_steps.py:208,210,215`, `di.py:107`) +
       `fail_under` final (nouvelle mesure − 2) + `coverage-badge.json` régénéré DANS LE M��ME COMMIT
       (CI : `git diff --exit-code`) → `docs(backlog): T5a — Lot 4 clos, gates vertes`
 

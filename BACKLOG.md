@@ -420,3 +420,11 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - Badge régénéré : 52,6 % (orange)
 - Gates : 4 vertes (ruff �� · format �� · mypy 124 src �� · pytest 194/1, 52,57 % ≥ 50)
 - Prochaine micro-tâche : **MT-4.2** (BACKLOG T5a + tickets fermés + fail_under final + badge régénéré même commit → commit docs).
+
+### MT-T5a-4.2 — Lot 4 clos & traçabilité finale (2026-08-14) ����
+- ROADMAP : 4.2b/4.4c cochés, 3.3/3.4 cochés, Phase 4.1/4.2 cochées, ordre d'exécution Lot 4 complet
+- BACKLOG : tickets `pipeline_steps.py:208,210,215` (dette @ 9 %, TODO agent_runner non câblé) tracés comme tickets ouverts L63 dans ROADMAP (hors lots, non bloquants) ; `di.py:107` fermé (MT-T5a-1.4)
+- `fail_under` final : 50 (couverture 52,57 % − 2, inchangé)
+- `coverage-badge.json` : 52,6 % (orange, inchangé)
+- Gates : 4 vertes (ruff · format · mypy 124 src · pytest 194/1, 52,57 % ≥ 50)
+- Commit `docs(backlog): T5a — Lot 4 clos, gates vertes`
