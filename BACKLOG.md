@@ -3,7 +3,8 @@
 Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 
 ## ROADMAP active
-`ROADMAP_CONSOLE.md` — Console Tab (9��ᵉ onglet) + Command Palette (Ctrl+K).
+Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
+(`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
 ## Micro-tâches
 
@@ -73,20 +74,18 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
   en ajoutant des paramètres d'injection (embed, get_matrix, cache, now_fn) : violation de KISS, pas de gain.
   � ✅ 2026-08-13
 
-### Ticket ouvert — mypy : conflit de module `scripts/schedule_backup.py`
+### Ticket résolu — mypy : conflit de module `scripts/schedule_backup.py` (Lot H2, 15/08/2026) ✅
 - **Symptôme** (sur `mypy .`) : `scripts/schedule_backup.py: error: Source file found twice under
   different module names: "schedule_backup" and "scripts.schedule_backup"`.
 - **Cause** : la racine du dépôt est sur `sys.path` (install éditable `.pth`), donc `schedule_backup.py`
   est importable à la fois comme module top-level `schedule_backup` et comme `scripts.schedule_backup`
   (namespace package). mypy refuse la double définition.
-- **Impact** : n'affecte PAS le gate `mypy` (sans chemin, `files` = 119 src). Apparaît uniquement sur `mypy .`.
-- **Résolutions possibles** (à choisir en Lot ultérieur) :
-  1. `mypy --explicit-package-bases` + `MYPYPATH`/section `[tool.mypy]` `explicit_package_bases = true`
-     pour forcer le mapping `scripts.*` ;
-  2. ou ajouter `scripts/__init__.py` (rend `scripts` package explicite) — vérifier qu'aucun import
-     `from schedule_backup import ...` ne casse ;
-  3. ou déplacer `scripts/` hors de la racine scannée par mypy (ex. `tools/`).
-- **Décision** : NE PAS exclure `scripts` de mypy (masquerait la dette). Traiter en nettoyage dédié.
+- **Résolution retenue** (option 2 des 3 envisagées, la plus structurelle) : `scripts/__init__.py` ajouté
+  (rend `scripts` package explicite, lève l'ambiguïté). Fichier entièrement typé (6 annotations de retour
+  ajoutées) et intégré nommément à `[tool.mypy] files=` du gate officiel — sans tirer le reste de `scripts/`
+  (140 erreurs préexistantes, hors périmètre de ce ticket).
+- **Vérifié** : `mypy` (gate officiel) → 125 fichiers propres ; `pytest -q` → 372 passed/1 skipped, aucune
+  régression. → commit `b35017d`.
 
 ### MT-1 — Backend champ `source` sur JarvisRequest  � ✅ 2026-08-13
 - `models/schemas.py` : `source: Literal["chat","console","palette"] = "chat"` (default non-breaking).
@@ -495,3 +494,18 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
   — assertions intactes, comportement externe inchangé
 - Gates : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest ✓
 - Commit à venir : `refactor(vector): extraction _run_bounded_search dans search`
+
+### MT-Lot8-H — Lot H : Nettoyage final et clôture du plan (15/08/2026) ✅
+- **H1** `agents/supervisor.py` : conventions `_profile_key` (instance, Generic/Vision) et `PROFILE_KEY`
+  (classe, Cyber) unifiées derrière une propriété `profile_key` sur `BaseAgent` (défaut `None`, surchargée
+  par sous-classe). `_agent_name()` simplifié à un seul point de lecture. 13 tests de caractérisation créés
+  dans `tests/test_supervisor.py` (`AgentSupervisor` et `_agent_name` avaient 0 % de couverture avant).
+- **H2** Ticket mypy `scripts/schedule_backup.py` résolu (détail dans le ticket dédié ci-dessus).
+- **H3** `fail_under` relevé 50 → 60 (cible finale du plan), couverture mesurée 60,85 % ≥ 60 %, badge
+  régénéré (`coverage-badge.json`).
+- **H4** Cette entrée + purge de `ROADMAP.md` (marqueurs « à committer » remplacés par les hashes réels
+  F4/G1-G6, Lot H coché clos) et de `BACKLOG.md` (ticket mypy clos, lien mort `ROADMAP_CONSOLE.md` retiré).
+- Gates (vérifiées empiriquement sur poste Windows réel, H:\Projet-JARVIS) : `pytest -q` → 372 passed/1
+  skipped · `ruff check` ✓ · `ruff format --check` ✓ · `mypy` → 125 fichiers propres.
+- Commits : `b35017d` (H1+H2), `eb3f427` (H3), commit à venir (H4).
+- **Plan clos : Lots 0 à 8 (A → H) tous ✅.**

@@ -17,11 +17,11 @@ un seul document désormais, `ROADMAP_LOT8.md` est supprimé.
 9. Ne jamais recréer de code « à l'identique supposé » : retrouver la source ou déduire le contrat des usages, verrouillé par un test.
 10. Après chaque lot : mettre à jour cette ROADMAP + `BACKLOG.md` avec le hash de commit et les chiffres réellement mesurés.
 
-## État courant (baseline vérifiée sur le zip fourni)
+## État final (plan clos, 15/08/2026)
 
-- `ruff check .` ✅ · `ruff format --check .` ✅ · `mypy` ✅ · `pytest --cov` ✅.
-- Couverture mesurée : **56,3 %** (badge à jour) ; `fail_under = 50` dans `pyproject.toml`.
-- Dette connue non bloquante : ticket mypy `scripts/schedule_backup.py` (conflit de module, cf. Lot H2) ; `agents/supervisor.py:55,150` conventions dupliquées (Lot H1).
+- `ruff check .` ✅ · `ruff format --check .` ✅ · `mypy` ✅ (125 src) · `pytest --cov` ✅ (373 tests, 372 passed/1 skipped).
+- Couverture mesurée : **60,85 %** (badge à jour, commit `eb3f427`) ; `fail_under = 60` dans `pyproject.toml`.
+- Dette antérieure soldée : ticket mypy `scripts/schedule_backup.py` (Lot H2, commit `b35017d`) ; conventions `_profile_key`/`PROFILE_KEY` dupliquées dans `agents/supervisor.py` (Lot H1, commit `b35017d`).
 
 ---
 
@@ -79,33 +79,27 @@ caractérisation. Décision actée dans `ADR-013-pipeline-source-unique.md`.
 - [x] F1 `services/adapters/http.py:_call_with_retry` : filet avec transport httpx factice — succès immédiat, retry puis succès, timeout, exception réseau, code non retryable, backoff borné → commit `28b5e32`
 - [x] F2 Extrait `is_retryable(error)` (fonction pure) : `ReadTimeout` non retryable, `HTTPStatusError`/`RequestError` retryables, reste non retryable — politique inchangée → commit `0e24af5`
 - [x] F3 `services/log.py:_load_logs` : filet — fichier absent, JSON valide, JSON corrompu (récupération raw_decode, fragments non-dict ignorés, objet racine non-liste), rotation (`MAX_LOG_ENTRIES`), filtre de niveau (défaut/env/alias WARN) → commit `27cc503`
-- [x] F4 Extrait `_recover_json_objects(content)` (parseur pur de récupération JSON) et `_rotate(logs, max_entries)` (rotation pure) hors de `_load_logs`/`log()` ; structure d'exceptions et de logs de `_load_logs` inchangée, filtre de niveau déjà isolé dans `log()` — 7 nouveaux tests directs sur les fonctions pures — **à committer**
+- [x] F4 Extrait `_recover_json_objects(content)` (parseur pur de récupération JSON) et `_rotate(logs, max_entries)` (rotation pure) hors de `_load_logs`/`log()` ; structure d'exceptions et de logs de `_load_logs` inchangée, filtre de niveau déjà isolé dans `log()` — 7 nouveaux tests directs sur les fonctions pures → commit `9f4ce08`
 
 ### Lot G — Verrou CI front ✅ CLOS
 Aucun job front dans `.github/workflows/ci.yml` avant ce lot ; vitest configuré
 mais seulement 5 fichiers de test pour 16 modules JS.
-- [x] G1 Job `frontend` dans `ci.yml` (Node 22, `npm ci` puis `npm test` dans `static/`), vérifié localement en cassant une assertion (`npm test` échoue) puis en la restaurant (40/40 verts) — **à committer**
-- [x] G2 Tests `static/assets/js/modules/state.js` — 4 tests (shape initiale, singleton, `resetState`) — **à committer**
-- [x] G3 Tests `utils.js` — 19 tests (`escHtml`, `debounce`, `toast`, `renderMarkdown`, skeletons, `autoResize`, `cachedFetch`+TTL) — **à committer**
-- [x] G4 Tests `status.js` — 12 tests (SSE via `EventSource` factice, `pollMetrics`, `updateBadges`) — **à committer**
-- [x] G5 Tests `files.js` — 20 tests (navigation dossier, historique, autorisation/révocation de chemin, erreurs réseau) — **à committer**
-- [x] G6 Tests `settings.js` — 16 tests (thème + localStorage, bannière hors-ligne, `restoreSettings`) — **à committer**
+- [x] G1 Job `frontend` dans `ci.yml` (Node 22, `npm ci` puis `npm test` dans `static/`), vérifié localement en cassant une assertion (`npm test` échoue) puis en la restaurant (40/40 verts) → commit `435d407`
+- [x] G2 Tests `static/assets/js/modules/state.js` — 4 tests (shape initiale, singleton, `resetState`) → commit `435d407`
+- [x] G3 Tests `utils.js` — 19 tests (`escHtml`, `debounce`, `toast`, `renderMarkdown`, skeletons, `autoResize`, `cachedFetch`+TTL) → commit `435d407`
+- [x] G4 Tests `status.js` — 12 tests (SSE via `EventSource` factice, `pollMetrics`, `updateBadges`) → commit `435d407` ; bug de locale trouvé et corrigé après coup (`toLocaleString()` dépendait de l'OS, `4,200` vs `4 200`) → commit `74ef0f3`
+- [x] G5 Tests `files.js` — 20 tests (navigation dossier, historique, autorisation/révocation de chemin, erreurs réseau) → commit `435d407`
+- [x] G6 Tests `settings.js` — 16 tests (thème + localStorage, bannière hors-ligne, `restoreSettings`) → commit `435d407`
 
 Suite frontend complète : 111 tests passent (10 fichiers, dont 5 nouveaux). Fonctions pures et contrats réseau simulés priorisés, aucun test DOM fragile.
 
-### Lot H — Nettoyage et cliquet de couverture 🔴 À FAIRE
-- [ ] **H1** `agents/supervisor.py:55,150` : caractériser puis factoriser les conventions dupliquées
-- [ ] **H2** Ticket mypy `scripts/schedule_backup.py` : trancher une stratégie (package explicite / `MYPYPATH` / déplacement vers `tools/`), sans `exclude` mécanique
-- [ ] **H3** `fail_under` en cliquet montant : relevé après chaque lot vert (actuellement 50), cible **60** en fin de plan ; badge régénéré depuis la CI
-- [ ] **H4** Purge finale de cette ROADMAP et de `BACKLOG.md` : chaque ligne restante pointe un commit ou une mesure réelle
+### Lot H — Nettoyage et cliquet de couverture ✅ CLOS
+- [x] **H1** `agents/supervisor.py` : conventions `_profile_key`/`PROFILE_KEY` dupliquées unifiées en une propriété `profile_key` sur `BaseAgent` (défaut `None`, surchargée dans `GenericAgent`/`CyberAgent`, héritée par `VisionAgent`) ; `_agent_name()` simplifié à un seul point d'accès ; 13 tests de caractérisation créés (`tests/test_supervisor.py`, 0 % de couverture avant) → commit `b35017d`
+- [x] **H2** Ticket mypy `scripts/schedule_backup.py` : stratégie tranchée = package explicite (`scripts/__init__.py`), pas de `MYPYPATH`/déplacement ni `exclude` mécanique ; fichier entièrement typé et intégré nommément au scope mypy officiel (`pyproject.toml` → `files=`) → commit `b35017d`
+- [x] **H3** `fail_under` relevé 50 → **60** (cible finale du plan), couverture mesurée 60,85 % ≥ 60 % ; badge régénéré → commit `eb3f427`
+- [x] **H4** Purge finale de cette ROADMAP et de `BACKLOG.md` : marqueurs « à committer » remplacés par les hashes réels, ticket mypy résolu clos, lien mort vers `ROADMAP_CONSOLE.md` (supprimé au commit `c987e6e`) retiré de `BACKLOG.md`
 
-## Ordre d'exécution restant
-
-```text
-H1 → H2 → H3 → H4
-```
-
-`Lot 8 / A, B, C, D, E, F, G` sont clos.
+**Plan clos : Lots 0 à 8 (A → H) tous ✅.** État final ci-dessus (`## État final`).
 
 ## Definition of done (par micro-tâche)
 
