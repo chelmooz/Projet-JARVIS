@@ -6,7 +6,10 @@ Ce guide complète le `README.md` et le `CHANGELOG.md` pour contribuer au code.
 
 - Python 3.10+ (un Python portable 3.12 est fourni sur clef pré-remplie)
 - Ollama portable (téléchargé automatiquement au 1er lancement)
-- `cp .env.example .env && pip install -r requirements.txt` (ou via `launchers/JARVIS.bat`)
+- `cp .env.example .env && pip install .` (ou via `launchers/JARVIS.bat`)
+
+Les dépendances sont épinglées dans `uv.lock` et `requirements.lock` (voir
+section « Reproductibilité ») : `pip install -r requirements.txt` est obsolète.
 
 ## Lancer en local
 
@@ -75,6 +78,29 @@ export JARVIS_LOW_IO=1
 ```
 
 Réduit la taille du cache vectoriel et le top-k de recherche.
+
+## Reproductibilité (install offline)
+
+Les dépendances Python sont épinglées une seule fois pour toutes :
+
+- `uv.lock` — vérité source, versionné (généré par `uv lock`).
+- `requirements.lock` — export plat de `uv.lock` pour pip, versionné
+  (régénéré par `uv export --format requirements-txt --no-hashes --no-emit-project`).
+
+Modifier une dépendance : `uv add <pkg>` puis régénérer les deux fichiers.
+
+Installer **offline** sur une machine isolée :
+
+```bash
+# 1. Sur une machine connectée, préparer le dossier de wheels (~500 Mo)
+python scripts/vendor_wheels.py
+
+# 2. Sur la clé/la machine cible (dossier vendor_wheels/ présent à la racine)
+python scripts/install.py        # détecte vendor_wheels/ → --no-index --find-links
+```
+
+Sans dossier `vendor_wheels/`, `scripts/install.py` retombe sur une install
+pip en ligne. Détails : `docs/adr/ADR-012-distribution-offline.md`.
 
 ## Intégrité des binaires
 
