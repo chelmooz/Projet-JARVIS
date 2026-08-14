@@ -66,19 +66,12 @@ async def _warmup_default_model(ctx: Any, default_model: str) -> None:
         )
 
 
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Cycle de vie FastAPI : initialisation au démarrage, nettoyage à l'arrêt."""
+def _generate_or_reuse_token() -> None:
+    """Génère le token mono-utilisateur s'il n'existe pas encore, sinon le réutilise."""
     import contextlib
     import secrets
     from pathlib import Path
 
-    from services.diagnostics.checks import warn_low_memory
-    from services.log import _configure_root_logging
-
-    _configure_root_logging()
-    warn_low_memory()
-
-    # Generate and save token for mono-user authentication
     token_file = Path(__file__).resolve().parent.parent / "memory" / ".jarvis_token"
     token_file.parent.mkdir(parents=True, exist_ok=True)
     if not token_file.exists():
@@ -92,6 +85,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         _logger.info(f"Using existing mono-user token: {token_file}")
 
+
+def _resolve_context(app: FastAPI) -> Any:
+    """Récupère ``app.state.context``, en le construisant via la DI réelle si absent."""
     if not hasattr(app.state, "context"):
         from controllers.di import get_app_context
 
@@ -101,11 +97,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if hasattr(ctx, "initialize") and not getattr(ctx, "_initialized", False):
         ctx.initialize()
 
-    _logger.info("=== Démarrage des services JARVIS ===")
+    return ctx
 
-    # CORRECTION : Warmup non-bloquant en arrière-plan.
-    # On conserve la référence des tâches dans le contexte pour éviter le
-    # garbage collection prématuré (piège classique asyncio).
+
+def _launch_background_warmup(ctx: Any) -> None:
+    """Lance le warmup vectoriel et modèle en tâches de fond (non-bloquant).
+
+    On conserve la référence des tâches dans le contexte pour éviter le
+    garbage collection prématuré (piège classique asyncio).
+    """
     if not hasattr(ctx, "_warmup_tasks"):
         ctx._warmup_tasks = []
 
@@ -117,6 +117,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _logger.info("Warmup lancé en arrière-plan. L'application est prête à accepter des requêtes.")
 
+
+async def _startup_sequence(app: FastAPI) -> Any:
+    """Séquence de démarrage complète : logging, token, contexte, warmup, ingestion.
+
+    Renvoie le contexte applicatif (``app.state.context``), réutilisé par
+    ``_shutdown_sequence`` à l'arrêt.
+    """
+    from services.diagnostics.checks import warn_low_memory
+    from services.log import _configure_root_logging
+
+    _configure_root_logging()
+    warn_low_memory()
+
+    _generate_or_reuse_token()
+
+    ctx = _resolve_context(app)
+
+    _logger.info("=== Démarrage des services JARVIS ===")
+
+    _launch_background_warmup(ctx)
+
     ingest_queue = getattr(ctx, "ingest_queue", None)
     if ingest_queue is not None:
         ingest_queue.start()
@@ -124,11 +145,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _logger.info("=== JARVIS est prêt à accepter des requêtes ===")
 
-    yield  # L'application tourne ici et accepte le trafic.
+    return ctx
 
-    # ==========================================================================
-    # SHUTDOWN (arrêt propre et déterministe)
-    # ==========================================================================
+
+async def _shutdown_sequence(ctx: Any) -> None:
+    """Séquence d'arrêt complète : annulation warmup, ingestion, inférence, vecteur."""
     _logger.info("=== Arrêt de JARVIS en cours ===")
 
     # Annuler les tâches de warmup en cours si elles tournent encore
@@ -136,6 +157,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if not task.done():
             task.cancel()
 
+    ingest_queue = getattr(ctx, "ingest_queue", None)
     if ingest_queue is not None:
         ingest_queue.stop()
         _logger.info("File d'ingestion arrêtée.")
@@ -155,6 +177,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _flush_vector_on_shutdown(ctx)
 
     _logger.info("=== Arrêt de JARVIS terminé ===")
+
+
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Cycle de vie FastAPI : initialisation au démarrage, nettoyage à l'arrêt."""
+    ctx = await _startup_sequence(app)
+
+    yield  # L'application tourne ici et accepte le trafic.
+
+    await _shutdown_sequence(ctx)
 
 
 def _flush_vector_on_shutdown(ctx: Any) -> None:
