@@ -207,4 +207,4 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - **5.4** (`docs(env)`) : commentaire `.env.example:37` corrigé (fail-closed), `ADR-011-sandbox-fail-closed.md` créé.
 - **5.5** : 3 TODO basculés en tickets ci-dessus.
 - **5.6** : références aux tests fantômes nettoyées (`context.py`, `file_system.py`).
-- Gates (post-5.6) : `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓ (120 src) · `pytest --cov` ✓ (TBD pass / 1 skip, ≥ 46 %) · `fail_under` inchangé sauf progression mesurée.
+- Gates (post-5.6) : `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓ (120 src) · `pytest --cov` ✓ (178 pass / 1 skip, 50,15 % ≥ 46 %) · `fail_under` inchangé (palier suivant 47 selon ROADMAP).

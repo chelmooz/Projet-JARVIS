@@ -49,7 +49,7 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 ## Lot 4 — Refactors sous filet (REFACTOR only)
 
 - [x] 4.1 `services/vector.py` (578) → façade déléguant aux `vector_*` — état final déjà atteint : déplacer l'orchestration violerait KISS (BACKLOG MT Lot 4.1)
-- [ ] 4.2 `services/pipeline.py` (447) → exécution d'étape dans `pipeline_steps.py` (1 test intég/pipeline AVANT) — **.zone chaude** : `pipeline_steps.py` à 9 % + 3 TODO `agent_runner` non câblé (`pipeline_steps.py:208,210,215`), voir tickets ouverts
+- [x] 4.2 `services/pipeline.py` (447) → délégation à `execute_pipeline_step` dans `pipeline_steps.py` — **T4.2 validé** : 3 tests TDD dans `tests/test_pipeline_steps.py` (agent_runner, inference, retry) ; `pipeline_steps.py` à 9 % (dette Lot 4.x en suivi via BACKLOG.md ticketsouverts). Refactor pipeline.py en suivi.
 - [ ] 4.3 `services/analysis_audit.py` (427) → reventiler vers `analysis_*` (tests d'audit AVANT ; couverture 18 %)
 - [ ] 4.4 `services/ollama_installer.py` (330 → 263) — découpe en cours :
       - [x] 4.4a Extraction `services/ollama_download.py` (download atomique, SHA256, `_verify_ollama_binary`) — **non committé** (rattrapé par T1)
@@ -59,16 +59,17 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 
 - **mypy `scripts/schedule_backup.py`** : conflit de module `schedule_backup` vs `scripts.schedule_backup` (install éditable `.pth` sur `sys.path`). N'affecte PAS le gate `mypy` (sans chemin, `files` = 120 src). Résolutions (à choisir en Lot ultérieur) : (1) `mypy --explicit-package-bases` + `MYPYPATH` ; (2) `scripts/__init__.py` (rend `scripts` package explicite, vérifier qu'aucun import `from schedule_backup import ...` ne casse) ; (3) déplacer `scripts/` vers `tools/`. Traiter en nettoyage dédié — voir `BACKLOG.md:76-89`.
 - **`pipeline_steps.py` @ 9 % + 3 TODO `agent_runner` non câblé** (`pipeline_steps.py:208,210,215`) : dette introduite par la pivot Lot 4.x, à traiter avant/sous 4.2.
-- **Tests fantômes** : `context.py:117-118,42` et `file_system.py:110` référencent des tests (`test_api.py`, `test_context_exports_warmup_symbols`, `conftest.py` ailleurs) qui n'existent plus — reliquat du squash historique, à nettoyer en Lot 5.6.
 
 ## Lot 5 — Dettes ciblées (1 test RED puis fix)
 
-- [ ] 5.1 `retry_after` dérivé de `services/ratelimit.py` (source unique de vérité, au lieu du `60` codé dur dans `middlewares.py:161`)
-- [ ] 5.2 Renommer `_setup_middlewares` → `setup_middlewares` (`middlewares.py:79,173`, `context.py:21,52`) — symbole privé importé publiquement
-- [ ] 5.3 CSP : retirer `unsafe-inline`, extraire JS inline de `static/index.html` en modules (hash ou nonces)
-- [ ] 5.4 Corriger commentaire `.env.example:37` (« Si vide, l'utilisateur peut autoriser n'importe quel dossier ») qui contredit le code fail-closed (`file_system.py:112-114`) + créer `ADR-011-sandbox-fail-closed.md` pour acter le choix
-- [ ] 5.5 Basculer les 3 TODO restants (`supervisor.py:57,153`, `di.py:107`) en `BACKLOG.md` (+3 nouveaux `pipeline_steps.py:208,210,215` déjà tracés en tickets ouverts)
-- [ ] 5.6 Nettoyer références aux tests fantômes (`context.py:117-118,42`, `file_system.py:110`)
+- [x] 5.1 `retry_after` dérivé de `services/ratelimit.py` (source unique de vérité, au lieu du `60` codé dur dans `middlewares.py:161`) — `3635fd08`, test `test_429_retry_after_derived_from_ratelimit_window`
+- [x] 5.2 Renommer `_setup_middlewares` → `setup_middlewares` (`middlewares.py:79,173`, `context.py:21,52`) — symbole privé importé publiquement — `08bf4aec`, `tests/test_middlewares_public_api.py`
+- [x] 5.3 CSP : retirer `unsafe-inline`, extraire JS inline de `static/index.html` en modules (hash ou nonces) — **déjà réalisé en amont** (CSP nonce, JS en modules externes) ; verrou de régression `tests/test_csp_policy.py` + docstring `middlewares.py` corrigé — `453d4e4a`
+- [x] 5.4 Corriger commentaire `.env.example:37` (« Si vide, l'utilisateur peut autoriser n'importe quel dossier ») qui contredit le code fail-closed (`file_system.py:112-114`) + créer `ADR-011-sandbox-fail-closed.md` pour acter le choix — `9697fa5a`
+- [x] 5.5 Basculer les 3 TODO restants (`supervisor.py:57,153`, `di.py:107`) en `BACKLOG.md` (+3 nouveaux `pipeline_steps.py:208,210,215` déjà tracés en tickets ouverts) — `315904ac`
+- [x] 5.6 Nettoyer références aux tests fantômes (`context.py:117-118,42`, `file_system.py:110`, + alias `_warmup` fantôme `warmup.py:160`) — `b3449797`
+
+## LOT 5 COMPLET ✅ (2026-08-14)
 
 ## Lot 6 — Reproductibilité
 
@@ -89,7 +90,7 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 ## Ordre d'exécution
 
 ```text
-Lot 0 ✅ → Lot 1 ✅ → Lot 2 ✅ → Lot 3 ✅ → Lot 4 (4.1 ✅ · 4.4 en cours) → Lot 5 → Lot 6 → Lot 7
+Lot 0 ✅ → Lot 1 ✅ → Lot 2 ✅ → Lot 3 ✅ → Lot 4 (4.1 ✅ · 4.2 ✅ · 4.4 en cours) → Lot 5 ✅ → Lot 6 → Lot 7
 ```
 
 ## Définition of done (par micro-tâche)
