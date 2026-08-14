@@ -95,6 +95,7 @@ relative_files = true
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-# Cible de couverture : guard anti-régression. Valeur = couverture mesurée - 2,
-# remontée par paliers à chaque lot TDD (mesuré = 52,44 % -> 50).
-fail_under = 50
+# Cible de couverture : guard anti-régression. Cliquet montant relevé par
+# paliers à chaque lot TDD ; H3 (Lot H, fin de plan) fixe la cible finale à
+# 60, atteinte avec marge (mesuré = 60,95 %).
+fail_under = 60
