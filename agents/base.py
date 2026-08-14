@@ -98,6 +98,19 @@ class BaseAgent(ABC):
         """Branche la toolbox (diagnostics + fichiers) décrivant les outils."""
         self.toolbox = toolbox
 
+    @property
+    def profile_key(self) -> str | None:
+        """Clé de profil de l'agent, si applicable (``None`` par défaut).
+
+        Contrat unique remplaçant les deux conventions historiques
+        divergentes (``_profile_key`` en instance pour Generic/Vision,
+        ``PROFILE_KEY`` en classe pour Cyber) — voir Lot H1. Les sous-classes
+        qui exposent un profil surchargent cette propriété ; les consommateurs
+        (ex. ``agents.supervisor._agent_name``) n'ont plus qu'un seul point
+        d'accès à connaître.
+        """
+        return None
+
     @abstractmethod
     def run(self, task: str, model: str, context: dict[str, Any]) -> AgentRunResult:
         """Exécute une tâche et retourne un :class:`AgentRunResult`."""

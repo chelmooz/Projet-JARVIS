@@ -49,15 +49,16 @@ class AgentLike(Protocol):
 def _agent_name(agent: AgentLike) -> str:
     """Nom lisible de l'agent pour les logs (lecture défensive).
 
-    Les conventions de nommage divergent encore dans la hiérarchie
-    (``_profile_key`` en instance pour Generic/Vision, ``PROFILE_KEY`` en
-    classe pour Cyber). Ce helper centralise la connaissance de ces
-    conventions en un point. → voir BACKLOG « Tickets TODO → BACKLOG (Lot 5.5) ».
+    Priorité : ``name`` explicite > ``profile_key`` (contrat uniforme
+    ``BaseAgent.profile_key``, Lot H1 — remplace les deux anciennes
+    conventions divergentes ``_profile_key``/``PROFILE_KEY``) > nom de
+    classe en dernier recours (agent duck-typé sans l'un ni l'autre).
+    ``getattr`` reste défensif : ``AgentLike`` n'exige que ``run``.
     """
     name = getattr(agent, "name", None)
     if name:
         return str(name)
-    profile = getattr(agent, "_profile_key", None) or getattr(agent, "PROFILE_KEY", None)
+    profile = getattr(agent, "profile_key", None)
     return str(profile) if profile else type(agent).__name__
 
 

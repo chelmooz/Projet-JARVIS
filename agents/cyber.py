@@ -118,6 +118,11 @@ class CyberAgent(BaseAgent):
         self.memory: Any | None = memory
         self._workflows: dict[str, dict[str, Any]] = self._load_workflows()
 
+    @property
+    def profile_key(self) -> str:
+        """Clé de profil (contrat uniforme ``BaseAgent.profile_key``, Lot H1)."""
+        return self.PROFILE_KEY
+
     # ------------------------------------------------------------------
     # Chargement des workflows
     # ------------------------------------------------------------------

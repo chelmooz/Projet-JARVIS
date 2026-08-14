@@ -6,6 +6,8 @@ Usage:
     python scripts/schedule_backup.py remove              # Supprime la tache planifiee
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import platform
@@ -20,12 +22,12 @@ PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKUP_DIR = os.path.join(PROJECT_DIR, "backups")
 
 
-def _ensure_backup_dir():
+def _ensure_backup_dir() -> None:
     """ensure backup dir."""
     os.makedirs(BACKUP_DIR, exist_ok=True)
 
 
-def _schedule_linux(interval: str, remove: bool = False):
+def _schedule_linux(interval: str, remove: bool = False) -> None:
     """schedule linux."""
     if remove:
         subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=10)
@@ -44,7 +46,7 @@ def _schedule_linux(interval: str, remove: bool = False):
     print(f"Planifie (linux): {cron_cmd}")
 
 
-def _schedule_windows(interval: str, remove: bool = False):
+def _schedule_windows(interval: str, remove: bool = False) -> None:
     """schedule windows."""
     task_name = "JARVIS Backup"
     if remove:
@@ -71,7 +73,7 @@ def _schedule_windows(interval: str, remove: bool = False):
     print(f"Tache '{task_name}' creee (/{freq}).")
 
 
-def main():
+def main() -> None:
     """Main."""
     parser = argparse.ArgumentParser(description="Planifie une sauvegarde automatique")
     parser.add_argument("--interval", choices=["daily", "hourly"], default="daily")

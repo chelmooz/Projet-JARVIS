@@ -46,6 +46,11 @@ class GenericAgent(BaseAgent):
         self._profile_key: str = profile_key
         self._domain_prompt: str = domain_prompt if domain_prompt is not None else DEFAULT_DOMAIN_PROMPT
 
+    @property
+    def profile_key(self) -> str:
+        """Clé de profil (contrat uniforme ``BaseAgent.profile_key``, Lot H1)."""
+        return self._profile_key
+
     def run(self, task: str, model: str, context: dict[str, Any]) -> AgentRunResult:
         """Exécute la tâche via le profil et retourne un :class:`AgentRunResult`."""
         system, user = self._build_messages(
