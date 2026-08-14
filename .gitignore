@@ -13,6 +13,7 @@ node_modules/
 .pytest-temp/
 
 lib/
+vendor_wheels/
 
 memory/.jarvis_token
 
