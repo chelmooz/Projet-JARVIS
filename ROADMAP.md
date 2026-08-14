@@ -78,7 +78,7 @@ caractérisation. Décision actée dans `ADR-013-pipeline-source-unique.md`.
 ### Lot F — HTTP et logs 🟡 EN COURS
 - [x] F1 `services/adapters/http.py:_call_with_retry` : filet avec transport httpx factice — succès immédiat, retry puis succès, timeout, exception réseau, code non retryable, backoff borné → `tests/test_adapters_http_retry.py`, 10 tests, 4 gates vertes (pytest/ruff check/ruff format/mypy) — **à committer**
 - [x] F2 Extrait `is_retryable(error)` (fonction pure) : `ReadTimeout` non retryable, `HTTPStatusError`/`RequestError` retryables, reste non retryable — politique inchangée, comportement vérifié par les 10 tests F1 + 5 tests directs sur `is_retryable` (services/adapters/http.py +20/-3) — **à committer**
-- [ ] **F3** `services/log.py:_load_logs` : filet — fichier absent, JSON invalide, rotation, filtre de niveau, entrée partiellement malformée
+- [x] F3 `services/log.py:_load_logs` : filet — fichier absent, JSON valide, JSON corrompu (récupération raw_decode, fragments non-dict ignorés, objet racine non-liste), rotation (`MAX_LOG_ENTRIES`), filtre de niveau (défaut/env/alias WARN) — `tests/test_log_characterization.py`, 17 tests, 4 gates vertes — **à committer**
 - [ ] **F4** Extraire un parseur de ligne pur ; séparer lecture / rotation / filtrage
 
 ### Lot G — Verrou CI front 🔴 À FAIRE
@@ -102,7 +102,7 @@ Priorité aux fonctions pures, aux événements et aux contrats réseau simulés
 ## Ordre d'exécution restant
 
 ```text
-F3 → F4 → G (G1 → G6) → H (H1 → H4)
+F4 → G (G1 → G6) → H (H1 → H4)
 ```
 
 `Lot 8 / A, B, C, D, E` sont clos.
