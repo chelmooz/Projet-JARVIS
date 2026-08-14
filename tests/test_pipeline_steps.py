@@ -30,6 +30,13 @@ class MockAgentRunner:
         return f"Réponse simulée pour {agent_key} : {prompt[:30]}..."
 
 
+class MockAgentRunnerThreeParams:
+    """Runner d'agent acceptant un 3e argument ``model``."""
+
+    def __call__(self, agent_key: str, prompt: str, model: str | None) -> str:
+        return f"Runner3 [{agent_key}] model={model} : {prompt[:30]}..."
+
+
 class MockInference:
     """Mock service d'inférence qui retourne une réponse fixe."""
 
@@ -74,6 +81,46 @@ def test_execute_pipeline_step_with_inference() -> None:
     assert result is state
     assert state["results"][-1]["step"] == "test_step"
     assert "Réponse d'inférence" in state["results"][-1]["response"]
+
+
+def test_execute_pipeline_step_runner_three_params_receives_model() -> None:
+    """TDD : un runner à 3 params reçoit le modèle sélectionné (parité _run_via_agent)."""
+    state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
+    step = MockStep(name="test_step", agent_key="dev")
+    result = execute_pipeline_step(
+        state=state,
+        step=step,
+        task="Test prompt",
+        agent_runner=MockAgentRunnerThreeParams(),
+        inference=None,
+        model_selector=lambda agent_key, inference: "qwen2.5-selected",
+        max_retries=0,
+    )
+    assert result is state
+    assert "model=qwen2.5-selected" in state["results"][-1]["response"]
+
+
+def test_execute_pipeline_step_runner_two_params_without_model() -> None:
+    """TDD : un runner à 2 params est appelé sans modèle (parité _run_via_agent)."""
+    calls: list[tuple[str, str]] = []
+    state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
+    step = MockStep(name="test_step", agent_key="dev")
+
+    def runner(agent_key: str, prompt: str) -> str:
+        calls.append((agent_key, prompt))
+        return "Réponse simulée"
+
+    execute_pipeline_step(
+        state=state,
+        step=step,
+        task="Test prompt",
+        agent_runner=runner,
+        inference=None,
+        model_selector=lambda agent_key, inference: "qwen2.5-selected",
+        max_retries=0,
+    )
+    assert len(calls) == 1
+    assert len(calls[0]) == 2
 
 
 def test_execute_pipeline_step_max_retries() -> None:

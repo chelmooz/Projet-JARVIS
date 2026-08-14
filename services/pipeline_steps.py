@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Mapping
 from typing import Any
@@ -9,6 +10,15 @@ from typing import Any
 from config.agent_profiles import model_for_agent
 
 _logger = logging.getLogger("jarvis.pipeline_steps")
+
+
+def _runner_supports_model(runner: Any) -> bool:
+    """Vérifie si le runner accepte un 3e argument 'model' (parité pipeline.py)."""
+    try:
+        sig = inspect.signature(runner)
+        return len(sig.parameters) >= 3
+    except (ValueError, TypeError):
+        return False
 
 
 def select_agent(state: dict[str, Any], router: Any) -> dict[str, Any]:
@@ -208,7 +218,14 @@ def execute_pipeline_step(
                 # Implémenter l'appel à l'agent_runner avec gestion du modèle
                 # Pour l'instant, on simule une réponse en appelant l'agent_runner comme une fonction
                 # Ceci devrait être remplacé par l'appel approprié selon l'interface de agent_runner
-                result = agent_runner(step.agent_key, prompt) if callable(agent_runner) else str(agent_runner)
+                if callable(agent_runner):
+                    model = model_selector(step.agent_key, inference) if model_selector is not None else None
+                    if _runner_supports_model(agent_runner):
+                        result = agent_runner(step.agent_key, prompt, model)
+                    else:
+                        result = agent_runner(step.agent_key, prompt)
+                else:
+                    result = str(agent_runner)
             # Sinon, essayer avec l'inférence
             elif inference is not None:
                 # Appeler le service d'inférence
