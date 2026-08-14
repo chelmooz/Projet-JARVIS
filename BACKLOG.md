@@ -442,3 +442,17 @@ Les TODO restants sont basculÃ©s ici (plus dans le code) â€” voir ROADMAP Lot 5.
 - B1 : ROADMAP.md corrige (ollama_download.py committ‚ en 1e648d996, note non committ‚ fausse)  
 - B2 : test_ollama_installer_security.py imports deja OK (ruff clean)  
 - B3 : Hotspots git (30 plus modifies) : pyproject.toml 13, BACKLOG.md 13, ROADMAP.md 9, README.md 9, .gitignore 6, pipeline_steps.py 6, test_pipeline_steps.py 6, ollama_installer.py 5, test_ollama_installer.py 5, CHANGELOG.md 5, middlewares.py 5, pipeline.py 4, selector.py 4, vision.py 4, index.html 4, coverage-badge.json 3, di.py 3, install.py 3, analysis_audit.py 3, context.py 3, warmup.py 3, test_analysis_audit.py 3, conftest.py 3, system.py 3, router.py 3, jarvis.py 3, ollama_adapter.py 3, package-lock.json 3, package.json 3, test_pipeline_characterization.py 2 
+  
+### MT-Lot8-C -- Lot C : Pipeline source unique (2026-08-14)  
+- C1-C2 : Filet caracterisation test_pipeline_characterization.py (10 tests) vert AVANT suppression  
+- C3 : ADR-013-pipeline-source-unique.md cree (decision + motif)  
+- C4 : execute_pipeline_step supprime de pipeline_steps.py, test_pipeline_steps.py supprime (8 tests)  
+- pipeline.py : inline _execute_single_step avec helpers (_should_retry, _wait_before_retry, _runner_supports_model, NonCallableRunnerError)  
+- fail_under 50 (couverture 52,44% - 2), badge 52,4%  
+- Gates : ruff ok . format ok . mypy ok (pre-existant) . pytest --cov ok (52,44%  
+- Commit 40e58505e : refactor(pipeline): single source of truth via PipelineService (C1-C4) 
+  
+### MT-Lot8-D1 -- Lot D1 : OrchestratorService TDD (2026-08-14)  
+- test_orchestrator.py : 16 tests (routage nominal, fallback, vision, metrics, analytics, logs, habits, injection DIP)  
+- Couverture orchestrator.py : 45% - apres commit  
+- Gates : ruff ok . format ok . mypy ok . pytest --cov ok (53,11% 
