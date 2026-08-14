@@ -225,3 +225,10 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - **6.5** `verify_release.py` : `version_sources()` = pyproject.toml + `config/constants.py` (regex `VERSION: Final[str]`) + `bin/VERSION.json` + launchers `JARVIS.bat/.sh` → `check_version_coherence()`. Workflow `.github/workflows/release.yml` (push tag `v*`) : `verify_release.py` + cohérence tag↔sources. Les 4 sources annoncent 6.0. Commit `f57ec6c85`.
 - **6.6** smoke test ALREADY couvert (Lot 3.1) : `tests/test_api_health.py::test_status_200_offline_degraded` (GET `/api/status` → 200 sans Ollama, enveloppe `{data, error:null}`). Note ROADMAP : la route réelle est `/api/status` (`router.py:239`), pas `/api/system/status`.
 - Gates Lot 6 : ruff ✓ · format ✓ · pytest 178/1 ✓ · cov ≥ 46 % ✓.
+
+### MT-7 — Lot 7 Documentation  � ✅ 2026-08-14
+- **7.1** README 821 l. → 156 l. : pitch + captures + installation 5 lignes + liens. Contenu opérationnel déplacé vers `docs/USAGE.md` (nouveau, ~600 l.) : installation guidée Windows/Linux/macOS, agents, modèles, skills, console, API, tests, sauvegarde, limitations. Liens internes vérifiés (scripts). Commit `1889a5107`.
+- **7.2** `CONTRIBUTING.md` : boucle TDD rouge→vert→refactor, commandes gates (`ruff check . && ruff format --check . && mypy && pytest --cov`), table conventional commits, conventions code, processus. Commit `2f0b4f880`.
+- **7.3** `RELEASE_NOTES_CORRECTED.md` fusionné dans CHANGELOG.md comme sous-section « Livraison corrigée — sécurité de distribution » du `[6.0]` puis fichier supprimé (artefact de travail). Commit `9961003b2`.
+- **7.4** Badge de couverture : `scripts/coverage_badge.py` lit `coverage.json` (pytest --cov-report=json) → écrit `coverage-badge.json` (endpoint shields.io, couleur par seuil). Versionné ; `coverage.json` ajouté au `.gitignore`. CI : step « Coverage badge » régénère + `git diff --exit-code` échoue si périmé (badge honnête, jamais de valeur fausse). README : `img.shields.io/endpoint?url=raw.../coverage-badge.json`. Coverage mesurée : 50,3 %. Commit `2c503510a`.
+- Gates Lot 7 : ruff ✓ · pytest 178/1 ✓ · mypy ✓.

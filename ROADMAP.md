@@ -84,10 +84,12 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 
 ## Lot 7 — Documentation
 
-- [ ] 7.1 Scinder `README.md` (821 l.) : README court (pitch, capture, installation 5 lignes, liens) + `docs/USAGE.md` mode d'emploi détaillé
-- [ ] 7.2 Créer `CONTRIBUTING.md` (commandes ruff/mypy/pytest, conventional commits, boucle TDD)
-- [ ] 7.3 Fusionner `RELEASE_NOTES_CORRECTED.md` → `CHANGELOG.md` puis supprimer (suffixe « CORRECTED » = artefact de travail)
-- [ ] 7.4 Remplacer badge Tests retiré par badge de couverture (généré par la CI)
+- [x] 7.1 Scinder `README.md` (821 l.) : README court (pitch, capture, installation 5 lignes, liens) + `docs/USAGE.md` mode d'emploi détaillé — `1889a5107`
+- [x] 7.2 Créer `CONTRIBUTING.md` (commandes ruff/mypy/pytest, conventional commits, boucle TDD) — `2f0b4f880`
+- [x] 7.3 Fusionner `RELEASE_NOTES_CORRECTED.md` → `CHANGELOG.md` puis supprimer (suffixe « CORRECTED » = artefact de travail) — `9961003b2`
+- [x] 7.4 Remplacer badge Tests retiré par badge de couverture (généré par la CI) — `2c503510a`
+
+## Lot 7 COMPLET ✅ (2026-08-14)
 
 ## Ordre d'exécution
 
