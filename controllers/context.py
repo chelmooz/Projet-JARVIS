@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from config.constants import MAX_BODY_SIZE, VERSION
 from config.paths import OLLAMA_PORT, STATIC_DIR
 from controllers.di import AppContext
-from controllers.middlewares import _setup_middlewares
+from controllers.middlewares import setup_middlewares
 from controllers.status import _refresh_status_cache, _status_refresher
 from controllers.warmup import _warmup_vector_store, lifespan
 
@@ -49,7 +49,7 @@ def build_app() -> FastAPI:
     démarrage/arrêt propre (startup/shutdown events).
     """
     app = FastAPI(title="JARVIS Portable Edition", version=VERSION, lifespan=cast(Any, lifespan))
-    _setup_middlewares(app)
+    setup_middlewares(app)
 
     # Montage propre des fichiers statiques (gère nativement la sécurité et le cache)
     if STATIC_DIR.exists():

@@ -3,8 +3,6 @@
 Dettes signalées (non corrigées ici) :
 - CSP : ``'unsafe-inline'`` sur script-src/style-src affaiblit la politique
   (nécessaire au JS inline de l'UI locale). Cible : nonce ou hash CSP.
-- ``retry_after: 60`` est hardcodé ; devrait être dérivé de la fenêtre réelle
-  de ``services.ratelimit`` (single source of truth).
 - ``_setup_middlewares`` est préfixé ``_`` mais importé par ``controllers/context.py``
   (symbole privé exporté). Cible : renommer en ``setup_middlewares`` (public)
   et mettre à jour l'import dans context.py (fichier déjà commité → coordination).
@@ -76,7 +74,7 @@ async def _body_size_limiter(request: Request, call_next: Callable[[Request], Aw
     return await call_next(request)
 
 
-def _setup_middlewares(app: FastAPI) -> None:
+def setup_middlewares(app: FastAPI) -> None:
     """Enregistre CORS + middlewares (profilage, audit, sécurité, quota, body).
 
     Ordre d'exécution (requête entrante) — Starlette exécute les middlewares
@@ -170,4 +168,4 @@ def _setup_middlewares(app: FastAPI) -> None:
     app.middleware("http")(_body_size_limiter)
 
 
-__all__ = ["_setup_middlewares"]
+__all__ = ["setup_middlewares"]
