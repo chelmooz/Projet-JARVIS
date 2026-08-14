@@ -37,7 +37,7 @@ export async function pollMetrics() {
         const m = ((await (await fetch('/api/metrics')).json()).data) || {};
         const rss = m.memory_rss_mb != null ? m.memory_rss_mb + ' MB' : '—';
         document.getElementById('st-rss').textContent = rss;
-        document.getElementById('st-requests').textContent = (m.requests || 0).toLocaleString();
+        document.getElementById('st-requests').textContent = (m.requests || 0).toLocaleString('en-US');
         document.getElementById('st-uptime').textContent = m.uptime_human || '—';
     } catch (e) {
         // Ignore
