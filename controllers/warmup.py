@@ -157,9 +157,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _logger.info("=== Arrêt de JARVIS terminé ===")
 
 
-_warmup = lifespan  # Alias requis par test_context_refactor.py::test_warmup_module_exists
-
-
 def _flush_vector_on_shutdown(ctx: Any) -> None:
     """Vide les mutations vectorielles en attente avant l'arrêt (14.0 flush groupé).
 
@@ -178,4 +175,4 @@ def _flush_vector_on_shutdown(ctx: Any) -> None:
         _logger.warning("Échec du flush vectoriel à l'arrêt : %s", e)
 
 
-__all__ = ["lifespan", "_warmup", "_warmup_vector_store"]
+__all__ = ["lifespan", "_warmup_vector_store"]

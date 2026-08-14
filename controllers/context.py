@@ -38,9 +38,6 @@ def _build_status_data(context: Any) -> dict[str, Any]:
     return build_status(context)
 
 
-_warmup = lifespan  # Alias pour test_context_exports_warmup_symbols
-
-
 def build_app() -> FastAPI:
     """Composition Root : Crée l'application et attache le lifespan.
 
@@ -113,9 +110,6 @@ def get_context() -> AppContext:
 # Singleton module-level — véritable instance AppContext (DI réelle, cf. controllers/di.py).
 # `monkeypatch.setattr(ctx_mod._ctx, "x", fake)` pose l'attribut sur cet objet stable
 # et monkeypatch le restaure proprement au teardown → pas de pollution inter-tests.
-# `_ctx.initialize()` déclenche la VRAIE initialisation (AppContext._do_initialize),
-# ce qui est le comportement attendu par les teardowns existants (ex. test_api.py
-# recrée un état "propre" en rappelant initialize() après _initialized = False).
 _ctx = AppContext()
 _ctx.initialize()
 

@@ -107,7 +107,8 @@ class FileSystemService:
         """Vérifie si le chemin est dans le sandbox JARVIS_FILES_SANDBOX_ROOT.
         Retourne ``True``/``False``. Le sandbox est **toujours requis** :
         la variable d'environnement JARVIS_FILES_SANDBOX_ROOT doit être définie.
-        En test, conftest.py la positionne sur /tmp/test-sandbox.
+        En test, la fixture ``sandbox_root`` (tests/conftest.py) la positionne
+        sur un ``tmp_path`` (passé par pytest).
         """
         sandbox = os.environ.get("JARVIS_FILES_SANDBOX_ROOT")
         if not sandbox:
