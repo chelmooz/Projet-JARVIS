@@ -296,7 +296,7 @@ class PipelineService(PipelinePort):
     def _run_via_agent(self, runner: Any, step: PipeStep, prompt: str, task: str) -> str:
         """Délègue l'exécution à l'agent_runner."""
         selector = self._model_selector
-        model = selector(step.agent_key, task) if selector is not None else None
+        model = selector(step.agent_key, self._inference) if selector is not None else None
         if self._supports_model:
             return str(runner(step.agent_key, prompt, model))
         return str(runner(step.agent_key, prompt))
@@ -304,7 +304,7 @@ class PipelineService(PipelinePort):
     def _run_via_inference(self, inference: Any, step: PipeStep, prompt: str, task: str) -> str:
         """Délègue l'exécution au service d'inférence."""
         selector = self._model_selector
-        model = selector(step.agent_key, task) if selector is not None else DEFAULT_MODEL
+        model = selector(step.agent_key, inference) if selector is not None else DEFAULT_MODEL
         raw = inference.query(prompt, model)
         return self._extract_response(raw)
 

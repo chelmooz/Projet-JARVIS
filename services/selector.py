@@ -202,6 +202,9 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
     if agent_key == VISION_KEY:
         return select_vision_model(inference) or ""
 
+    if inference is None:
+        return ""
+
     prefs = read_preferences()
     model_map = prefs.get("model_map", fallback_models())
 
