@@ -10,8 +10,13 @@ from services.pipeline_steps import execute_pipeline_step
 class MockStep:
     """Pas de étape minimale pour les tests."""
 
-    def __init__(self, name: str = "test_step", agent_key: str | None = "dev",
-                 prompt_template: str = "Tâche : {task}", on_error: str = "abort"):
+    def __init__(
+        self,
+        name: str = "test_step",
+        agent_key: str | None = "dev",
+        prompt_template: str = "Tâche : {task}",
+        on_error: str = "abort",
+    ):
         self.name = name
         self.agent_key = agent_key
         self.prompt_template = prompt_template
