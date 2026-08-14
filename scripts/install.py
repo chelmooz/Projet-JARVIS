@@ -84,6 +84,31 @@ def _resolve_pip_exe():
     return sys.executable
 
 
+def _vendor_find_links():
+    """Retourne la liste --find-links vers vendor_wheels/ si present (offline).
+
+    Dossiers possibles : vendor_wheels (sdist exception, antlr4) + le sous-dossier
+    plateforme courant (win_amd64 / manylinux_2_17_x86_64 / macosx_11_0_arm64),
+    produit par scripts/vendor_wheels.py.
+    """
+    vendor = os.path.join(BASE_DIR, "vendor_wheels")
+    if not os.path.isdir(vendor):
+        return []
+
+    subdir = None
+    if SYSTEM == "windows":
+        subdir = "win_amd64"
+    elif SYSTEM == "linux" and ARCH in ("x86_64", "AMD64"):
+        subdir = "manylinux_2_17_x86_64"
+    elif SYSTEM == "darwin" and ARCH == "arm64":
+        subdir = "macosx_11_0_arm64"
+
+    links = [vendor]
+    if subdir and os.path.isdir(os.path.join(vendor, subdir)):
+        links.append(os.path.join(vendor, subdir))
+    return links
+
+
 def install_python_deps():
     """Installe les packages Python."""
     print(yellow("\n[1/3] Dependances Python..."))
@@ -95,20 +120,34 @@ def install_python_deps():
         return False
 
     pip_exe = _resolve_pip_exe()
+    offline = False
 
-    # S'assurer que pip/setuptools/wheel sont presents (le Python embeddable
-    # Windows et le Python portable n'embarquent pas pip par defaut).
-    subprocess.run(
-        [pip_exe, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"],
-        capture_output=True,
-        timeout=300,
-    )
+    find_links = _vendor_find_links()
+    if find_links:
+        offline = True
+        print(f"  {cyan('Mode offline : wheels locales detectees')} (vendor_wheels/)")
+        for link in find_links:
+            print(f"    {gray('--find-links')} {link}")
+    else:
+        # S'assurer que pip/setuptools/wheel sont presents (le Python embeddable
+        # Windows et le Python portable n'embarquent pas pip par defaut).
+        subprocess.run(
+            [pip_exe, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"],
+            capture_output=True,
+            timeout=300,
+        )
 
     # Installer depuis pyproject.toml (dependances dans [project.dependencies])
     cmd = [pip_exe, "-m", "pip", "install", "."]
+    if offline:
+        cmd = [pip_exe, "-m", "pip", "install", "--no-index"]
+        for link in find_links:
+            cmd += ["--find-links", link]
+        cmd.append(".")
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=300)
-        print(f"  {green('[OK] Packages Python installes depuis pyproject.toml')} ({pip_exe})")
+        mode = "vendor_wheels (offline)" if offline else "pyproject.toml"
+        print(f"  {green(f'[OK] Packages Python installes depuis {mode}')} ({pip_exe})")
         return True
     except subprocess.CalledProcessError as e:
         err = e.stderr.decode()
