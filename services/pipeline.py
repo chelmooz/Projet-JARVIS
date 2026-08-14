@@ -15,7 +15,12 @@ from models import Pipeline, PipeStep
 from ports.pipeline import PipelinePort
 from services.adapters.protocols import IResponseJudge, ITraceStore, IVectorSearch, TraceRecord
 from services.pipeline_helpers import build_failure, build_hyde_query, has_fatal_error, is_stagnant
-from services.pipeline_steps import execute_pipeline_step
+from services.pipeline_steps import (
+    NonCallableRunnerError,
+    _runner_supports_model,
+    _should_retry,
+    _wait_before_retry,
+)
 from services.rag_judge import JUDGE_THRESHOLD
 
 _logger = logging.getLogger("jarvis.pipeline")
@@ -212,26 +217,97 @@ class PipelineService(PipelinePort):
     # ─── Exécution des étapes ─────────────────────────────────────────
 
     def _execute_all_steps(self, pipeline: Pipeline, task: str, ctx: dict[str, Any]) -> list[dict[str, Any]]:
-        """Parcourt les étapes séquentiellement via pipeline_steps, retourne les résultats."""
+        """Parcourt les étapes séquentiellement, retourne les résultats."""
         state: dict[str, Any] = {"task": task, "context": ctx, "results": []}
 
         for step in pipeline.steps:
-            execute_pipeline_step(
-                state=state,
-                step=step,
-                task=task,
-                agent_runner=self._agent_runner,
-                inference=self._inference,
-                model_selector=self._model_selector,
-                max_retries=self._max_retries,
-            )
             if state.get("error") is not None and step.on_error != "skip":
                 break
+
+            state = self._execute_single_step(state, step, task)
+
             if state["results"] and state["results"][-1]["error"] is None:
                 self._record_habits(task, pipeline.id, step)
 
-        results: list[dict[str, Any]] = state["results"]
-        return results
+        return state["results"]
+
+    def _execute_single_step(self, state: dict[str, Any], step: Any, task: str) -> dict[str, Any]:
+        """Exécute une étape unique avec gestion des réessais (logique inline depuis pipeline_steps)."""
+        if "context" not in state:
+            state["context"] = {}
+        if "results" not in state:
+            state["results"] = []
+
+        prompt = step.prompt_template.format(task=task, **state["context"])
+
+        for attempt in range(self._max_retries + 1):
+            try:
+                result = None
+                error = None
+
+                if self._agent_runner is not None and step.agent_key:
+                    if callable(self._agent_runner):
+                        model = (
+                            self._model_selector(step.agent_key, self._inference)
+                            if self._model_selector is not None
+                            else None
+                        )
+                        if _runner_supports_model(self._agent_runner):
+                            result = self._agent_runner(step.agent_key, prompt, model)
+                        else:
+                            result = self._agent_runner(step.agent_key, prompt)
+                    else:
+                        raise NonCallableRunnerError(f"agent_runner non callable : {self._agent_runner!r}")
+                elif self._inference is not None:
+                    raw_result = self._inference.query(prompt, None)
+                    if hasattr(raw_result, "data") and isinstance(raw_result.data, dict):
+                        result = str(raw_result.data.get("response", str(raw_result)))
+                    elif isinstance(raw_result, dict):
+                        result = str(raw_result.get("response", str(raw_result)))
+                    else:
+                        result = str(raw_result)
+                else:
+                    error = "Aucun agent_runner ni inference configuré"
+
+                if error is None:
+                    state["results"].append(
+                        {
+                            "step": step.name,
+                            "agent": step.agent_key,
+                            "response": result,
+                            "error": None,
+                        }
+                    )
+                    state["context"][step.name] = result
+                    break
+
+                if _should_retry(step, attempt, self._max_retries):
+                    _wait_before_retry(attempt, self._max_retries, step.name)
+                    continue
+                break
+
+            except Exception as e:
+                error = str(e)[:200]
+                if _should_retry(step, attempt, self._max_retries):
+                    _wait_before_retry(attempt, self._max_retries, step.name)
+                    continue
+                break
+
+        else:
+            error = error or "Erreur inconnue après tous les retries"
+
+        if error is not None:
+            state["error"] = error
+            state["results"].append(
+                {
+                    "step": step.name,
+                    "agent": step.agent_key,
+                    "response": None,
+                    "error": error,
+                }
+            )
+
+        return state
 
     def _record_habits(self, task: str, pipeline_id: str, step: PipeStep) -> None:
         """Hook habits en frontière d'orchestration (dépend du contexte pipeline, pas de l'étape)."""

@@ -156,3 +156,80 @@ def test_on_error_skip_continue() -> None:
     assert result["results"][0]["error"] is not None  # s1 échoue
     assert result["results"][1]["error"] is None  # s2 continue et réussit
     assert result["error"] is None  # pas d'arrêt fatal : la dernière étape a réussi
+
+
+class ThreeParamRunner:
+    """Runner acceptant 3 paramètres (agent_key, prompt, model)."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, str | None]] = []
+
+    def __call__(self, agent_key: str, prompt: str, model: str | None = None) -> str:
+        self.calls.append((agent_key, prompt, model))
+        return f"ok-{agent_key}-{model}"
+
+
+class TwoParamRunner:
+    """Runner acceptant 2 paramètres (agent_key, prompt)."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def __call__(self, agent_key: str, prompt: str) -> str:
+        self.calls.append((agent_key, prompt))
+        return f"ok-{agent_key}"
+
+
+def test_runner_three_params_receives_model() -> None:
+    """Parité _run_via_agent : runner 3 params reçoit le modèle sélectionné."""
+    runner = ThreeParamRunner()
+
+    # model_selector receives (agent_key, inference) and returns model name
+    def model_selector(agent_key: str, inference: Any) -> str:
+        return "qwen2.5-selected"
+
+    service = PipelineService(agent_runner=runner, inference=None, model_selector=model_selector, max_retries=0)
+    service.register(
+        Pipeline(
+            id="p",
+            steps=(PipeStep(name="s1", agent_key="dev", prompt_template="{task}"),),
+        )
+    )
+    result = service.run("p", "tester")
+    assert result["error"] is None
+    assert len(runner.calls) == 1
+    assert runner.calls[0][2] is not None  # model passed
+    assert "qwen" in runner.calls[0][2].lower()
+
+
+def test_runner_two_params_without_model() -> None:
+    """Parité _run_via_agent : runner 2 params appelé sans modèle."""
+    runner = TwoParamRunner()
+    service = build_service(runner=runner, max_retries=0)
+    service.register(Pipeline(id="p", steps=(PipeStep(name="s1", agent_key="dev", prompt_template="{task}"),)))
+    result = service.run("p", "tester")
+    assert result["error"] is None
+    assert len(runner.calls) == 1
+    assert len(runner.calls[0]) == 2  # only agent_key, prompt
+
+
+def test_non_callable_runner_error_typed() -> None:
+    """Parité : runner non callable → erreur typée dans results, pas repr str()."""
+    service = build_service(runner="not-a-callable", max_retries=0)
+    service.register(Pipeline(id="p", steps=(PipeStep(name="s1", agent_key="dev", prompt_template="{task}"),)))
+    result = service.run("p", "tester")
+    assert result["error"] is not None
+    assert result["results"][-1]["response"] is None
+    assert (
+        "NonCallableRunnerError" in result["results"][-1]["error"]
+        or "non callable" in result["results"][-1]["error"].lower()
+    )
+
+
+def test_max_retries_respected() -> None:
+    """TDD : le nombre de réessais est respecté (sans backend configuré)."""
+    service = build_service(max_retries=0)
+    service.register(Pipeline(id="p", steps=(PipeStep(name="s1", agent_key="dev", prompt_template="{task}"),)))
+    result = service.run("p", "tester")
+    assert "error" in result
+    assert "Aucun agent_runner ni inference configuré" in result["error"]
