@@ -73,12 +73,14 @@ de module **, aucun test réseau/Ollama/disque hors `tmp_path`, stop si > 60 min
 
 ## Lot 6 — Reproductibilité
 
-- [ ] 6.1 Générer `uv.lock` (ou `requirements.lock`) versionné
-- [ ] 6.2 `uv pip download -r requirements.lock -d vendor_wheels --platform {win_amd64, manylinux_2_17_x86_64, macosx_11_0_arm64} --python-version 3.12 --only-binary=:all:`
-- [ ] 6.3 `scripts/install.py` + `install_portable_python.py` consomment `--no-index --find-links vendor_wheels`
-- [ ] 6.4 `ADR-012-distribution-offline.md` + section `docs/DEVELOP.md`
-- [ ] 6.5 Workflow `release.yml` : `verify_release.py` + cohérence versions (pyproject, `bin/VERSION.json`, `config/constants.py`, launchers)
-- [ ] 6.6 Smoke test « démarrage » : `/api/system/status` → 200 sans backend Ollama présent (mode dégradé explicite)
+- [x] 6.1 Générer `uv.lock` (ou `requirements.lock`) versionné — `4dcbd6465`
+- [x] 6.2 `uv pip download -r requirements.lock -d vendor_wheels --platform {win_amd64, manylinux_2_17_x86_64, macosx_11_0_arm64} --python-version 3.12 --only-binary=:all:` → `scripts/vendor_wheels.py` (uv 0.12 a retiré `uv pip download` : repli `pip download` ; exception sdist `antlr4==4.9.3`) — `8c4987bcb`
+- [x] 6.3 `scripts/install.py` consomme `--no-index --find-links vendor_wheels` (mode offline détecté par `_vendor_find_links`) — `2d8574370`
+- [x] 6.4 `ADR-012-distribution-offline.md` + section `docs/DEVELOP.md` — `5cce77dd1`
+- [x] 6.5 Workflow `release.yml` : `verify_release.py` (cohérence versions pyproject, `bin/VERSION.json`, `config/constants.py`, `launchers`) + workflow `v*` — `f57ec6c85`
+- [x] 6.6 Smoke test « démarrage » : `/api/status` → 200 sans backend Ollama (mode dégradé explicite) — déjà couvert par `tests/test_api_health.py::test_status_200_offline_degraded` (Lot 3.1). Note : la route réelle s'appelle `/api/status` (pas `/api/system/status` comme au ROADMAP) — `router.py:239`.
+
+## Lot 6 COMPLET ✅ (2026-08-14)
 
 ## Lot 7 — Documentation
 

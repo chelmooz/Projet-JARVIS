@@ -216,3 +216,12 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 ### MT-5 — T4 extraction archives (Lot 4.4b)  � ✅ 2026-08-14
 - `services/ollama_archive.py` créé (65 l.) : `_extract_tar_zst` + `_safe_extract_zip` coupés-collés à l'identique depuis `ollama_installer.py`. Imports réels : os, subprocess, zipfile, stat, logging, Callable, `LAUNCHER_WAIT_TIMEOUT` (config.constants). `_LogFn` dupliqué (convention du dépôt : alias par module, cf. ollama_download.py).
 - `ollama_installer.py` : imports morts `zipfile`/`stat` retirés ; ré-export `from services.ollama_archive import _extract_tar_zst, _safe_extract_zip` ajouté à `__all__` (ruff voit le ré-export volontaire, tests inchangés). Aucun doublon de `def` (vérifié). Commit `e677d10e`.
+
+### MT-6 — Lot 6 Reproductibilité  � ✅ 2026-08-14
+- **6.1** `uv.lock` (TOML, 59 packages épinglés) commit `4dcbd6465` + `requirements.lock` (export plat `uv export --no-emit-project`) pour pip.
+- **6.2** uv 0.12.3 a RETIRÉ `uv pip download` → repli `pip download` (args identiques). Contrainte pip 26+ : `--platform` exige `--only-binary=:all:` (ou `--no-deps`) ; `requirements.lock` étant plat, `--no-deps` suffit. Exception : `antlr4-python3-runtime==4.9.3` (transitif de `omegaconf==2.3.1`, épinglé `==4.9.*`, via rapidocr) n'a AUCUNE wheel → sdist pur Python téléchargé une fois (setuptools présent dans le Python portable). `scripts/vendor_wheels.py` commité `8c4987bcb` ; `vendor_wheels/` ajouté à `.gitignore`.
+- **6.3** `scripts/install.py` : `_vendor_find_links()` détecte `vendor_wheels/[/plateforme]` → `pip install --no-index --find-links` (mode offline). Commit `2d8574370`.
+- **6.4** `docs/adr/ADR-012-distribution-offline.md` + section Reproductibilité dans `docs/DEVELOP.md` (Prérequis corrigé : `pip install .` au lieu de `requirements.txt` obsolète). Commit `5cce77dd1`.
+- **6.5** `verify_release.py` : `version_sources()` = pyproject.toml + `config/constants.py` (regex `VERSION: Final[str]`) + `bin/VERSION.json` + launchers `JARVIS.bat/.sh` → `check_version_coherence()`. Workflow `.github/workflows/release.yml` (push tag `v*`) : `verify_release.py` + cohérence tag↔sources. Les 4 sources annoncent 6.0. Commit `f57ec6c85`.
+- **6.6** smoke test ALREADY couvert (Lot 3.1) : `tests/test_api_health.py::test_status_200_offline_degraded` (GET `/api/status` → 200 sans Ollama, enveloppe `{data, error:null}`). Note ROADMAP : la route réelle est `/api/status` (`router.py:239`), pas `/api/system/status`.
+- Gates Lot 6 : ruff ✓ · format ✓ · pytest 178/1 ✓ · cov ≥ 46 % ✓.
