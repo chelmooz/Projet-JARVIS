@@ -123,6 +123,26 @@ def test_execute_pipeline_step_runner_two_params_without_model() -> None:
     assert len(calls[0]) == 2
 
 
+def test_execute_pipeline_step_non_callable_runner() -> None:
+    """TDD : un agent_runner non callable produit une erreur typée, pas un repr."""
+    from services.pipeline_steps import NonCallableRunnerError
+
+    state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}
+    step = MockStep(name="test_step", agent_key="dev")
+    execute_pipeline_step(
+        state=state,
+        step=step,
+        task="Test prompt",
+        agent_runner="not-a-callable",
+        inference=None,
+        model_selector=None,
+        max_retries=0,
+    )
+    assert state["error"] == str(NonCallableRunnerError("agent_runner non callable : 'not-a-callable'"))
+    assert state["results"][-1]["response"] is None
+    assert state["results"][-1]["error"]  # erreur d'entrée, pas un repr de succès
+
+
 def test_execute_pipeline_step_max_retries() -> None:
     """TDD : le nombre de réessais est respecté."""
     state: dict[str, Any] = {"task": "Test prompt", "context": {}, "results": []}

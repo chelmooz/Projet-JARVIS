@@ -12,6 +12,10 @@ from config.agent_profiles import model_for_agent
 _logger = logging.getLogger("jarvis.pipeline_steps")
 
 
+class NonCallableRunnerError(Exception):
+    """Levée quand ``agent_runner`` n'est pas callable (attr échec d'étape)."""
+
+
 def _runner_supports_model(runner: Any) -> bool:
     """Vérifie si le runner accepte un 3e argument 'model' (parité pipeline.py)."""
     try:
@@ -225,7 +229,7 @@ def execute_pipeline_step(
                     else:
                         result = agent_runner(step.agent_key, prompt)
                 else:
-                    result = str(agent_runner)
+                    raise NonCallableRunnerError(f"agent_runner non callable : {agent_runner!r}")
             # Sinon, essayer avec l'inférence
             elif inference is not None:
                 # Appeler le service d'inférence
