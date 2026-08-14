@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Vérifier la préparation de la distribution
+        run: python scripts/verify_release.py
+      - name: Vérifier la cohérence des versions
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag version: $VERSION"
+          python - "$VERSION" <<'EOF'
+          import sys
+          sys.path.insert(0, "scripts")
+          import verify_release
+          sources = verify_release.version_sources()
+          tag = sys.argv[1]
+          mismatches = [
+              f"{name} = {version} (tag v{tag})"
+              for name, version in sources.items()
+              if version != tag
+          ]
+          if mismatches:
+              raise SystemExit(
+                  "Version incohérente avec le tag :\n  - " + "\n  - ".join(mismatches)
+              )
+          print("OK — toutes les sources annoncent la version", tag)
+          EOF
