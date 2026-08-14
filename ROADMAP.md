@@ -81,17 +81,17 @@ caractérisation. Décision actée dans `ADR-013-pipeline-source-unique.md`.
 - [x] F3 `services/log.py:_load_logs` : filet — fichier absent, JSON valide, JSON corrompu (récupération raw_decode, fragments non-dict ignorés, objet racine non-liste), rotation (`MAX_LOG_ENTRIES`), filtre de niveau (défaut/env/alias WARN) → commit `27cc503`
 - [x] F4 Extrait `_recover_json_objects(content)` (parseur pur de récupération JSON) et `_rotate(logs, max_entries)` (rotation pure) hors de `_load_logs`/`log()` ; structure d'exceptions et de logs de `_load_logs` inchangée, filtre de niveau déjà isolé dans `log()` — 7 nouveaux tests directs sur les fonctions pures — **à committer**
 
-### Lot G — Verrou CI front 🔴 À FAIRE
-Aucun job front dans `.github/workflows/ci.yml` aujourd'hui ; vitest configuré
+### Lot G — Verrou CI front ✅ CLOS
+Aucun job front dans `.github/workflows/ci.yml` avant ce lot ; vitest configuré
 mais seulement 5 fichiers de test pour 16 modules JS.
-- [ ] **G1** Job `frontend` dans `ci.yml` (Node explicite, `npm ci` puis `npm test` dans `static/`), vérifié en cassant un test puis en le restaurant
-- [ ] **G2** Tests `static/assets/js/modules/state.js`
-- [ ] **G3** Tests `utils.js`
-- [ ] **G4** Tests `status.js`
-- [ ] **G5** Tests `files.js`
-- [ ] **G6** Tests `settings.js`
+- [x] G1 Job `frontend` dans `ci.yml` (Node 22, `npm ci` puis `npm test` dans `static/`), vérifié localement en cassant une assertion (`npm test` échoue) puis en la restaurant (40/40 verts) — **à committer**
+- [x] G2 Tests `static/assets/js/modules/state.js` — 4 tests (shape initiale, singleton, `resetState`) — **à committer**
+- [x] G3 Tests `utils.js` — 19 tests (`escHtml`, `debounce`, `toast`, `renderMarkdown`, skeletons, `autoResize`, `cachedFetch`+TTL) — **à committer**
+- [x] G4 Tests `status.js` — 12 tests (SSE via `EventSource` factice, `pollMetrics`, `updateBadges`) — **à committer**
+- [x] G5 Tests `files.js` — 20 tests (navigation dossier, historique, autorisation/révocation de chemin, erreurs réseau) — **à committer**
+- [x] G6 Tests `settings.js` — 16 tests (thème + localStorage, bannière hors-ligne, `restoreSettings`) — **à committer**
 
-Priorité aux fonctions pures, aux événements et aux contrats réseau simulés. Pas de tests DOM fragiles.
+Suite frontend complète : 111 tests passent (10 fichiers, dont 5 nouveaux). Fonctions pures et contrats réseau simulés priorisés, aucun test DOM fragile.
 
 ### Lot H — Nettoyage et cliquet de couverture 🔴 À FAIRE
 - [ ] **H1** `agents/supervisor.py:55,150` : caractériser puis factoriser les conventions dupliquées
@@ -102,10 +102,10 @@ Priorité aux fonctions pures, aux événements et aux contrats réseau simulés
 ## Ordre d'exécution restant
 
 ```text
-G (G1 → G6) → H (H1 → H4)
+H1 → H2 → H3 → H4
 ```
 
-`Lot 8 / A, B, C, D, E, F` sont clos.
+`Lot 8 / A, B, C, D, E, F, G` sont clos.
 
 ## Definition of done (par micro-tâche)
 
