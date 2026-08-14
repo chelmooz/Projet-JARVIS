@@ -52,10 +52,7 @@ def _agent_name(agent: AgentLike) -> str:
     Les conventions de nommage divergent encore dans la hiérarchie
     (``_profile_key`` en instance pour Generic/Vision, ``PROFILE_KEY`` en
     classe pour Cyber). Ce helper centralise la connaissance de ces
-    conventions en un point.
-
-    TODO(refacto-SOLID): ajouter une propriété publique ``name`` sur
-    ``BaseAgent`` (1 re-commit) et supprimer ce getattr multi-conventions.
+    conventions en un point. → voir BACKLOG « Tickets TODO → BACKLOG (Lot 5.5) ».
     """
     name = getattr(agent, "name", None)
     if name:
@@ -150,9 +147,8 @@ class AgentSupervisor:
     def _timeout_result(self, name: str, model: str) -> dict[str, Any]:
         """Réponse structurée retournée quand l'agent dépasse le délai.
 
-        TODO(refacto-SOLID): modéliser ce cas par un union type
-        ``RunOutcome = AgentRunResult | TimeoutResult`` (re-commit models/base)
-        au lieu d'un champ de contrôle ``timeout`` ajouté au dict nominal.
+        → voir BACKLOG « Tickets TODO → BACKLOG (Lot 5.5) » pour le refacto
+        vers un union type ``RunOutcome``.
         """
         return {
             "response": f"[Timeout] l'agent n'a pas répondu sous {self._timeout}s",

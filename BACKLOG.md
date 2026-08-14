@@ -191,4 +191,20 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
   côté backend (ex. liste `agents` résolue) si besoin.
 - Revue architecture large (SOLID/skill `solid`) non faite : la base est saine, passage
   lint/tests verts ; refactoring profond non lancé pour éviter tout risque sur la base stable.
+- T4.2 test(execute_pipeline_step) écrit en TDD : 3 tests dans tests/test_pipeline_steps.py — valides agent_runner, inference, retry. Refactor pipeline.py pour déléguer à pipeline_steps.py en suivi."
 - T1 terminé (2026-08-14) : 2 commits atomiques (`docs(roadmap)` + `fix(ollama)`), 4 gates vertes (ruff/check/mypy/pytest --cov), `fail_under=46` avec mesure réelle 49,41 %. ROADMAP.md mise à jour (Lots 1–3 cochés, Lot 4.1 vector façade, règle 4 amendée inscrite). `_install_linux_apt` duplication corrigée (1 seule occurrence).
+
+### Tickets TODO → BACKLOG (Lot 5.5, 2026-08-14)
+Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.5 :
+- **supervisor.py:57** `TODO(refacto-SOLID)` : ajout propriété publique `name` sur `BaseAgent` — supprimer le getattr multi-conventions (`_profile_key`/`PROFILE_KEY`) dans `_agent_display_name`.
+- **supervisor.py:153** `TODO(refacto-SOLID)` : modéliser un union type `RunOutcome = AgentRunResult | TimeoutResult` au lieu du champ de contrôle `timeout` ajouté au dict nominal.
+- **di.py:107** `TODO` : `agent_runner=None` passé à `PipelineService` — décider du câblage (cf. tickets pipeline_steps agent_runner).
+
+### LOT 5 — Dettes ciblées livrées (2026-08-14)
+- **5.1** (`fix(middlewares)`) : `retry_after` dérivé de `services.ratelimit.WINDOW` (source unique de vérité) — test `test_429_retry_after_derived_from_ratelimit_window` (RED→GREEN).
+- **5.2** (`refactor(middlewares)`) : `_setup_middlewares` → `setup_middlewares` (public), import `context.py` mis à jour — test `tests/test_middlewares_public_api.py` (RED→GREEN).
+- **5.3** (`test(middlewares)`) : CSP nonce-based **sans** `unsafe-inline`, JS déjà externalisé en modules — verrou de régression `tests/test_csp_policy.py` ; docstring `middlewares.py` corrigé (dette devenue fausse).
+- **5.4** (`docs(env)`) : commentaire `.env.example:37` corrigé (fail-closed), `ADR-011-sandbox-fail-closed.md` créé.
+- **5.5** : 3 TODO basculés en tickets ci-dessus.
+- **5.6** : références aux tests fantômes nettoyées (`context.py`, `file_system.py`).
+- Gates (post-5.6) : `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓ (120 src) · `pytest --cov` ✓ (TBD pass / 1 skip, ≥ 46 %) · `fail_under` inchangé sauf progression mesurée.

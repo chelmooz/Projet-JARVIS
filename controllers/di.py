@@ -103,8 +103,9 @@ class AppContext:
         self.agent_supervisor = AgentSupervisor()
 
         # 7. Pipeline (dépend de inference, memory)
+        # agent_runner=None : câblage à décider — voir BACKLOG « Tickets TODO → BACKLOG (Lot 5.5) ».
         self.pipeline = PipelineService(
-            agent_runner=None,  # TODO: câbler si nécessaire
+            agent_runner=None,
             inference=self.inference,
             memory=self.memory,
             model_selector=select_model,
