@@ -369,12 +369,12 @@ def test_install_linux_tar_full_flow(tmp_path: Path) -> None:
         open(os.path.join(lib_path, "libollama.so"), "w").close()
 
     with (
-        patch("services.ollama_installer.platform.machine", return_value="x86_64"),
-        patch("services.ollama_installer.BIN_LINUX", str(bin_dir)),
-        patch("services.ollama_installer.BASE_DIR", str(base_dir)),
-        patch("services.ollama_installer._download_file"),
-        patch("services.ollama_installer._verify_ollama_binary", return_value=True),
-        patch("services.ollama_installer._extract_tar_zst", side_effect=fake_extract),
+        patch("services.ollama_install_linux.platform.machine", return_value="x86_64"),
+        patch("services.ollama_install_linux.BIN_LINUX", str(bin_dir)),
+        patch("services.ollama_install_linux.BASE_DIR", str(base_dir)),
+        patch("services.ollama_install_linux._download_file"),
+        patch("services.ollama_install_linux._verify_ollama_binary", return_value=True),
+        patch("services.ollama_install_linux._extract_tar_zst", side_effect=fake_extract),
     ):
         result = _install_linux_tar(log)
 
