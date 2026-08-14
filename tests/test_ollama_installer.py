@@ -7,6 +7,7 @@ d'emblée (réseau et subprocess mockés, disque en tmp_path uniquement).
 from __future__ import annotations
 
 import hashlib
+import os
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -322,3 +323,118 @@ def test_ensure_ollama_binary_existing_invalid_returns_none(tmp_path: Path) -> N
 
     assert result is None
     assert any("suspect" in c[1] for c in log_calls)
+
+
+# ---- Installateurs plateforme (4.4c, MT-3.1) ----
+# 5 tests de caractérisation obligatoires : un par installateur, avant
+# l'extraction vers services/ollama_install_{linux,windows,mac}.py.
+
+
+def _make_log() -> tuple[list[tuple[str, str, bool | None]], object]:
+    def log(msg: str, detail: str, success: bool | None) -> None:
+        log_calls.append((msg, detail, success))
+
+    log_calls: list[tuple[str, str, bool | None]] = []
+    return log_calls, log
+
+
+def test_install_linux_apt_success() -> None:
+    """_install_linux_apt : apt ok -> chemin du binaire via shutil.which."""
+    from services.ollama_installer import _install_linux_apt
+
+    log_calls, log = _make_log()
+    with (
+        patch("services.ollama_installer.subprocess.run", return_value=MagicMock(returncode=0)),
+        patch("services.ollama_installer.shutil.which", return_value="/usr/bin/ollama"),
+    ):
+        result = _install_linux_apt(log)
+    assert result == "/usr/bin/ollama"
+    assert ("Ollama", "Tentative apt install ollama...", None) in log_calls
+
+
+def test_install_linux_tar_full_flow(tmp_path: Path) -> None:
+    """_install_linux_tar : download+verify+extract+copy -> chemin BIN_LINUX/ollama."""
+    from services.ollama_installer import _install_linux_tar
+
+    log_calls, log = _make_log()
+    bin_dir = tmp_path / "bin"
+    base_dir = tmp_path / "base"
+
+    def fake_extract(dl: str, dl_bin: str, log_fn: object) -> None:
+        bin_path = os.path.join(dl_bin, "bin", "ollama")
+        os.makedirs(os.path.dirname(bin_path))
+        open(bin_path, "w").close()
+        lib_path = os.path.join(dl_bin, "lib", "ollama")
+        os.makedirs(lib_path)
+        open(os.path.join(lib_path, "libollama.so"), "w").close()
+
+    with (
+        patch("services.ollama_installer.platform.machine", return_value="x86_64"),
+        patch("services.ollama_installer.BIN_LINUX", str(bin_dir)),
+        patch("services.ollama_installer.BASE_DIR", str(base_dir)),
+        patch("services.ollama_installer._download_file"),
+        patch("services.ollama_installer._verify_ollama_binary", return_value=True),
+        patch("services.ollama_installer._extract_tar_zst", side_effect=fake_extract),
+    ):
+        result = _install_linux_tar(log)
+
+    assert result == str(bin_dir / "ollama")
+    assert (bin_dir / "ollama").exists()
+    assert (base_dir / "lib" / "ollama" / "libollama.so").exists()
+    # Nettoyage finally : archive et arborescence temporaires supprimées
+    assert not (base_dir / ".cache" / "ollama-linux.tar.zst").exists()
+    assert not (base_dir / ".cache" / "ollama-extract").exists()
+
+
+def test_install_windows_zip_full_flow(tmp_path: Path) -> None:
+    """_install_windows_zip : télécharge, extrait, copie binaire + moteur -> ollama.exe."""
+    from services.ollama_installer import _install_windows_zip
+
+    log_calls, log = _make_log()
+    bin_dir = tmp_path / "bin"
+    base_dir = tmp_path / "base"
+
+    def fake_extract(dl: str, dl_bin: str) -> None:
+        exe = os.path.join(dl_bin, "ollama.exe")
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        open(exe, "w").close()
+        lib = os.path.join(dl_bin, "lib", "ollama")
+        os.makedirs(lib)
+        open(os.path.join(lib, "llama-server.exe"), "w").close()
+
+    with (
+        patch.dict("os.environ", {"TEMP": str(tmp_path)}),
+        patch("services.ollama_installer.BIN_DIR", str(bin_dir)),
+        patch("services.ollama_installer.BASE_DIR", str(base_dir)),
+        patch("services.ollama_installer._download_file"),
+        patch("services.ollama_installer._verify_ollama_binary", return_value=True),
+        patch("services.ollama_installer._safe_extract_zip", side_effect=fake_extract),
+    ):
+        result = _install_windows_zip(log)
+
+    assert result == str(bin_dir / "ollama.exe")
+    assert (bin_dir / "ollama.exe").exists()
+    # Moteur d'inférence copié sous BASE_DIR/lib/ollama (parité linux)
+    assert (base_dir / "lib" / "ollama" / "llama-server.exe").exists()
+    assert not (tmp_path / "ollama-windows.zip").exists()
+    assert not (tmp_path / "ollama-extract").exists()
+
+
+def test_install_mac_brew_sans_brew() -> None:
+    """_install_mac_brew : sans brew -> None sans erreur."""
+    from services.ollama_installer import _install_mac_brew
+
+    log_calls, log = _make_log()
+    with patch("services.ollama_installer.shutil.which", return_value=None):
+        result = _install_mac_brew(log)
+    assert result is None
+
+
+def test_install_mac_script_refuse_reseau() -> None:
+    """_install_mac_script : refuse curl|sh, log désactivé, retourne None."""
+    from services.ollama_installer import _install_mac_script
+
+    log_calls, log = _make_log()
+    result = _install_mac_script(log)
+    assert result is None
+    assert any("désactivée" in c[1] for c in log_calls)
