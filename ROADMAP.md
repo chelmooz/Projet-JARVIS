@@ -99,7 +99,32 @@ Suite frontend complète : 111 tests passent (10 fichiers, dont 5 nouveaux). Fon
 - [x] **H3** `fail_under` relevé 50 → **60** (cible finale du plan), couverture mesurée 60,85 % ≥ 60 % ; badge régénéré → commit `eb3f427`
 - [x] **H4** Purge finale de cette ROADMAP et de `BACKLOG.md` : marqueurs « à committer » remplacés par les hashes réels, ticket mypy résolu clos, lien mort vers `ROADMAP_CONSOLE.md` (supprimé au commit `c987e6e`) retiré de `BACKLOG.md`
 
-**Plan clos : Lots 0 à 8 (A → H) tous ✅.** État final ci-dessus (`## État final`).
+**Lots 0 à 8 (A → H) tous ✅.** État figé à ce stade ci-dessus (`## État final`).
+
+---
+
+## Lot 9 — Durcissement post-audit (ouvert, non clos)
+
+- Commit `bd17dbb` : "Durcissement Post-Audit - 339 tests pass, all gates green".
+- **Écart à corriger** : ce lot a été committé sans mise à jour de cette ROADMAP ni de `BACKLOG.md`
+  (violation de la règle permanente #10), et sans respecter le gabarit "un commit conventionnel, un
+  seul sujet, diff ≤ 200 lignes" (règle #3) — le commit touche 52 fichiers pour 1 621 insertions et
+  mélange refactor fonctionnel (`agents/supervisor.py`, `controllers/router.py`,
+  `controllers/routes/system.py`, `services/pipeline.py`, `services/vector.py`, `services/selector.py`,
+  `services/dependency_bootstrap.py`, `graph/agent_graph.py`) et fichiers de test associés.
+- **Régression de chiffre non expliquée** : 339 tests annoncés dans ce commit contre 372 passed/1 skipped
+  au dernier état officiel du Lot H — aucune ligne du message de commit ni du diff n'explique l'écart de
+  33 tests. À investiguer avant de considérer ce lot comme clos.
+- **Statut des 4 gates (`ruff check`, `ruff format --check`, `mypy`, `pytest --cov`)** : annoncées vertes
+  dans le message de commit, non re-vérifiées empiriquement en dehors de cette affirmation — à rejouer
+  avant tout GO de déploiement.
+- Correction associée réalisée : `venv/Scripts/` (binaires Windows + `pyvenv.cfg` exposant un chemin
+  absolu et un nom d'utilisateur système) avait été committé par erreur dans ce même Lot 9 ; retiré du
+  suivi git isolément, cf. commit `ddd60ae` et `.gitignore` (règle `venv/` ajoutée).
+- **Reste à faire pour clore proprement le Lot 9** : (1) confirmer/expliquer le delta 372→339 tests,
+  (2) rejouer les 4 gates sur HEAD et documenter les chiffres mesurés réellement, (3) découper a
+  posteriori le commit `bd17dbb` en micro-tâches conformes aux règles du projet si son contenu doit être
+  retravaillé, (4) ajouter l'entrée `BACKLOG.md` correspondante avec hash et chiffres mesurés.
 
 ## Definition of done (par micro-tâche)
 

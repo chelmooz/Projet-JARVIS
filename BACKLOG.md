@@ -508,4 +508,29 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - Gates (vérifiées empiriquement sur poste Windows réel, H:\Projet-JARVIS) : `pytest -q` → 372 passed/1
   skipped · `ruff check` ✓ · `ruff format --check` ✓ · `mypy` → 125 fichiers propres.
 - Commits : `b35017d` (H1+H2), `eb3f427` (H3), commit à venir (H4).
-- **Plan clos : Lots 0 à 8 (A → H) tous ✅.**
+- **Lots 0 à 8 (A → H) tous ✅.**
+
+### MT-Lot9 — Durcissement post-audit (2026-08-15) ⚠️ OUVERT, non clos
+
+- Commit `bd17dbb` : "Durcissement Post-Audit - 339 tests pass, all gates green".
+- Fichiers modifiés (extrait) : `agents/supervisor.py`, `controllers/di.py`, `controllers/router.py`,
+  `controllers/routes/system.py`, `controllers/warmup.py`, `graph/agent_graph.py`,
+  `scripts/vendor_wheels.py`, `services/analytics.py`, `services/dependency_bootstrap.py`,
+  `services/pipeline.py`, `services/selector.py`, `services/static_files.py`, `services/vector.py`,
+  + 14 nouveaux fichiers de test (`test_analytics.py`, `test_bootstrap_cleanup.py`,
+  `test_feedback_weights.py`, `test_log_concurrent.py`, `test_pipeline_agent_runner.py`,
+  `test_router_middleware.py`, `test_select_model.py`, `test_supervisor_timeout.py`,
+  `test_vector_corrupted.py`, `test_vendor_wheels.py`, `test_warmup_shutdown.py`, etc.).
+- Chiffres déclarés dans le message de commit : 339 tests passés, gates vertes — **non re-mesurés par un
+  tiers**, à confirmer par rejeu réel avant de les considérer fiables.
+- Écart non expliqué : 339 < 372 passed/1 skipped (dernier chiffre officiel, Lot H) — delta de 33 tests
+  sans justification écrite.
+- Non-conformités aux règles permanentes du projet, constatées a posteriori : diff de 52 fichiers /
+  1 621 insertions (règle #3 : "≤ 200 lignes"), sujet multiple mêlant refactor fonctionnel et fichiers
+  de build (règle #7 : "une seule règle par micro-tâche").
+- Incident associé et corrigé isolément : `venv/Scripts/` (binaires Windows, `pyvenv.cfg` avec chemin
+  absolu + nom d'utilisateur système) committé par erreur dans ce même commit → retiré du suivi git
+  (commit `ddd60ae`, `.gitignore` complété avec `venv/`). Fichiers locaux non supprimés, git uniquement.
+- **Ce lot n'est pas considéré comme clos** tant que les gates n'ont pas été rejouées empiriquement et
+  que l'écart de tests n'a pas été expliqué. Voir `ROADMAP.md` section "Lot 9" pour le détail du reste
+  à faire.
