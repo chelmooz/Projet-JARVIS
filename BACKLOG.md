@@ -546,3 +546,42 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
   (126 fichiers) ✓ · `pytest --cov` → **389 passed / 1 skipped / 0 failed**, couverture 60,66-60,76 %.
 - Commits (en plus de `bd17dbb`) : `156b6c6`, `9839d01`, `4c84fdf`, `661bc4a`, `f667571`, `c9f410b`,
   `9ca8cbb`, `aed8e7d`, `ff28be3`, `06d893b` (ou `7846db7` si squashés au push).
+
+### MT-Lot1 — Caractérisation pipeline_steps / adapters http (2026-08-15) ✅ CLOS
+
+- **Recentrage du périmètre** : le Lot 1 tel que noté à l'origine couvrait `pipeline_steps`,
+  `adapters_http`, `log`, `warmup`, `selector`. Audit de couverture réel avant de coder : `log.py` (94 %),
+  `warmup.py` (97 %) et `selector.py` (98 %) déjà largement couverts (Lot 0.6 + Lot H). Seuls deux vrais
+  trous restaient — `pipeline_steps.py` (18 %) et `adapters/http.py` (56 %) — d'où le recentrage.
+- **`services/pipeline_steps.py` : 18 % → 100 %**, 39 tests
+  (`tests/test_pipeline_steps_characterization.py`) : `select_agent` (image → vision, router, fallback
+  dev), `select_model` (modèle explicite, résolution via `model_for_agent`, fallback `first_available`,
+  `RuntimeError` si rien de disponible), `retrieve_context` (habits + cas similaires, exceptions mémoire/
+  vector store avalées), `query_model` (agent introuvable, tâche vide, `run` vs `query` vs fallback `str`,
+  contexte injecté dans le prompt, `toolbox.auto_execute` + exception avalée, exception agent capturée),
+  `save_results` (court-circuit réponse vide, indexation vectorielle + exception avalée), `format_output`
+  (état complet et état par défaut), + helpers privés de retry (`_should_retry`, `_wait_before_retry`,
+  `_runner_supports_model`).
+- **`services/adapters/http.py` : 56 % → 100 %**, 53 tests au total (16 existants de retry dans
+  `tests/test_adapters_http_retry.py` + 37 nouveaux dans `tests/test_adapters_http_lifecycle.py`) :
+  `ping`/`_check_endpoint`, `_get_http`, `_request_client_for_call` (seam `MagicMock`, création/cache par
+  thread, thread annulé), `cancel_request` (nominal, thread inconnu, exception de fermeture avalée),
+  `close` (état nettoyé, exceptions de fermeture avalées côté pool partagé et clients dédiés),
+  `_load_base_url`/`_load_timeout`/`_load_keep_alive` (lecture disque + fallback + mise en cache),
+  `_keep_alive_for` (modèle par défaut, profil correspondant, aucun profil, fichier absent),
+  `_call_streaming`/`_extract_stream_chunk` (clés `response`/`message`, lignes vides/JSON invalide
+  ignorées, sink poussé, exception réseau → `RuntimeError`, adapter fermé, aucun client disponible), et
+  les branches restantes de `_call_with_retry` (fermeture en cours de boucle, client `None` en cours de
+  boucle, budget épuisé pendant l'attente via `time.monotonic` maîtrisé).
+- **Incident de session (non-push)** : les fichiers de test avaient d'abord été écrits dans une sandbox
+  jetable déconnectée du poste Windows de l'utilisateur (`H:\Projet-JARVIS`) — travail perdu côté dépôt
+  réel, jamais commité ni poussé. Détecté au début de la session suivante en clonant
+  `github.com/chelmooz/Projet-JARVIS` et en constatant que `pipeline_steps.py`/`adapters/http.py` étaient
+  encore à 18 %/56 % sur `origin/main`. Les deux fichiers de test ont été réécrits intégralement depuis
+  cette sandbox, remis en main propre à l'utilisateur (téléchargement direct, pas de patch git), commités
+  et poussés depuis son poste.
+- **Gates (rejouées empiriquement dans la sandbox après synchronisation sur `origin/main`)** :
+  `ruff check` ✓ · `ruff format --check` ✓ · `mypy` (126 fichiers) ✓ · `pytest --cov` →
+  **466 passed / 1 skipped / 0 failed** (était 389 avant ce lot), couverture **63,46 %** (seuil 60 %).
+- Commit : `f2f084b` — "test(pipeline_steps,adapters/http): Lot 1 — caractérisation complète
+  (18%->100%, 56%->100%)".

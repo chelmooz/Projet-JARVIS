@@ -103,28 +103,44 @@ Suite frontend complète : 111 tests passent (10 fichiers, dont 5 nouveaux). Fon
 
 ---
 
-## Lot 9 — Durcissement post-audit (ouvert, non clos)
+## Lot 9 — Durcissement post-audit ✅ CLOS
 
-- Commit `bd17dbb` : "Durcissement Post-Audit - 339 tests pass, all gates green".
-- **Écart à corriger** : ce lot a été committé sans mise à jour de cette ROADMAP ni de `BACKLOG.md`
-  (violation de la règle permanente #10), et sans respecter le gabarit "un commit conventionnel, un
-  seul sujet, diff ≤ 200 lignes" (règle #3) — le commit touche 52 fichiers pour 1 621 insertions et
-  mélange refactor fonctionnel (`agents/supervisor.py`, `controllers/router.py`,
-  `controllers/routes/system.py`, `services/pipeline.py`, `services/vector.py`, `services/selector.py`,
-  `services/dependency_bootstrap.py`, `graph/agent_graph.py`) et fichiers de test associés.
-- **Régression de chiffre non expliquée** : 339 tests annoncés dans ce commit contre 372 passed/1 skipped
-  au dernier état officiel du Lot H — aucune ligne du message de commit ni du diff n'explique l'écart de
-  33 tests. À investiguer avant de considérer ce lot comme clos.
-- **Statut des 4 gates (`ruff check`, `ruff format --check`, `mypy`, `pytest --cov`)** : annoncées vertes
-  dans le message de commit, non re-vérifiées empiriquement en dehors de cette affirmation — à rejouer
-  avant tout GO de déploiement.
-- Correction associée réalisée : `venv/Scripts/` (binaires Windows + `pyvenv.cfg` exposant un chemin
-  absolu et un nom d'utilisateur système) avait été committé par erreur dans ce même Lot 9 ; retiré du
-  suivi git isolément, cf. commit `ddd60ae` et `.gitignore` (règle `venv/` ajoutée).
-- **Reste à faire pour clore proprement le Lot 9** : (1) confirmer/expliquer le delta 372→339 tests,
-  (2) rejouer les 4 gates sur HEAD et documenter les chiffres mesurés réellement, (3) découper a
-  posteriori le commit `bd17dbb` en micro-tâches conformes aux règles du projet si son contenu doit être
-  retravaillé, (4) ajouter l'entrée `BACKLOG.md` correspondante avec hash et chiffres mesurés.
+- Commit initial `bd17dbb` ("Durcissement Post-Audit") committé sans mise à jour de cette ROADMAP ni de
+  `BACKLOG.md` (violation règle #10) et sans respecter le gabarit "un commit, un sujet, diff ≤ 200 lignes"
+  (règle #3, 52 fichiers / 1 621 insertions mêlant refactor fonctionnel et tests).
+- Chiffre "339 tests" annoncé dans le message de commit initial : **infirmé** par le rejeu réel, non
+  fiable tel quel au moment du commit.
+- Incident isolé : `venv/Scripts/` (binaires Windows + `pyvenv.cfg` exposant un chemin absolu et un nom
+  d'utilisateur système) committé par erreur → retiré du suivi git (commit `156b6c6`), `.gitignore`
+  complété (`venv/`, commit `9839d01`).
+- **Rejeu réel des 4 gates** (poste Windows `H:\Projet-JARVIS`, Python 3.12.10) après correction de 3
+  vagues de bugs trouvés par le rejeu lui-même : `ruff check` 87→0 erreurs (1 vrai bug F821, code mort) ;
+  `mypy` 6→0 erreurs (3 vrais bugs : typo `agent_graph_factory`, route `/static/{path:path}` cassée,
+  appel fantôme `LogService.close()`) ; `pytest --cov` 5 failed→0 (5 routes dupliquées dans
+  `controllers/routes/system.py` interceptant les vraies routes de `router.py`).
+- **Résultat final vérifié** : `ruff check` ✓ · `ruff format --check` ✓ · `mypy` (126 fichiers) ✓ ·
+  `pytest --cov` → **389 passed / 1 skipped / 0 failed**, couverture 60,66–60,76 %.
+- Commits : `bd17dbb`, `156b6c6`, `9839d01`, `4c84fdf`, `7846db7` (fix routes dupliquées + test
+  middleware), `ce7667c` (bilan BACKLOG.md).
+
+## Lot 1 — Caractérisation pipeline_steps / adapters http ✅ CLOS
+
+Périmètre initial (`pipeline_steps`, `adapters_http`, `log`, `warmup`, `selector`) recentré après audit de
+couverture réel : `log.py` (94 %), `warmup.py` (97 %) et `selector.py` (98 %) déjà couverts par les lots
+précédents (0.6, H). Seuls deux vrais trous restaient.
+
+- [x] `services/pipeline_steps.py` : 18 % → **100 %**, 39 tests (`tests/test_pipeline_steps_characterization.py`)
+  — `select_agent`, `select_model`, `retrieve_context`, `query_model`, `save_results`, `format_output` +
+  helpers privés de retry (`_should_retry`, `_wait_before_retry`, `_runner_supports_model`).
+- [x] `services/adapters/http.py` : 56 % → **100 %**, 53 tests au total (16 existants de retry +
+  37 nouveaux dans `tests/test_adapters_http_lifecycle.py`) — `ping`/`_check_endpoint`, `_get_http`,
+  `_request_client_for_call`, `cancel_request`, `close`, `_load_base_url`/`_load_timeout`/
+  `_load_keep_alive`/`_keep_alive_for` (lecture config disque + cache), `_call_streaming`/
+  `_extract_stream_chunk`, et les branches restantes de `_call_with_retry` (fermeture en cours de boucle,
+  client `None` en cours de boucle, budget épuisé pendant l'attente).
+- **Gates (vérifiées empiriquement)** : `ruff check` ✓ · `ruff format --check` ✓ · `mypy` (126 fichiers) ✓ ·
+  `pytest --cov` → **466 passed / 1 skipped / 0 failed** (était 389), couverture **63,46 %** (seuil 60 %).
+- Commit : `f2f084b`.
 
 ## Definition of done (par micro-tâche)
 
