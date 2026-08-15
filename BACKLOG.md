@@ -6,7 +6,184 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
-## Micro-tâches
+### MT-Lot10-L8-P4 — Lot 8c : CI sur Windows (P4) (2026-08-15) ✅ (config) / ⏳ (validation)
+- `.github/workflows/ci.yml` : job `quality` passe de `runs-on: ubuntu-latest` à
+  une matrice `os: [ubuntu-latest, windows-latest]` × `python-version:
+  ["3.12", "3.13"]`, avec exclusion `windows-latest/3.13` (Python portable
+  épinglé en 3.12, P2). `fail-fast: false` pour que les deux OS s'exécutent
+  même en cas d'échec.
+- Cache pip multi-OS : path = `~/.cache/pip` (Linux) + `~/AppData/Local/pip/Cache`
+  (Windows) — `%LOCALAPPDATA%` n'est PAS expansé par actions/cache (documenté
+  dans le README officiel de l'action), remplacé par `~`.
+- Step « Coverage badge » restreint à Linux (`if: runner.os == 'Linux'`) : le
+  badge committé est produit par le job Linux de référence ; Windows n'a pas à
+  le régénérer (couverture légèrement différente selon OS, et le fichier committé
+  doit rester stable).
+- Validation : YAML parsé ✓ (PyYAML, structure matrice/exclusion/fail-fast/if
+  vérifiés). ⚠️ Pas de push GitHub local (pré-déploiement) : le run réel
+  Windows sera validé au prochain push/pull request. Échecs attendus éventuels
+  sur `services/port_manager.py`, `services/launcher_win.py`,
+  `scripts/schedule_backup.py` (code Windows-spécifique) → à traiter en lots
+  séparés si constatés.
+- Gates locaux : ruff ✓ · mypy (133) ✓ · pytest 861 passed / 84,72 % ✓.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L8-P5 — Lot 8b : mypy couvre jarvis.py + scripts (P5) (2026-08-15) ✅
+- Objectif : `files=` de `[tool.mypy]` étendu à `jarvis.py` + 7 scripts
+  (install, install_portable_python, jarvis_doctor, restore_backup,
+  vendor_wheels, coverage_badge, verify_release), un fichier à la fois.
+- Sondage initial des erreurs : jarvis.py / jarvis_doctor / coverage_badge /
+  verify_release = 0 (ajout direct) ; restore_backup = 7 ; install_portable_python = 24 ;
+  vendor_wheels = 28 ; install.py = 84.
+- Corrections :
+  - `restore_backup.py` : 3× `dest_root or str(paths.ROOT)` (mélange `str | None`
+    avec `Path` → str explicite, les erreurs 64/149/167 en découlaient).
+  - `install_portable_python.py` : annotations sur log/download/extract/
+    enable_site_packages/install_pip/main (no-untyped-def/no-untyped-call).
+  - `vendor_wheels.py` : idem (color/green/yellow/red/_filtered_requirements/
+    _download_platform_wheel/download_wheels/download_sdist_exceptions/main).
+  - `install.py` : annotations couleur + helpers + `Path` explicite dans
+    `_resolve_pip_exe` (ternaire SIM108 imposé par ruff), `str | None` pour
+    `_should_refuse_online_fallback` (P3, signature pure conservée).
+- Gates : ruff check ✓ · ruff format ✓ (222 fichiers) · mypy (**133** fichiers) ✓ ·
+  pytest --cov → **861 passed / 1 skipped**, couverture 84,72 % ≥ 60 % ;
+  `.pytest-temp` non recréé (validation P13 stable).
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L8-P13 — Lot 8a : retrait `--basetemp=.pytest-temp` (P13) (2026-08-15) ✅
+- RED (config, iron law en exception) : suppression `addopts = ["--basetemp=.pytest-temp"]`
+  dans `pyproject.toml` `[tool.pytest.ini_options]` → vérification comportementale :
+  pytest doit utiliser le basetemp système par défaut (`%TEMP%\pytest-of-<user>`).
+- Blocage environnement rencontré : `%TEMP%\pytest-of-sangoku` avait des ACL
+  corrompues (Accès refusé même pour `takeown`/`icacls`/`rmdir`) → 20 erreurs de
+  setup `tmp_path` (PermissionError WinError 5). Cause racine : c'est pour cela
+  que l'addopts existait. Résolution : l'utilisateur a lancé en cmd admin
+  `takeown /f … /r /d O && icacls … /reset /t /c` (syntaxe Windows fr : `/d O`,
+  pas `/d y`), puis suppression du dossier.
+- GREEN : run complet sans addopts → **861 passed / 1 skipped**, couverture
+  84,70 % ; `.pytest-temp` non recréé (vérifié post-run) ; pytest écrit bien dans
+  `%TEMP%\pytest-of-sangoku\pytest-0`.
+- `.gitignore` (`.pytest-temp/`) conservé en filet de sécurité ; `analysis_core.py`
+  (`_SKIPPED_DIR_NAMES`) et `verify_release.py` (caches de livraison) conservent
+  `.pytest-temp` dans leurs listes défensives (inoffensif).
+- Gates : ruff check ✓ · ruff format ✓ · mypy (125 fichiers) ✓ · pytest --cov →
+  **861 passed / 1 skipped**, couverture 84,70 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+
+### MT-Lot10-L5 — Lot 5 post-audit : `metrics.py` bufferisé (P10) (2026-08-15) ✅
+- RED : `tests/test_metrics_buffered_flush.py` (3 tests, horloge injectée, zéro
+  sleep) — 10 incréments → zéro écriture disque (échec attendu : 12 écritures) ;
+  intervalle écoulé (61 s > 60 s) → une écriture unique ; `flush()` explicite →
+  écriture immédiate. `tests/test_metrics_flush_on_shutdown.py` — l'arrêt propre
+  doit vider le buffer (échec attendu : `flush_called` False).
+- GREEN : `MetricsService(flush_interval=60.0, now=time.time)` — `_maybe_flush()`
+  piggyback (persistance périodique sans thread dédié, KISS), `flush()` public
+  (RLock, maj `_last_flush_ts`), `incr_*`/`get_metrics` en mémoire.
+  `MetricsPort` : `flush()` ajouté au contrat. `_shutdown_sequence` (warmup.py) :
+  flush des métriques à l'arrêt (garde `hasattr(metrics, "flush")`).
+  Docstring de module réécrit (la NOTE « dette » devenait fausse — pattern Lot 5.3).
+- Gates : ruff check ✓ · ruff format ✓ · mypy (125 fichiers) ✓ · pytest --cov →
+  **861 passed / 1 skipped**, couverture 84,70 % ≥ 60 % (metrics.py 86 %).
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L3 — Lot 3 post-audit : contrat `ctx` typé via Protocol (P8) (2026-08-15) ✅
+- RED : `tests/test_context_protocol_conformance.py` — `isinstance(AppContext(),
+  JarvisContext)` (conformance à l'exécution, pas seulement mypy). Échec attendu
+  confirmé : `ModuleNotFoundError: ports.jarvis_context`.
+- GREEN : `ports/jarvis_context.py` (nouveau) — `@runtime_checkable Protocol
+  JarvisContext` : inference/memory/vector/conversations/log, status_cache,
+  `_initialized`, `_warmup_tasks`, `initialize()`. `AppContext.__init__` :
+  `_warmup_tasks` déclaré (conformance honnête à la construction — supprime le
+  hasattr défensif de `_launch_background_warmup`).
+- Annotations `ctx: Any` → `ctx: JarvisContext` dans `warmup.py` (6 fonctions),
+  `status.py::build_status`, `context.py::_build_status_data` ; `cast` explicite
+  dans `_resolve_context` (mypy no-any-return).
+- getattr conservés (commentés) uniquement où le contrat est réellement
+  optionnel : `ingest_queue`/`stop_event` (jamais posés sur AppContext),
+  `vector`/`inference` en lecture (contexte dégradé épinglé par
+  test_warmup_lifespan.py — « aucun attribut, aucune exception »), `flush`
+  (capacité optionnelle du vecteur). Un seul Protocol partagé, zéro duplication.
+- Gates : ruff check ✓ · ruff format ✓ · mypy (**125** fichiers) ✓ · pytest --cov →
+  **857 passed / 1 skipped**, couverture 84,48 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L2 — Lot 2 post-audit : bootstrap offline non-silencieux (P3) (2026-08-15) ✅
+- Précision contre-audit validée : zéro flag `JARVIS_OFFLINE` dans le repo —
+  le fallback PyPI était silencieux et inconditionnel.
+- RED : `tests/test_install_offline_flag.py` (2 tests) — (1) `JARVIS_OFFLINE=1`
+  + `vendor_wheels/` absent → `False` + message explicite (cite le flag et
+  `vendor_wheels/`) + zéro appel `subprocess.run` ; (2) pin : sans flag, le
+  fallback PyPI actuel reste intact (2 appels pip). Échec attendu confirmé
+  (le code ignorait le flag → `True`).
+- GREEN : `_should_refuse_online_fallback(offline_flag, find_links)` — fonction
+  pure (décision unique, extraite selon plan/REFACTOR) ; appelée au début
+  d'`install_python_deps()` avant tout `subprocess.run` → refus explicite.
+  Convention de lecture : toute valeur non vide active le mode (cohérent avec
+  `JARVIS_NO_BROWSER` dans jarvis.py).
+- Documentation : `JARVIS_OFFLINE=false` + commentaire dans `.env.example`
+  (bloc low-I/O) ; une ligne dans README.md section « Sans internet ? ».
+- Gates : ruff check ✓ · ruff format ✓ · mypy (124 fichiers) ✓ · pytest --cov →
+  **855 passed / 1 skipped**, couverture 84,43 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L6 — Lot 6 post-audit : façade `services/diagnostic.py` supprimée (P11) (2026-08-15) ✅
+- Cartographie : la façade ne contenait que le ré-export `DiagnosticService`
+  depuis `services/diagnostics/service.py` (docstring l.3 = seule « référence »).
+  Aucun import réel production/tests.
+- REFACTOR (vérifié) : `service.py` délègue aux feuilles `checks.py` (8 méthodes
+  homonymes = orchestration fine, pas de duplication de logique) — frontière
+  checks.py (bas niveau) / service.py (orchestration) déjà saine.
+- RED : `tests/test_diagnostic_facade_removed.py` (2 tests) — (1) le fichier
+  n'existe pas (échec attendu confirmé) ; (2) verrou AST : aucun import de
+  `services.diagnostic` (exclut `services.diagnostics` et `services.diagnostic_ext`).
+- GREEN : `git rm services/diagnostic.py`.
+- Gates : ruff check ✓ · ruff format ✓ · mypy (**124** fichiers) ✓ · pytest --cov →
+  **853 passed / 1 skipped**, couverture 86,06 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L7 — Lot 7 post-audit : `services/facts.py` orphelin supprimé (P12) (2026-08-15) ✅
+- Vérification préalable : 0 import production, 0 référence test (grep + AST).
+  Aucun test isolé à supprimer d'abord (aucun ne ciblait le module).
+- RED : `tests/test_facts_module_removed.py` (2 tests) — (1) `services/facts.py`
+  ne doit pas exister (échec attendu confirmé : fichier présent) ; (2) verrou AST
+  sur 9 dossiers (config/controllers/services/agents/graph/ports/models/scripts/tests) :
+  aucun import de module contenant `facts`.
+- GREEN : `git rm services/facts.py`. Aucun remplacement — `FactStore` n'était
+  jamais instancié.
+- Traçabilité : section « Post-audit : nettoyage de code mort (P7, P9, P12) »
+  ajoutée en tête de `CHANGELOG.md`.
+- Gates : ruff check ✓ · ruff format ✓ · mypy (**125** fichiers — facts.py sorti du gate) ✓ ·
+  pytest --cov → **851 passed / 1 skipped**, couverture 86,06 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L4 — Lot 4 post-audit : `IngestQueue.stop()` déterministe (P9) (2026-08-15) ✅
+- RED : `tests/test_ingest_queue_stop.py` (3 tests, thread réel + `SlowVector` fake) —
+  `stop(timeout=...)` draine l'item en vol (join), warning « encore actif » si worker
+  toujours occupé après timeout, warning avec compteur d'items restants.
+  Échec attendu confirmé : `TypeError: stop() got an unexpected keyword argument 'timeout'`.
+- GREEN : `stop(self, timeout: float = 5.0)` — `_stop.set()` puis `_worker.join(timeout)` ;
+  warning explicite si worker encore actif **ou** file non vide (compteur) — plus d'arrêt
+  silencieux laissant des embeddings non indexés.
+- REFACTOR : appelant unique `warmup.py:166` (`_shutdown_sequence`) → timeout par défaut
+  5 s conservé, rien à propager.
+- Gates : ruff check ✓ · ruff format ✓ · mypy (126 fichiers) ✓ · pytest --cov →
+  **849 passed / 1 skipped**, couverture 86,06 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot10-L1 — Lot 1 post-audit : code mort `_shutdown` supprimé (P7) (2026-08-15) ✅
+- Décision KISS (validée par l'utilisateur) : **option (a) supprimer** — `JARVIS.bat` → `launcher_win.py`
+  (handler enregistré `signal.signal`, l.186-188) ; `JARVIS.sh` → `jarvis.py::main()`, mais Uvicorn gère
+  nativement SIGINT/SIGTERM (docstring jarvis.py l.6-7) + `finally: pm.stop_all()` (l.152-154) → enregistrer
+  le handler maison aurait cassé le graceful shutdown Uvicorn (exit immédiat sans drain des connexions).
+- TDD RED : `tests/test_jarvis_dead_code.py` — verrou AST : toute fonction privée de `jarvis.py` doit être
+  référencée au moins une fois (Load). Échec attendu confirmé : `['_shutdown'] != []`.
+- GREEN : `_shutdown` (l.70-81) supprimée de `jarvis.py` (0 référence ailleurs, vérifié par grep).
+  Uvicorn = unique gestionnaire de signaux sur Unix ; `launcher_win.py` inchangé.
+- Gates : ruff check ✓ · ruff format ✓ · mypy (126 fichiers) ✓ · pytest --cov → **846 passed / 1 skipped**,
+  couverture 86,07 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
 
 ### MT-3 — ROADMAP TDD qualité (audit 68→90)  �� 🔧 2026-08-13
 - Créé `ROADMAP.md` à la racine : suivi à cocher des LOTS 0→7. Contrat TDD strict RED→GREEN→REFACTOR.

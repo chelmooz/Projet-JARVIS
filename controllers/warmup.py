@@ -14,17 +14,20 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import cast
 
 from fastapi import FastAPI
 
 from config.constants import DEFAULT_MODEL
+from ports.jarvis_context import JarvisContext
 
 _logger = logging.getLogger("jarvis.warmup")
 
 
-async def _warmup_vector_store(ctx: Any) -> None:
+async def _warmup_vector_store(ctx: JarvisContext) -> None:
     """Pré-charge et consolide le store vectoriel de manière asynchrone."""
+    # Lecture défensive : le warmup tolère les contextes dégradés sans vecteur
+    # (contrat épinglé par test_warmup_lifespan.py — « aucun attribut, aucune exception »).
     vector = getattr(ctx, "vector", None)
     if not vector:
         return
@@ -41,8 +44,9 @@ async def _warmup_vector_store(ctx: Any) -> None:
         )
 
 
-async def _warmup_default_model(ctx: Any, default_model: str) -> None:
+async def _warmup_default_model(ctx: JarvisContext, default_model: str) -> None:
     """Envoie une requête de réveil au modèle par défaut pour éviter le cold-start."""
+    # Lecture défensive : même contrat dégradé que _warmup_vector_store.
     inference = getattr(ctx, "inference", None)
     if not inference:
         return
@@ -86,7 +90,7 @@ def _generate_or_reuse_token() -> None:
         _logger.info(f"Using existing mono-user token: {token_file}")
 
 
-def _resolve_context(app: FastAPI) -> Any:
+def _resolve_context(app: FastAPI) -> JarvisContext:
     """Récupère ``app.state.context``, en le construisant via la DI réelle si absent."""
     if not hasattr(app.state, "context"):
         from controllers.di import get_app_context
@@ -94,21 +98,20 @@ def _resolve_context(app: FastAPI) -> Any:
         app.state.context = get_app_context()
     ctx = app.state.context
 
-    if hasattr(ctx, "initialize") and not getattr(ctx, "_initialized", False):
+    # `initialize` n'est pas dans le contrat JarvisContext : présent sur AppContext
+    # mais absent des contextes de test — garde défensive conservée.
+    if hasattr(ctx, "initialize") and not ctx._initialized:
         ctx.initialize()
 
-    return ctx
+    return cast(JarvisContext, ctx)
 
 
-def _launch_background_warmup(ctx: Any) -> None:
+def _launch_background_warmup(ctx: JarvisContext) -> None:
     """Lance le warmup vectoriel et modèle en tâches de fond (non-bloquant).
 
     On conserve la référence des tâches dans le contexte pour éviter le
     garbage collection prématuré (piège classique asyncio).
     """
-    if not hasattr(ctx, "_warmup_tasks"):
-        ctx._warmup_tasks = []
-
     task_vector = asyncio.create_task(_warmup_vector_store(ctx))
     ctx._warmup_tasks.append(task_vector)
 
@@ -118,7 +121,7 @@ def _launch_background_warmup(ctx: Any) -> None:
     _logger.info("Warmup lancé en arrière-plan. L'application est prête à accepter des requêtes.")
 
 
-async def _startup_sequence(app: FastAPI) -> Any:
+async def _startup_sequence(app: FastAPI) -> JarvisContext:
     """Séquence de démarrage complète : logging, token, contexte, warmup, ingestion.
 
     Renvoie le contexte applicatif (``app.state.context``), réutilisé par
@@ -148,12 +151,12 @@ async def _startup_sequence(app: FastAPI) -> Any:
     return ctx
 
 
-async def _shutdown_sequence(ctx: Any) -> None:
+async def _shutdown_sequence(ctx: JarvisContext) -> None:
     """Séquence d'arrêt complète : annulation warmup, ingestion, inférence, vecteur."""
     _logger.info("=== Arrêt de JARVIS en cours ===")
 
     # Annuler les tâches de warmup en cours si elles tournent encore
-    tasks = getattr(ctx, "_warmup_tasks", [])
+    tasks = ctx._warmup_tasks
     if tasks:
         for task in tasks:
             if not task.done():
@@ -161,6 +164,7 @@ async def _shutdown_sequence(ctx: Any) -> None:
         # Attendre la fin des tâches annulées (évite CancelledError dans les logs)
         await asyncio.gather(*tasks, return_exceptions=True)
 
+    # Optionnels (jamais posés sur AppContext, fournis par les contextes de test)
     ingest_queue = getattr(ctx, "ingest_queue", None)
     if ingest_queue is not None:
         ingest_queue.stop()
@@ -169,6 +173,13 @@ async def _shutdown_sequence(ctx: Any) -> None:
     stop_event = getattr(ctx, "stop_event", None)
     if stop_event is not None:
         stop_event.set()
+
+    # Flush des métriques bufferisées (P10) : persistance garantie à l'arrêt,
+    # même si l'intervalle périodique n'est pas écoulé.
+    metrics = getattr(ctx, "metrics", None)
+    if metrics is not None and hasattr(metrics, "flush"):
+        metrics.flush()
+        _logger.info("Métriques persistées à l'arrêt.")
 
     inference = getattr(ctx, "inference", None)
     if inference is not None:
@@ -192,16 +203,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _shutdown_sequence(ctx)
 
 
-def _flush_vector_on_shutdown(ctx: Any) -> None:
+def _flush_vector_on_shutdown(ctx: JarvisContext) -> None:
     """Vide les mutations vectorielles en attente avant l'arrêt (14.0 flush groupé).
 
     Appelé dans la section SHUTDOWN du lifespan : garantit qu'aucun message
     indexé n'est perdu si le dernier lot n'a pas encore été écrit.
     """
+    # Lecture défensive : contexte dégradé possible (même contrat que warmup).
     vector = getattr(ctx, "vector", None)
     if vector is None:
         return
     try:
+        # `flush` est une capacité optionnelle du vecteur : garde défensive.
         flush = getattr(vector, "flush", None)
         if flush is not None:
             flush()

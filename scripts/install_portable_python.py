@@ -22,12 +22,12 @@ PYTHON_URLS = {
 }
 
 
-def log(msg, ok=True):
+def log(msg: str, ok: bool = True) -> None:
     """Log."""
     print(f"  {'OK' if ok else '**'} {msg}")
 
 
-def download(url, dest):
+def download(url: str, dest: str) -> bool:
     """Download."""
     log(f"Telechargement {url.split('/')[-1]}...")
     try:
@@ -38,14 +38,14 @@ def download(url, dest):
         return False
 
 
-def extract(zip_path, target):
+def extract(zip_path: str, target: str) -> None:
     """Extract."""
     log(f"Extraction vers {target}...")
     with zipfile.ZipFile(zip_path, "r") as z:
         z.extractall(target)
 
 
-def enable_site_packages(python_dir):
+def enable_site_packages(python_dir: str) -> bool:
     """Enable site packages."""
     for f in os.listdir(python_dir):
         if f.endswith("._pth"):
@@ -68,7 +68,7 @@ def enable_site_packages(python_dir):
     return False
 
 
-def install_pip(python_exe):
+def install_pip(python_exe: str) -> bool:
     """Install pip."""
     log("Installation de pip...")
     get_pip = os.path.join(BASE_DIR, "get-pip.py")
@@ -87,7 +87,7 @@ def install_pip(python_exe):
     return True
 
 
-def main():
+def main() -> None:
     """Main."""
     print()
     print("  JARVIS Portable — Installation de Python portable")

@@ -39,26 +39,26 @@ DEFAULT_PLATFORMS = [
 SDIST_ONLY = ["antlr4-python3-runtime==4.9.3"]
 
 
-def color(text, code):
+def color(text: str, code: str) -> str:
     """Color."""
     if not sys.stdout.isatty():
         return text
     return f"\033[{code}m{text}\033[0m"
 
 
-def green(text):
+def green(text: str) -> str:
     return color(text, "92")
 
 
-def yellow(text):
+def yellow(text: str) -> str:
     return color(text, "93")
 
 
-def red(text):
+def red(text: str) -> str:
     return color(text, "91")
 
 
-def _filtered_requirements(dest, exc):
+def _filtered_requirements(dest: str, exc: list[str]) -> str:
     """Recopie requirements.lock sans les paquets en exception, pour pip download."""
     filtered = os.path.join(dest, "requirements.vendor.txt")
     with open(REQUIREMENTS, encoding="utf-8") as src, open(filtered, "w", encoding="utf-8") as out:
@@ -70,7 +70,7 @@ def _filtered_requirements(dest, exc):
     return filtered
 
 
-def _download_platform_wheel(platform_tag, requirements_file, dest):
+def _download_platform_wheel(platform_tag: str, requirements_file: str, dest: str) -> bool:
     """Telecharge les wheels binaires pour une plateforme donnee (--no-deps)."""
     cmd = [
         sys.executable,
@@ -98,12 +98,12 @@ def _download_platform_wheel(platform_tag, requirements_file, dest):
         return False
 
 
-def download_wheels(platform_tag, dest, requirements_file):
+def download_wheels(platform_tag: str, dest: str, requirements_file: str) -> bool:
     """Telecharge les wheels binaires pour une plateforme (--no-deps)."""
     return _download_platform_wheel(platform_tag, requirements_file, dest)
 
 
-def download_sdist_exceptions(dest):
+def download_sdist_exceptions(dest: str) -> bool:
     """Telecharge les sdists sans wheel (antlr4) une seule fois (pur Python)."""
     ok = True
     for pkg in SDIST_ONLY:
@@ -128,7 +128,7 @@ def download_sdist_exceptions(dest):
     return ok
 
 
-def main():
+def main() -> None:
     """Main."""
     print()
     print("  JARVIS Portable — Vendoring des wheels")

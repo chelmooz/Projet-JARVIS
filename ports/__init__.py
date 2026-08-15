@@ -31,12 +31,17 @@ class LogPort(Protocol):
 
 @runtime_checkable
 class MetricsPort(Protocol):
-    """Contrat pour services/metrics.py (MetricsService)."""
+    """Contrat pour services/metrics.py (MetricsService).
+
+    ``flush()`` : persistance immédiate du buffer mémoire (arrêt propre,
+    P10) — les incréments ne sont pas persistés à chaque appel.
+    """
 
     def incr_requests(self, endpoint: str = "/api/jarvis") -> None: ...
     def incr_pipeline_run(self) -> None: ...
     def incr_errors(self) -> None: ...
     def get_metrics(self) -> dict[str, Any]: ...
+    def flush(self) -> None: ...
 
 
 # ---------------------------------------------------------------------------

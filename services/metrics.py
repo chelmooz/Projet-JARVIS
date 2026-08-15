@@ -1,11 +1,12 @@
 """MetricsService — Métriques d'usage (uptime, requêtes, pipelines, erreurs).
 
-NOTE DevOps / Performance :
-L'implémentation actuelle persiste sur disque à chaque incrémentation (via write_json_atomic).
-Sur un support de type clef USB, les appels répétés à os.fsync() peuvent dégrader les
-performances et la durée de vie du support.
-Cible d'évolution : Bufferiser les compteurs en mémoire et persister uniquement
-périodiquement (ex: toutes les 60s) ou lors du graceful shutdown.
+Les compteurs sont bufferisés en mémoire : aucun écriture disque par
+incrément (``write_json_atomic`` + ``os.fsync`` coûteux sur clef USB et
+usure du support). Persistance :
+- périodique (piggyback : à chaque incrément/lecture, si l'intervalle de
+  60 s est écoulé) — pas de thread dédié ;
+- immédiate via ``flush()`` public, déclenché à l'arrêt propre par
+  ``controllers/warmup.py::_shutdown_sequence``.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 from config.constants import MEMORY_DIR
@@ -26,6 +28,9 @@ _logger = logging.getLogger("jarvis.metrics")
 # Fichier de persistance des métriques (conservées entre redémarrages)
 METRICS_PATH = os.path.join(MEMORY_DIR, "metrics.json")
 _lock = threading.RLock()
+
+# Intervalle de persistance périodique (piggyback, pas de thread)
+FLUSH_INTERVAL_SECONDS = 60.0
 
 # psutil est optionnel : import défensif pour ne pas casser l'install portable
 try:
@@ -71,9 +76,19 @@ def get_resource_usage() -> dict[str, Any]:
 class MetricsService(MetricsPort):
     """Service de suivi des métriques d'usage et de performance."""
 
-    def __init__(self) -> None:
-        """Charge les métriques depuis le disque, initialise les compteurs à zéro si nouveau fichier."""
+    def __init__(
+        self,
+        flush_interval: float = FLUSH_INTERVAL_SECONDS,
+        now: Callable[[], float] = time.time,
+    ) -> None:
+        """Charge les métriques depuis le disque, initialise les compteurs à zéro si nouveau fichier.
+
+        ``now`` est injectable pour les tests (horloge simulée, zéro sleep).
+        """
         os.makedirs(os.path.dirname(METRICS_PATH), exist_ok=True)
+        self._flush_interval = flush_interval
+        self._now = now
+        self._last_flush_ts = now()
         self._data = self._load()
 
         # Initialisation défensive des valeurs par défaut
@@ -98,30 +113,41 @@ class MetricsService(MetricsPort):
         with _lock:
             write_json_atomic(METRICS_PATH, self._data)
 
+    def flush(self) -> None:
+        """Persiste immédiatement le buffer mémoire (arrêt propre, P10)."""
+        with _lock:
+            self._save()
+            self._last_flush_ts = self._now()
+
+    def _maybe_flush(self) -> None:
+        """Persiste si l'intervalle est écoulé (piggyback, pas de thread dédié)."""
+        if self._now() - self._last_flush_ts >= self._flush_interval:
+            self.flush()
+
     def incr_requests(self, endpoint: str = "/api/jarvis") -> None:
         """Incrémente le compteur global de requêtes et le compteur par endpoint."""
         with _lock:
             self._data["requests"] += 1
             by_endpoint = self._data.setdefault("by_endpoint", {})
             by_endpoint[endpoint] = by_endpoint.get(endpoint, 0) + 1
-            # NOTE : Appel coûteux en I/O sur chaque requête (voir note de module)
-            write_json_atomic(METRICS_PATH, self._data)
+            self._maybe_flush()
 
     def incr_pipeline_run(self) -> None:
         """Incrémente le compteur d'exécutions de pipelines."""
         with _lock:
             self._data["pipeline_runs"] += 1
-            write_json_atomic(METRICS_PATH, self._data)
+            self._maybe_flush()
 
     def incr_errors(self) -> None:
         """Incrémente le compteur d'erreurs."""
         with _lock:
             self._data["errors"] += 1
-            write_json_atomic(METRICS_PATH, self._data)
+            self._maybe_flush()
 
     def get_metrics(self) -> dict[str, Any]:
         """Retourne toutes les métriques agrégées avec l'uptime formaté."""
         with _lock:
+            self._maybe_flush()
             start_time = self._data.get("uptime", time.time())
             uptime = round(time.time() - start_time, 1)
 

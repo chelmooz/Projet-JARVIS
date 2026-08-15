@@ -47,8 +47,28 @@ class IngestQueue:
         worker.start()
         _logger.info("File d'ingestion vectorielle demarree")
 
-    def stop(self) -> None:
+    def stop(self, timeout: float = 5.0) -> None:
+        """Arrête le worker de façon déterministe (audit P9).
+
+        Pose le flag d'arrêt puis attend le worker jusqu'à ``timeout`` secondes
+        (drain de l'item en vol). Si le worker est encore actif après ce délai
+        ou si des messages restent en file, un warning explicite est journalisé
+        — plus d'arrêt silencieux laissant des embeddings non indexés.
+        """
         self._stop.set()
+        if self._worker is not None:
+            self._worker.join(timeout)
+        if self._worker is not None and self._worker.is_alive():
+            _logger.warning(
+                "Arrêt de la file d'ingestion : worker encore actif après %.1fs, %d message(s) restant(s)",
+                timeout,
+                self._q.qsize(),
+            )
+        elif not self._q.empty():
+            _logger.warning(
+                "Arrêt de la file d'ingestion : %d message(s) restant(s) non traités",
+                self._q.qsize(),
+            )
 
     def _run(self) -> None:
         while not self._stop.is_set():

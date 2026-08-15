@@ -88,6 +88,8 @@ launchers\JARVIS.bat            # Windows — ./launchers/JARVIS.sh sur Linux/ma
 > (`ollama pull`, plusieurs Go) — instructions complètes dans le [mode d'emploi](docs/USAGE.md).
 > 🛰️ **Sans internet ?** `scripts/vendor_wheels.py` produit `vendor_wheels/` (~500 Mo)
 > pour une installation 100 % offline — voir la section Reproductibilité de [docs/DEVELOP.md](docs/DEVELOP.md).
+> Posez `JARVIS_OFFLINE=1` dans `.env` : `scripts/install.py` refusera alors tout
+> accès PyPI si `vendor_wheels/` est absent (échec explicite, jamais de réseau).
 
 ---
 

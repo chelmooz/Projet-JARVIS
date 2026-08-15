@@ -8,7 +8,9 @@ Responsabilité unique :
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from typing import Any
 
 from agents.base import BaseAgent
 from agents.factory import create_agents
@@ -57,6 +59,7 @@ class AppContext:
         self.agent_supervisor: AgentSupervisor | None = None
         self.file_system: FileSystemService | None = None
         self._initialized = False
+        self._warmup_tasks: list[asyncio.Task[Any]] = []
 
     def initialize(self) -> None:
         """Initialise tous les services (idempotent)."""

@@ -67,20 +67,6 @@ def preflight_check(logger: logging.Logger) -> bool:
     return True
 
 
-def _shutdown(pm, signum, frame) -> None:
-    """Gestionnaire de signal pour l'arrêt propre (SIGINT/SIGTERM).
-
-    Appelle pm.stop_all(), puis sys.exit(0) quel que soit le résultat.
-    """
-    logger = logging.getLogger("JARVIS")
-    logger.info("Signal %s reçu. Arrêt en cours...", signum)
-    try:
-        pm.stop_all()
-    except Exception:
-        logger.warning("Erreur lors de l'arrêt des processus", exc_info=True)
-    sys.exit(0)
-
-
 def main() -> None:
     """Point d'entrée principal."""
     os.chdir(BASE_DIR)

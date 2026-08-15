@@ -9,40 +9,41 @@ import os
 import platform
 import subprocess
 import sys
+from pathlib import Path
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SYSTEM = platform.system().lower()
 ARCH = platform.machine()
 
 
-def color(text, code):
+def color(text: str, code: str) -> str:
     """Color."""
     if not sys.stdout.isatty():
         return text
     return f"\033[{code}m{text}\033[0m"
 
 
-def green(text):
+def green(text: str) -> str:
     return color(text, "92")
 
 
-def yellow(text):
+def yellow(text: str) -> str:
     return color(text, "93")
 
 
-def cyan(text):
+def cyan(text: str) -> str:
     return color(text, "96")
 
 
-def red(text):
+def red(text: str) -> str:
     return color(text, "91")
 
 
-def gray(text):
+def gray(text: str) -> str:
     return color(text, "90")
 
 
-def header():
+def header() -> None:
     """Header."""
     # Clear écran sans subprocess ni shell (portable : ANSI fonctionne sur
     # les terminaux modernes Windows 10+/Linux/macOS).
@@ -55,7 +56,7 @@ def header():
     print()
 
 
-def _resolve_pip_exe():
+def _resolve_pip_exe() -> str:
     """Determine l'interpreteur cible pour l'install des deps, par ordre de priorite :
     1. portable_python/<plateforme>/... (celui reellement utilise par JARVIS.bat)
     2. venv/ du projet s'il existe
@@ -66,7 +67,7 @@ def _resolve_pip_exe():
         sys.path.insert(0, BASE_DIR)
         from config.paths import get_portable_python
 
-        candidate = get_portable_python()
+        candidate = Path(get_portable_python())
         if candidate.exists():
             return str(candidate)
     except Exception:
@@ -74,17 +75,14 @@ def _resolve_pip_exe():
 
     venv_dir = os.path.join(BASE_DIR, "venv")
     if os.path.isdir(venv_dir):
-        if SYSTEM == "windows":
-            candidate = os.path.join(venv_dir, "Scripts", "python.exe")
-        else:
-            candidate = os.path.join(venv_dir, "bin", "python")
-        if os.path.exists(candidate):
-            return candidate
+        candidate = Path(venv_dir, "Scripts", "python.exe") if SYSTEM == "windows" else Path(venv_dir, "bin", "python")
+        if candidate.exists():
+            return str(candidate)
 
     return sys.executable
 
 
-def _vendor_find_links():
+def _vendor_find_links() -> list[str]:
     """Retourne la liste --find-links vers vendor_wheels/ si present (offline).
 
     Dossiers possibles : vendor_wheels (sdist exception, antlr4) + le sous-dossier
@@ -109,7 +107,16 @@ def _vendor_find_links():
     return links
 
 
-def install_python_deps():
+def _should_refuse_online_fallback(offline_flag: str | None, find_links: list[str]) -> bool:
+    """Vrai si le mode offline est demandé mais qu'aucune wheel locale n'est disponible.
+
+    Décision unique et pure : sous ``JARVIS_OFFLINE``, le fallback PyPI est
+    refusé explicitement — jamais de tentative réseau silencieuse (P3).
+    """
+    return bool(offline_flag) and not find_links
+
+
+def install_python_deps() -> bool:
     """Installe les packages Python."""
     print(yellow("\n[1/3] Dependances Python..."))
 
@@ -120,9 +127,15 @@ def install_python_deps():
         return False
 
     pip_exe = _resolve_pip_exe()
-    offline = False
 
     find_links = _vendor_find_links()
+    if _should_refuse_online_fallback(os.environ.get("JARVIS_OFFLINE"), find_links):
+        print(red("  JARVIS_OFFLINE actif mais aucun vendor_wheels/ detecte."))
+        print(red("  Installation impossible hors ligne : produisez les wheels avec"))
+        print(red("  scripts/vendor_wheels.py sur une machine connectee, puis relancez."))
+        return False
+
+    offline = False
     if find_links:
         offline = True
         print(f"  {cyan('Mode offline : wheels locales detectees')} (vendor_wheels/)")
@@ -163,7 +176,7 @@ def install_python_deps():
         return False
 
 
-def setup_ollama():
+def setup_ollama() -> bool:
     """Installe le binaire Ollama **portable** SUR LA CLÉ (jamais sur l'ordi client).
 
     Les machines à auditer ne sont PAS la machine de déploiement : une installation
@@ -198,7 +211,7 @@ def setup_ollama():
         _install_windows_zip,
     )
 
-    def log(step, message, success):
+    def log(step: str, message: str, success: bool | None) -> None:
         mark = green("[OK]") if success else (red("[FAIL]") if success is False else gray("..."))
         print(f"      {mark} {step} : {message}")
 
@@ -225,7 +238,7 @@ def setup_ollama():
     return False
 
 
-def install_openwebui():
+def install_openwebui() -> bool:
     """Installe OpenWebUI via pip."""
     print(yellow("\n[3/3] OpenWebUI (interface utilisateur)..."))
 
@@ -246,7 +259,7 @@ def install_openwebui():
         return False
 
 
-def _portable_ollama_path():
+def _portable_ollama_path() -> str | None:
     """Retourne le chemin du binaire Ollama portable s'il existe sur la clé, sinon None."""
     name = "ollama.exe" if SYSTEM == "windows" else "ollama"
     subdirs = {"windows": [""], "linux": ["linux"], "darwin": ["mac"]}
@@ -257,7 +270,7 @@ def _portable_ollama_path():
     return None
 
 
-def print_final():
+def print_final() -> None:
     """Print final. N'affiche plus de commande manuelle 'ollama serve' (voir bug
     deploiement USB Windows du 12/08 : lancer Ollama a la main hors JARVIS.bat
     demarre sur le port systeme 11434 avec les modeles hors cle)."""
@@ -283,7 +296,7 @@ def print_final():
     print()
 
 
-def main():
+def main() -> None:
     """Main."""
     header()
 

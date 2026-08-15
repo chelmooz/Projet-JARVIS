@@ -15,6 +15,7 @@ from typing import Any
 
 from config.constants import VERSION
 from controllers.di import AppContext
+from ports.jarvis_context import JarvisContext
 
 _logger = logging.getLogger("jarvis.context")
 
@@ -33,7 +34,7 @@ def _service_healthy(service: Any) -> bool:
         return False
 
 
-def build_status(context: Any) -> dict[str, Any]:
+def build_status(context: JarvisContext) -> dict[str, Any]:
     """Construit le dict de status à partir du contexte (état des services).
 
     Source unique pour les endpoints API (/api/status, /api/status/stream).
@@ -41,8 +42,9 @@ def build_status(context: Any) -> dict[str, Any]:
     de l'ancien ``context.py`` : l'état est dérivé des ports (``ping`` /
     ``is_healthy``), sans état global mutable.
     """
-    inference = getattr(context, "inference", None)
+    inference = context.inference
     ollama_up = False
+    # `ping` est une capacité optionnelle de l'inférence : garde défensive.
     if inference is not None and hasattr(inference, "ping"):
         try:
             ollama_up = bool(inference.ping())
@@ -52,9 +54,9 @@ def build_status(context: Any) -> dict[str, Any]:
     return {
         "ollama": ollama_up,
         "inference": _service_healthy(inference),
-        "vector": _service_healthy(getattr(context, "vector", None)),
-        "memory": _service_healthy(getattr(context, "memory", None)),
-        "conversations": _service_healthy(getattr(context, "conversations", None)),
+        "vector": _service_healthy(context.vector),
+        "memory": _service_healthy(context.memory),
+        "conversations": _service_healthy(context.conversations),
         "version": VERSION,
     }
 

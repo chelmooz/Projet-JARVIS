@@ -51,7 +51,7 @@ def get_backup_dir(arg: str | None = None) -> str:
 
 def list_backup_items(backup_dir: str, dest_root: str | None = None) -> list[tuple[str, str]]:
     """Retourne la liste des paires (chemin_source, chemin_destination) a restaurer."""
-    dest_root = dest_root or paths.ROOT
+    dest_root = dest_root or str(paths.ROOT)
     items: list[tuple[str, str]] = []
     for sub in SOURCE_SUBDIRS:
         src = os.path.join(backup_dir, sub)
@@ -101,7 +101,7 @@ def snapshot_dest(dest_root: str) -> str | None:
     a sauvegarder (destination vide). En cas d'erreur disque, leve pour bloquer
     la restauration (fail-fast : mieux vaut refuser que perdre l'etat courant).
     """
-    dest_root = dest_root or paths.ROOT
+    dest_root = dest_root or str(paths.ROOT)
     srcs = [os.path.join(dest_root, sub) for sub in SOURCE_SUBDIRS]
     if not any(os.path.isdir(s) for s in srcs):
         return None
@@ -136,7 +136,7 @@ def restore(
     Avant ecriture, verifie l'integrite du backup (fail-fast si corrompu) et,
     sauf no_snapshot, sauvegarde l'etat courant de la destination (reversible).
     """
-    dest_root = dest_root or paths.ROOT
+    dest_root = dest_root or str(paths.ROOT)
     if not os.path.isdir(backup_dir):
         raise FileNotFoundError(f"Repertoire de backup introuvable : {backup_dir}")
 

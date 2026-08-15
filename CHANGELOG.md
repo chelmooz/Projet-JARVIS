@@ -1,5 +1,56 @@
 # Changelog — JARVIS Portable Edition
 
+## [Non publié] — Post-audit : nettoyage de code mort (P7, P9, P12)
+
+Lot 1 — `jarvis.py:_shutdown` supprimée : définie mais jamais enregistrée via
+`signal.signal`. Uvicorn gère nativement SIGINT/SIGTERM et le `finally:
+pm.stop_all()` couvre l'arrêt d'Ollama ; Windows passe par
+`services/launcher_win.py` qui enregistre son propre handler. Enregistrer le
+handler dans `jarvis.py` aurait cassé le graceful shutdown Uvicorn sur Unix.
+
+Lot 4 — `services/ingest_queue.py` : `stop()` est désormais déterministe
+(`stop(timeout=5.0)` → join du worker avec timeout, warning explicite si le
+worker est encore actif ou si des messages restent en file). Plus d'arrêt
+silencieux laissant des embeddings non indexés.
+
+Lot 7 — `services/facts.py` (`FactStore`) supprimé : module orphelin, 0 import
+production et 0 référence test. Aucun remplacement — jamais instancié.
+
+Lot 6 — `services/diagnostic.py` (façade de compatibilité) supprimé : 0 import
+réel depuis la migration. `services/diagnostics/service.py` reste la source
+unique (orchestration délégant aux feuilles `checks.py`).
+
+Lot 2 — `scripts/install.py` : nouveau flag `JARVIS_OFFLINE` — posé sans
+`vendor_wheels/` (via `scripts/vendor_wheels.py`), l'installation refuse
+explicitement le fallback PyPI (message clair, zéro tentative réseau).
+Décision isolée dans `_should_refuse_online_fallback()`.
+
+Lot 3 — Contrat `ctx` typé : nouveau port `ports/jarvis_context.py`
+(Protocol `JarvisContext`, vérifié à l'exécution contre `AppContext`).
+`warmup.py`/`status.py`/`context.py` passent de `ctx: Any` au Protocol ;
+`_warmup_tasks` déclaré dans `AppContext.__init__`. Les lectures réellement
+optionnelles (contexte dégradé, capacités optionnelles) restent en `getattr`
+défensif, documenté au point d'usage.
+
+Lot 5 — `services/metrics.py` bufferisé : plus d'écriture disque par
+incrément (usure clef USB). Persistance périodique piggyback (60 s, horloge
+injectable, pas de thread) + `flush()` public ; `MetricsPort.flush()` ajouté
+au contrat ; `_shutdown_sequence` vide le buffer à l'arrêt propre.
+
+Lot 8a — `pyproject.toml` : l'override `--basetemp=.pytest-temp` est retiré ;
+pytest revient au basetemp système par défaut (`%TEMP%\pytest-of-<user>`),
+plus d'artefacts de test dans la racine du repo. `.gitignore` conserve
+`.pytest-temp/` en filet de sécurité.
+
+Lot 8b — mypy strict couvre désormais `jarvis.py` + les 7 scripts du dépôt
+(125 → 133 fichiers) : annotations de types complétées sur `install.py`,
+`install_portable_python.py`, `vendor_wheels.py`, `restore_backup.py`
+(notamment résolution `Path`/`str` dans `_resolve_pip_exe`).
+
+Lot 8c — CI : le job `quality` tourne aussi sur `windows-latest` (matrice OS ×
+Python 3.12, exclusion 3.13/Windows, `fail-fast: false`). Cache pip adapté
+(`~/AppData/Local/pip/Cache`), step « Coverage badge » limité à Linux.
+
 ## [Non publié] — Lot 0.6 : rapatriement de tests orphelins depuis fix/perf-audit-2026-08
 
 Investigation du commit `dd5def7` (11/08, suppression de 100 fichiers de tests /

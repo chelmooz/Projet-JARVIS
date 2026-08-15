@@ -21,6 +21,7 @@ from controllers.di import AppContext
 from controllers.middlewares import setup_middlewares
 from controllers.status import _refresh_status_cache, _status_refresher
 from controllers.warmup import _warmup_vector_store, lifespan
+from ports.jarvis_context import JarvisContext
 
 _logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ async def _body_size_limiter(request: Request, call_next: Callable[[Request], Aw
     return await call_next(request)
 
 
-def _build_status_data(context: Any) -> dict[str, Any]:
+def _build_status_data(context: JarvisContext) -> dict[str, Any]:
     from controllers.status import build_status
 
     return build_status(context)

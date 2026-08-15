@@ -57,7 +57,6 @@ indent-style = "space"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 pythonpath = ["."]
-addopts = ["--basetemp=.pytest-temp"]
 asyncio_mode = "auto"
 
 [tool.mypy]
@@ -65,7 +64,7 @@ python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 explicit_package_bases = true
-files = ["services", "controllers", "agents", "graph", "ports", "config", "models", "scripts/schedule_backup.py"]
+files = ["jarvis.py", "services", "controllers", "agents", "graph", "ports", "config", "models", "scripts/schedule_backup.py", "scripts/jarvis_doctor.py", "scripts/coverage_badge.py", "scripts/verify_release.py", "scripts/restore_backup.py", "scripts/install_portable_python.py", "scripts/vendor_wheels.py", "scripts/install.py"]
 exclude = ["build", "node_modules", "\\.venv", "dist"]
 
 [[tool.mypy.overrides]]
