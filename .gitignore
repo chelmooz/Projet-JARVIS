@@ -18,6 +18,10 @@ node_modules/
 lib/
 vendor_wheels/
 
+# Environnement virtuel local (contient des chemins absolus et un nom d'utilisateur
+# système propres à la machine d'installation — jamais portable, jamais à committer)
+venv/
+
 memory/.jarvis_token
 
 bin/ollama.exe
