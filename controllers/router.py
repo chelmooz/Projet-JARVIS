@@ -163,7 +163,7 @@ def _register_middlewares(app: FastAPI) -> None:
     ) -> Response:
         # Skip token verification for health checks and docs
         if (
-            request.url.path in ["/", "/api/status", "/api/backend", "/api/metrics"]
+            request.url.path in ["/", "/api/status", "/api/status/stream", "/api/backend", "/api/metrics"]
             or request.url.path.startswith("/docs")
             or request.url.path.startswith("/redoc")
             or request.url.path.startswith("/openapi.json")

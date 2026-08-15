@@ -75,6 +75,14 @@ class InferenceService(ChatPort, MultimodalPort, EmbeddingPort, ModelRegistryPor
         """Vérifie si le backend Ollama est accessible."""
         return self._adapter().ping()
 
+    def is_healthy(self) -> bool:
+        """Vérifie que le backend Ollama répond (santé du service d'inférence)."""
+        try:
+            return self.ping()
+        except Exception:
+            _logger.warning("Inference health check failed", exc_info=True)
+            return False
+
     def close(self) -> None:
         """Libère l'adaptateur (fermeture déterministe du client HTTP à l'arrêt)."""
         self._adapter().close()

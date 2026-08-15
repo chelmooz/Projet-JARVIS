@@ -13,14 +13,20 @@ format de réponse différent (non enveloppé) — cause des échecs
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
 from starlette.responses import Response
 
 from controllers.router import _get_context
 from controllers.status import build_status
+from services.profiling import get_slow_endpoints
 from services.static_files import serve_static_file
 
 _logger = logging.getLogger(__name__)
@@ -44,6 +50,39 @@ async def health(request: Request) -> JSONResponse:
     data = build_status(context)
     healthy = all(data[key] for key in ("inference", "vector", "memory", "conversations"))
     return JSONResponse(content={"healthy": healthy}, status_code=200 if healthy else 503)
+
+
+# =============================================================================
+# Status Stream — SSE (remplace le polling côté client)
+# =============================================================================
+
+
+async def _status_events(request: Request, heartbeat_every: int = 15, max_duration: int = 60) -> AsyncIterator[dict[str, Any]]:
+    """Flux SSE : statut courant puis heartbeats jusqu'à déconnexion ou ``max_duration``.
+
+    Le client SSE (EventSource, cf. status.js) se reconnecte automatiquement
+    (``retry: 5000``) — pas besoin de garder la connexion ouverte indéfiniment.
+    """
+    context = _get_context(request)
+    cache = request.app.state.status_cache
+    lock = request.app.state.status_lock
+
+    async with lock:
+        data = dict(cache["data"]) if cache["data"] else build_status(context)
+    data["slow_endpoints"] = get_slow_endpoints()
+    yield {"data": json.dumps(data)}
+
+    elapsed = 0
+    while elapsed < max_duration and not await request.is_disconnected():
+        await asyncio.sleep(heartbeat_every)
+        elapsed += heartbeat_every
+        yield {"comment": "keep"}
+
+
+@router.get("/api/status/stream")
+async def status_stream(request: Request) -> EventSourceResponse:
+    """Endpoint SSE consommé par le panneau latéral (status.js: connectStatusSSE)."""
+    return EventSourceResponse(_status_events(request), headers={"retry": "5000"})
 
 
 # =============================================================================
