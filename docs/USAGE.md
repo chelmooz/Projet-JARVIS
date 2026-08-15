@@ -110,6 +110,26 @@ copy .env.example .env
 cp .env.example .env
 ```
 
+> 📂 **Accès aux dossiers (indispensable pour un usage audit)** : par défaut, JARVIS
+> ne peut lire **aucun** fichier — c'est voulu (voir
+> [ADR-011](adr/ADR-011-sandbox-fail-closed.md)). Pour débloquer l'explorateur de
+> dossiers (« Parcourir » dans Réglages), éditez `.env` et définissez
+> `JARVIS_FILES_SANDBOX_ROOT` — c'est le **périmètre maximal** à l'intérieur
+> duquel vous pourrez ensuite autoriser des sous-dossiers un par un, pas "le
+> seul dossier accessible" :
+>
+> ```
+> # Usage prudent (protéger sa propre machine) : un dossier dédié et restreint
+> JARVIS_FILES_SANDBOX_ROOT=C:\Projet-JARVIS\allowed_files
+>
+> # Usage audit (inspecter une machine tierce avec la clé USB) : le disque
+> # entier de la machine auditée, pour tout pouvoir autoriser depuis l'UI
+> JARVIS_FILES_SANDBOX_ROOT=C:\
+> ```
+>
+> Un périmètre large (`C:\`) est adapté à un outil d'audit que vous contrôlez,
+> mais réduit la protection si la clé USB tombe dans d'autres mains.
+
 Puis lancez la plateforme — le `.bat` fait tout (téléchargement du moteur portable,
 démarrage du serveur sur 11436, puis lancement de l'API) :
 
