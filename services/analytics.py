@@ -119,11 +119,8 @@ class AnalyticsService(AnalyticsPort):
         avg_latency = round(sum(x.get("latency_ms", 0) for x in q) / total, 1) if total else 0.0
 
         # Heuristique : l'agent "vectorize" correspond aux conversations ingestées
-        total_conversations = sum(1 for x in q if x.get("agent") == "vectorize")
-
         return {
             "total_queries": total,
-            "total_conversations": total_conversations,
             "success_rate": round(success / total * 100, 1) if total else 0.0,
             "avg_latency_ms": avg_latency,
             "queries": q,

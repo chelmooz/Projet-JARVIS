@@ -76,7 +76,10 @@ class AgentGraph:
             raise ValueError(f"Agent '{agent_key}' introuvable dans le registre")
 
         if not model:
-            model = select_model(agent_key, None, self.model_provider)
+            try:
+                model = select_model(agent_key, None, self.model_provider)
+            except ValueError as e:
+                raise ValueError(f"Aucun modèle disponible pour '{agent_key}': {e}")
 
         result = self.agent_supervisor.run(
             agent,

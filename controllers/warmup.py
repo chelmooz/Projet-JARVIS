@@ -153,9 +153,13 @@ async def _shutdown_sequence(ctx: Any) -> None:
     _logger.info("=== Arrêt de JARVIS en cours ===")
 
     # Annuler les tâches de warmup en cours si elles tournent encore
-    for task in getattr(ctx, "_warmup_tasks", []):
-        if not task.done():
-            task.cancel()
+    tasks = getattr(ctx, "_warmup_tasks", [])
+    if tasks:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        # Attendre la fin des tâches annulées (évite CancelledError dans les logs)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     ingest_queue = getattr(ctx, "ingest_queue", None)
     if ingest_queue is not None:

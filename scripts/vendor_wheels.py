@@ -30,7 +30,8 @@ PYTHON_VERSION = "3.12"
 
 DEFAULT_PLATFORMS = [
     "win_amd64",
-    "manylinux_2_17_x86_64",
+    "linux_x86_64",
+    "macosx_10_15_x86_64",
     "macosx_11_0_arm64",
 ]
 
@@ -69,8 +70,8 @@ def _filtered_requirements(dest, exc):
     return filtered
 
 
-def download_wheels(platform_tag, dest, requirements_file):
-    """Telecharge les wheels binaires pour une plateforme (--no-deps)."""
+def _download_platform_wheel(platform_tag, requirements_file, dest):
+    """Telecharge les wheels binaires pour une plateforme donnee (--no-deps)."""
     cmd = [
         sys.executable,
         "-m",
@@ -90,11 +91,16 @@ def download_wheels(platform_tag, dest, requirements_file):
     print(yellow(f"\n[{platform_tag}] wheels -> {dest}"))
     try:
         subprocess.run(cmd, check=True, timeout=1200)
-        print(f"  {green(f'[OK] {platform_tag} wheels')}")
+        print(f"  [OK] {platform_tag} wheels")
         return True
     except subprocess.CalledProcessError as e:
         print(red(f"  Echec wheels {platform_tag} (retour {e.returncode})"))
         return False
+
+
+def download_wheels(platform_tag, dest, requirements_file):
+    """Telecharge les wheels binaires pour une plateforme (--no-deps)."""
+    return _download_platform_wheel(platform_tag, requirements_file, dest)
 
 
 def download_sdist_exceptions(dest):

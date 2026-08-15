@@ -146,45 +146,11 @@ def create_app() -> FastAPI:
     app.state.status_cache = {"data": None, "ts": 0.0}
     app.state.status_lock = asyncio.Lock()
 
-    # Enregistrement des middlewares et des routes.
+# Enregistrement des middlewares et des routes.
     _register_middlewares(app)
     _register_routes(app)
 
     return app
-
-    # Middleware d'authentification token mono-user
-    @app.middleware("http")
-    async def verify_token_middleware(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        # Skip token verification for health checks and docs
-        if (
-            request.url.path in ["/", "/api/status", "/api/backend", "/api/metrics"]
-            or request.url.path.startswith("/docs")
-            or request.url.path.startswith("/redoc")
-            or request.url.path.startswith("/openapi.json")
-        ):
-            return await call_next(request)
-
-        # Skip token verification if OpenWebUI is disabled (no CORS needed either)
-        if os.environ.get("JARVIS_ENABLE_OPENWEBUI", "0") != "1":
-            return await call_next(request)
-
-        # Require token in header for all other routes
-        token = request.headers.get("X-JARVIS-Token")
-        if not token:
-            return JSONResponse(status_code=401, content={"detail": "Missing X-JARVIS-Token header"})
-
-        # Verify token
-        token_file = Path(__file__).resolve().parent.parent / "memory" / ".jarvis_token"
-        if not token_file.exists():
-            return JSONResponse(status_code=503, content={"detail": "Authentication token not available"})
-
-        valid_token = token_file.read_text().strip()
-        if token != valid_token:
-            return JSONResponse(status_code=401, content={"detail": "Invalid X-JARVIS-Token"})
-
-        return await call_next(request)
 
     # Lazy import des sous-routeurs (désenchevêtrement 15.8)
     from controllers.routes import agents as agents_routes
@@ -200,7 +166,6 @@ def create_app() -> FastAPI:
     from controllers.routes import kill_coding as kill_coding_routes
     from controllers.routes import pipelines as pipelines_routes
     from controllers.routes import quality_audit as quality_audit_routes
-    from controllers.routes import settings as settings_routes
     from controllers.routes import skills as skills_routes
 
     # Enregistrement des routeurs métier.

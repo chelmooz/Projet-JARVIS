@@ -1,62 +1,32 @@
-"""Routes système — Endpoints de monitoring (/api/health, /api/status).
-
-Ce module regroupe les endpoints système pour le monitoring et la santé de l'application.
-Extrait de controllers/router.py (dette signalée l.7-14) pour respecter SRP.
-"""
+"""Routes système — Endpoints de monitoring et de configuration."""
 
 from __future__ import annotations
 
 import asyncio
-import json
+import time
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from sse_starlette.sse import EventSourceResponse
 
 from controllers.router import _get_context
-from controllers.status import build_status
-from services.profiling import get_slow_endpoints
+
+from services.static_files import serve_static_file
 
 _logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # =============================================================================
-# Health Check (Nouveau endpoint pour déploiement propre)
+# Health Check
 # =============================================================================
-
 
 @router.get("/api/health")
 async def health(request: Request) -> JSONResponse:
-    """Endpoint de santé pour le monitoring.
-
-    Retourne l'état de santé de tous les services critiques :
-    - ollama: Backend d'inférence
-    - inference: Service d'inférence
-    - vector: Index vectoriel
-    - memory: Service de mémoire
-    - conversations: Service de conversations
-    - version: Version de JARVIS
-
-    Utilisé par les load balancers et outils de monitoring (Kubernetes, Docker, etc.).
-    """
+    """Endpoint de santé pour le monitoring."""
     context = _get_context(request)
-
-    # Vérifier chaque service
-    def check_service(name: str, service: Any) -> bool:
-        """Vérifie si un service est en bonne santé."""
-        check = getattr(service, "is_healthy", None)
-        if check is None:
-            return False
-        try:
-            return bool(check())
-        except Exception:
-            _logger.warning(f"Health check failed for {name}", exc_info=True)
-            return False
-
     inference = getattr(context, "inference", None)
     ollama_up = False
     if inference is not None and hasattr(inference, "ping"):
@@ -64,80 +34,72 @@ async def health(request: Request) -> JSONResponse:
             ollama_up = bool(inference.ping())
         except Exception:
             _logger.warning("Inference ping failed", exc_info=True)
-            ollama_up = False
 
-    status = {
-        "ollama": ollama_up,
-        "inference": check_service("inference", inference),
-        "vector": check_service("vector", getattr(context, "vector", None)),
-        "memory": check_service("memory", getattr(context, "memory", None)),
-        "conversations": check_service("conversations", getattr(context, "conversations", None)),
-        "version": "6.0",  # À synchroniser avec config.constants.VERSION
-    }
-
-    # Vérifier si tout est OK
-    all_healthy = all(status.values())
-
-    if all_healthy:
-        return JSONResponse(status_code=200, content={"status": status, "healthy": True})
-    else:
-        return JSONResponse(status_code=503, content={"status": status, "healthy": False})
+    return JSONResponse(content={"ollama": ollama_up, "version": "6.0"}, status_code=200 if ollama_up else 503)
 
 
 # =============================================================================
-# Status Stream — SSE (remplace le polling 5s côté client)
+# System Information
 # =============================================================================
 
+@router.get("/api/backend")
+async def get_backend() -> JSONResponse:
+    """Retourne le backend utilisé."""
+    return JSONResponse(content={"backend": "ollama"}, status_code=200)
 
-async def _status_generator(request: Request, max_duration: int = 60) -> AsyncIterator[dict[str, Any] | str]:
-    """Génère un flux SSE alimenté par le cache de statut.
 
-    Envoie un ping initial (commentaire SSE) pour confirmer la connexion,
-    puis le statut actuel depuis app.state.status_cache. Le flux reste ouvert
-    en envoyant des heartbeats toutes les 15s, puis se termine après 60s — le
-    client SSE gère automatiquement la reconnexion (retry: 5000).
+@router.get("/api/models")
+async def list_models(request: Request) -> JSONResponse:
+    """Liste les modèles disponibles."""
+    context = _get_context(request)
+    inference = getattr(context, "inference", None)
+    if inference is None:
+        return JSONResponse(content={"models": [], "available": False}, status_code=200)
+    models = inference.list_models()
+    return JSONResponse(content={"models": models, "available": True}, status_code=200)
 
-    max_duration (60s par défaut) : durée du flux avant fermeture.
-    """
+
+@router.get("/", response_model=None)
+async def index(request: Request) -> JSONResponse:
+    """Sert la page d'accueil."""
+    return JSONResponse(content={"message": "JARVIS API — voir /docs pour la documentation"})
+
+
+@router.get("/api/status")
+async def get_status(request: Request) -> JSONResponse:
+    """Renvoie le status agrégé."""
     context = _get_context(request)
     cache = request.app.state.status_cache
     lock = request.app.state.status_lock
 
-    # Ping initial pour confirmer la connexion SSE
-    # (sse_starlette formate deja les lignes "data: ..." — ne pas prefixer
-    # nous-memes, sinon le client recoit "data: data: {...}" et JSON.parse echoue)
-    yield {"comment": "ping"}
-
-    # Envoyer le statut actuel
     async with lock:
-        data = dict(cache["data"]) if cache["data"] else build_status(context)
-    data["slow_endpoints"] = get_slow_endpoints()
-    yield {"data": json.dumps(data)}
-
-    # Heartbeats toutes les 15s avant fermeture (le client SSE se reconnecte avec retry: 5000)
-    start = asyncio.get_event_loop().time()
-    try:
-        while True:
-            await asyncio.sleep(15)
-            if await request.is_disconnected():
-                break
-            if asyncio.get_event_loop().time() - start >= max_duration:
-                break
-            yield {"comment": "keep"}
-    except asyncio.CancelledError:
-        _logger.debug("Status stream cancelled")
+        data = cache["data"] if time.time() - cache["ts"] < 60 else None
+    if data is None:
+        from controllers.status import build_status
+        async with lock:
+            cache["data"] = build_status(context)
+            cache["ts"] = time.time()
+        data = cache["data"]
+    data = dict(data)
+    if not data:
+        return JSONResponse(content={"error": "no data"}, status_code=404)
+    return JSONResponse(content=data, status_code=200)
 
 
-@router.get("/api/status/stream")
-async def status_stream(request: Request) -> EventSourceResponse:
-    """Endpoint SSE pour le statut des services.
+@router.get("/api/metrics")
+async def get_metrics(request: Request) -> JSONResponse:
+    """Retourne les métriques de l'application."""
+    context = _get_context(request)
+    inference = getattr(context, "inference", None)
+    models = inference.list_models() if inference else []
+    return JSONResponse(content={"models": models, "status": "ok"}, status_code=200)
 
-    Remplace le polling 5s de setInterval(pollStatus, 5000) : le client
-    reçoit un ping initial + le statut, puis un heartbeat toutes les 15s.
-    Le statut est lu depuis le cache côté serveur (rafraîchi par _status_refresher).
-    Inclut retry: 5000 pour reconnexion automatique.
-    """
-    return EventSourceResponse(
-        _status_generator(request),
-        headers={"retry": "5000"},
-    )
+
+# =============================================================================
+# Static Files
+# =============================================================================
+
+@router.get("/static/{path:path}")
+async def serve_static(path: str, request: Request) -> JSONResponse:
+    """Sert les fichiers statiques."""
+    return await serve_static_file(request, path)

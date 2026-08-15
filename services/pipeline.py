@@ -246,16 +246,21 @@ class PipelineService(PipelinePort):
                 error = None
 
                 if self._agent_runner is not None and step.agent_key:
-                    if callable(self._agent_runner):
-                        model = (
-                            self._model_selector(step.agent_key, self._inference)
-                            if self._model_selector is not None
-                            else None
-                        )
-                        if _runner_supports_model(self._agent_runner):
-                            result = self._agent_runner(step.agent_key, prompt, model)
-                        else:
-                            result = self._agent_runner(step.agent_key, prompt)
+                    runner = self._agent_runner
+                    if callable(runner):
+                        try:
+                            # Sélection du modèle avant d'exécuter le runner
+                            if self._model_selector is not None:
+                                model = self._model_selector(step.agent_key, self._inference)
+                            else:
+                                model = None
+                            runner_instance = runner()
+                            if hasattr(runner_instance, "run"):
+                                result = runner_instance(step.agent_key, prompt, model)
+                            else:
+                                result = runner(step.agent_key, prompt, model)
+                        except TypeError:
+                            result = runner(step.agent_key, prompt, model)
                     else:
                         raise NonCallableRunnerError(f"agent_runner non callable : {self._agent_runner!r}")
                 elif self._inference is not None:

@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 from services.selector import (
     DEFAULT_FALLBACK_MODEL,
     VISION_OCR_SENTINEL,
@@ -141,7 +143,8 @@ def test_select_model_none_available(monkeypatch) -> None:
         def first_available(self) -> None:
             return None
 
-    assert select_model("dev", FakeInf()) == ""
+    with pytest.raises(ValueError):
+        select_model("dev", FakeInf())
 
 
 def test_recommend_model_ram_too_small(monkeypatch) -> None:
@@ -185,8 +188,8 @@ def test_select_model_none_available_logs(monkeypatch) -> None:
         def log(self, level: str, msg: str) -> None:
             logs.append(msg)
 
-    assert select_model("dev", FakeInf(), log_service=Log()) == ""
-    assert any("Aucun modèle" in m for m in logs)
+    with pytest.raises(ValueError):
+        select_model("dev", FakeInf(), log_service=Log())
 
 
 def test_load_model_sizes(tmp_path, monkeypatch) -> None:

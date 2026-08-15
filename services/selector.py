@@ -203,7 +203,10 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
         return select_vision_model(inference) or ""
 
     if inference is None:
-        return ""
+        raise ValueError(
+            f"Aucun modèle disponible pour l'agent '{agent_key}'. "
+            "Vérifiez que Ollama est démarré avec au moins un modèle."
+        )
 
     prefs = read_preferences()
     model_map = prefs.get("model_map", fallback_models())
@@ -229,7 +232,10 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
 
     if log_service:
         log_service.log("WARN", f"Aucun modèle disponible pour l'agent '{agent_key}'")
-    return ""
+    raise ValueError(
+        f"Aucun modèle disponible pour l'agent '{agent_key}'. "
+        "Vérifiez que Ollama est démarré avec au moins un modèle."
+    )
 
 
 __all__ = [

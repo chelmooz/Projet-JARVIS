@@ -5,7 +5,7 @@ Encadre l'appel ``agent.run`` d'un timeout wall-clock configurable. Si l'agent
 structurée est retournée au lieu de bloquer indéfiniment le pipeline.
 
 Pourquoi un thread manuel et non ``concurrent.futures`` ?
---------------------------------------------------------
+-------------------------------------------------------
 Les threads Python ne sont **pas** interruptibles : ``Future.cancel()`` ne
 stoppe pas un thread déjà démarré. Le pattern ``Thread`` + ``join(timeout)``
 est donc requis pour pouvoir invoquer ``cancel_fn`` (fermeture du client HTTP
@@ -39,28 +39,15 @@ CancelFn = Callable[[int], None]
 # Contrat minimal de l'agent supervisé (ISP : seule la méthode exécutée).
 # ---------------------------------------------------------------------------
 
-
 class AgentLike(Protocol):
     """Tout objet exposant ``run(task, model, context)`` peut être supervisé."""
 
     def run(self, task: str, model: str, context: dict[str, Any]) -> Any: ...
 
 
-def _agent_name(agent: AgentLike) -> str:
-    """Nom lisible de l'agent pour les logs (lecture défensive).
-
-    Priorité : ``name`` explicite > ``profile_key`` (contrat uniforme
-    ``BaseAgent.profile_key``, Lot H1 — remplace les deux anciennes
-    conventions divergentes ``_profile_key``/``PROFILE_KEY``) > nom de
-    classe en dernier recours (agent duck-typé sans l'un ni l'autre).
-    ``getattr`` reste défensif : ``AgentLike`` n'exige que ``run``.
-    """
-    name = getattr(agent, "name", None)
-    if name:
-        return str(name)
-    profile = getattr(agent, "profile_key", None)
-    return str(profile) if profile else type(agent).__name__
-
+# ---------------------------------------------------------------------------
+# Classe principal
+# ---------------------------------------------------------------------------
 
 class AgentSupervisor:
     """Exécute ``run()`` d'un agent sous garde-fou de timeout wall-clock."""
@@ -83,18 +70,20 @@ class AgentSupervisor:
     ) -> dict[str, Any]:
         """Exécute ``agent.run`` dans un thread ; résultat ou erreur timeout.
 
-        ``cancel_fn`` (optionnel) est appelé au timeout avec l'identifiant du
-        worker thread pour annuler la requête sous-jacente **du seul worker**
-        (ROADMAP 14.1 : annulation ciblée par requête, sans fermer le pool
-        HTTP partagé utilisé par les requêtes concurrentes).
+        Un ``stop_event`` est transmis dans le contexte de l'agent.
+        Si le timeout expire, l'événement est déclenché pour demander à
+        l'agent de s'arrêter le plus rapidement possible.
         """
         result: dict[str, Any] | None = None
         error: BaseException | None = None
 
+        stop_event = threading.Event()
+
         def _target() -> None:
             nonlocal result, error
+            ctx = {**context, "_stop_event": stop_event}
             try:
-                result = agent.run(task, model, context)
+                result = agent.run(task, model, ctx)
             except BaseException as exc:  # propagé proprement ci-dessous
                 error = exc
 
@@ -103,6 +92,7 @@ class AgentSupervisor:
         worker.join(self._timeout)
 
         if worker.is_alive():
+            stop_event.set()  # SIGNALER AU WORKER
             return self._on_timeout(agent, model, cancel_fn, worker.ident)
 
         if error is not None:
@@ -157,6 +147,26 @@ class AgentSupervisor:
             "model": model,
             "timeout": True,
         }
+
+
+# ---------------------------------------------------------------------------
+# Utilitaires
+# ---------------------------------------------------------------------------
+
+def _agent_name(agent: AgentLike) -> str:
+    """Nom lisible de l'agent pour les logs (lecture défensive).
+
+    Priorité : ``name`` explicite > ``profile_key`` (contrat uniforme
+    ``BaseAgent.profile_key``, Lot H1 — remplace les deux anciennes
+    conventions divergentes ``_profile_key``/``PROFILE_KEY``) > nom de
+    classe en dernier recours (agent duck-typé sans l'un ni l'autre).
+    ``getattr`` reste défensif : ``AgentLike`` n'exige que ``run``.
+    """
+    name = getattr(agent, "name", None)
+    if name:
+        return str(name)
+    profile = getattr(agent, "profile_key", None)
+    return str(profile) if profile else type(agent).__name__
 
 
 __all__ = ["AgentSupervisor", "CancelFn"]

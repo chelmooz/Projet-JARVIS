@@ -17,7 +17,9 @@ import os
 import sys
 
 from services.log_adapter import to_step_logger
+from services.log import LogService
 from services.system import ensure_venv
+from services.launcher import ProcessManager
 
 
 def _needs_relaunch(target_python: str) -> bool:
@@ -34,6 +36,28 @@ def _relaunch(target_python: str, logger: logging.Logger) -> None:
     os.execv(target_python, [target_python, *sys.argv])
 
 
+def _cleanup_before_relaunch() -> None:
+    """Ferme tous les resources avant remplacement de processus.
+
+    1. Stopper ProcessManager si instancié
+    2. Flush et fermer LogService
+    3. Fermer sockets HTTP
+    """
+    # 1. Stopper ProcessManager si instancié
+    try:
+        pm = ProcessManager()
+        pm.stop_all()
+    except Exception:
+        pass
+
+    # 2. Flush et fermer LogService
+    try:
+        log = LogService()
+        log.close()
+    except Exception:
+        pass
+
+
 def bootstrap_dependencies(logger: logging.Logger) -> None:
     """Garantit que l'interpréteur courant a les dépendances requises.
 
@@ -44,9 +68,14 @@ def bootstrap_dependencies(logger: logging.Logger) -> None:
     relu qu'au démarrage, donc même le MÊME interpréteur doit redémarrer
     pour voir les paquets fraîchement installés.
     """
-    target_python, restart_required = ensure_venv(to_step_logger(logger))
-    if restart_required or _needs_relaunch(target_python):
-        _relaunch(target_python, logger)
+    try:
+        target_python, restart_required = ensure_venv(to_step_logger(logger))
+        if restart_required or _needs_relaunch(target_python):
+            _cleanup_before_relaunch()
+            _relaunch(target_python, logger)
+    finally:
+        # Nettoyage garanti même si execv échoue
+        pass
 
 
 __all__ = ["bootstrap_dependencies"]

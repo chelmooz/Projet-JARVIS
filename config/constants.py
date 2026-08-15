@@ -247,7 +247,6 @@ __all__ = [
     "DEFAULT_BACKEND",
     "OLLAMA_VERSION",
     # Feedback
-    "FEEDBACK_WEIGHTS",
     "WEIGHT_MIN",
     "WEIGHT_MAX",
     "RECENCY_DECAY",

@@ -68,6 +68,22 @@ __all__ = [
 ]
 
 
+def _archive_corrupted_file(path: str) -> str:
+    """Archiver un fichier corrompu par renommage (pas de copie = pas de boucle de retry).
+
+    Returns the path of the archived file, or empty string on failure.
+    """
+    corrupted_path = f"{path}.corrupted.{int(time.time())}"
+    try:
+        if os.path.exists(path):
+            os.rename(path, corrupted_path)
+            _logger.critical("Fichier corrompu archivé : %s", corrupted_path)
+            return corrupted_path
+    except OSError as rename_error:
+        _logger.error("Échec de l'archivage du fichier corrompu : %s", rename_error)
+    return ""
+
+
 class VectorService(VectorPort):
     """Index vectoriel local : orchestre indexation, embedding et recherche cosinus.
 
@@ -137,16 +153,8 @@ class VectorService(VectorPort):
                 raise ValueError("Structure de données invalide")
 
         except (orjson.JSONDecodeError, OSError, ValueError):
-            _logger.critical(
-                "Fichier vectoriel corrompu (%s). Sauvegarde automatique vers %s", VECTOR_PATH, VECTOR_BACKUP_PATH
-            )
-            # Sauvegarde du fichier corrompu
-            try:
-                if os.path.exists(VECTOR_PATH):
-                    shutil.copy2(VECTOR_PATH, VECTOR_BACKUP_PATH)
-                    _logger.info("Fichier corrompu sauvegardé dans %s", VECTOR_BACKUP_PATH)
-            except OSError as backup_error:
-                _logger.error("Échec de la sauvegarde du fichier corrompu : %s", backup_error)
+            # Archivage du fichier corrompu par renommage (pas de copie = pas de boucle de retry)
+            _archive_corrupted_file(VECTOR_PATH)
 
             # Retourne un état vide mais valide
             return {"documents": [], "embedding_dim": None}
