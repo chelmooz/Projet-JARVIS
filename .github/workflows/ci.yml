@@ -24,9 +24,9 @@ jobs:
       - name: Cache pip
         uses: actions/cache@v4
         with:
-        path: |
-          ~/.cache/pip
-          ~/AppData/Local/pip/Cache
+          path: |
+            ~/.cache/pip
+            ~/AppData/Local/pip/Cache
           key: ${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-py${{ matrix.python-version }}-
