@@ -117,6 +117,15 @@ démarrage du serveur sur 11436, puis lancement de l'API) :
 launchers\JARVIS.bat
 ```
 
+> 🤔 **Pourquoi lancer JARVIS avant même d'avoir les modèles ?** Ça peut sembler à
+> l'envers, mais c'est nécessaire : `JARVIS.bat` ne fait pas que démarrer l'appli,
+> il démarre aussi le **serveur Ollama portable** (port 11436). C'est ce serveur,
+> une fois actif, qui reçoit les commandes de téléchargement (`ollama.exe pull`) à
+> l'étape suivante — sans lui, aucun `pull` n'est possible. Il est donc normal qu'à
+> ce stade JARVIS tourne sans encore avoir de modèle : c'est le but de ce premier
+> lancement. Vous **redémarrerez JARVIS une fois les modèles téléchargés** (étape 6)
+> pour qu'il les détecte — c'est expliqué en détail à la fin de l'étape 5.
+
 > **Premier lancement (avec internet)** : le `.bat` télécharge le binaire portable
 > depuis GitHub Releases (~700 Mo, souvent 1 à 5 min selon la connexion). JARVIS
 > récupère également l’empreinte SHA-256 officielle correspondant au fichier, puis
@@ -201,17 +210,34 @@ Puis téléchargez les 6 modèles (à faire **une seule fois**, avec internet) :
 > 👁️ `@vision` (RapidOCR) est installé via `pip`, pas listé ici — voir la section
 > [🧠 Les 6 modèles](#-les-6-modèles--100-huggingface--ollama-portable) plus bas.
 
+#### ⚠️ Redémarrer JARVIS pour que les modèles soient détectés
+
+Une fois les 6 téléchargements terminés (`success` affiché pour chacun), la console
+JARVIS ouverte depuis l'**étape 4** a démarré **avant** que les modèles existent —
+elle ne les voit donc pas encore. Il faut la redémarrer :
+
+1. Retournez dans la **1ʳᵉ fenêtre** (celle de l'étape 4, avec la console JARVIS).
+2. Fermez-la (fermez la fenêtre, ou `Ctrl+C` puis confirmez).
+3. Passez directement à l'**étape 6** ci-dessous pour la relancer.
+
+> 💡 Ce redémarrage n'est nécessaire qu'**une seule fois**, juste après ce premier
+> téléchargement des modèles. Les lancements suivants de JARVIS les détecteront
+> normalement dès le démarrage.
+
 ---
 
-### Étape 6 — Lancer JARVIS
+### Étape 6 — Relancer JARVIS (maintenant avec les modèles)
 
-Double-cliquez sur `launchers\JARVIS.bat`.
+Double-cliquez sur `launchers\JARVIS.bat` — ceci est le **redémarrage** évoqué juste
+au-dessus, pas un nouveau lancement à partir de zéro.
 
-> 📥 **Premier lancement** : JARVIS télécharge lui-même le **binaire Ollama portable**
-> (`bin\ollama.exe` + `lib\ollama\`) depuis le site officiel — Internet nécessaire à ce
-> moment précis, uniquement la première fois. Le serveur Ollama portable démarre ensuite
-> automatiquement sur **`127.0.0.1:11436`** (port JARVIS, distinct du 11434 système —
-> et inutilisé ici : aucun Ollama système n'est installé).
+> 📥 **Rappel (déjà fait à l'étape 4)** : c'est au tout premier lancement que JARVIS
+> télécharge le **binaire Ollama portable** (`bin\ollama.exe` + `lib\ollama\`) depuis
+> le site officiel — Internet nécessaire à ce moment précis, uniquement la première
+> fois. Le serveur Ollama portable démarre ensuite automatiquement sur
+> **`127.0.0.1:11436`** (port JARVIS, distinct du 11434 système — et inutilisé ici :
+> aucun Ollama système n'est installé). Cette fois-ci, le binaire est déjà présent :
+> le démarrage sera donc plus rapide.
 
 Patientez ~5 secondes, puis ouvrez votre navigateur sur **http://localhost:8000** 🎉
 
