@@ -6,6 +6,35 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot11-L1 — Extended FS : accès disques/partitions non-montées (plan verrouillé) (2026-08-15) ✅
+- Plan exécuté tel quel (5 fichiers autorisés, zéro fonctionnalité ajoutée) :
+  - `services/extended_file_system.py` (nouveau) : ExtendedFileSystemService — Get-Disk/Get-Partition
+    (PowerShell), magic bytes (ext/Btrfs/XFS/APFS/HFS+/LUKS/VeraCrypt), montage `diskpart` + service
+    Ext2Fsd (`sc query`, pas de CLI `/mount` inexistante), lecture directe `ext4.Volume(f, offset=...)`
+    (offset réel via `Get-Partition -ExpandProperty Offset`), fallback Linux `lsblk`. Contrat API figé
+    (`mounted_drives`, `physical_disks`, `has_ext2fsd`, `ext2fsd_running`, `mounted_ext4`, `platform`).
+  - `controllers/routes/extended_files.py` (nouveau) : `/api/files/all_drives`, `/api/files/mount_ext4`,
+    `/api/files/unmount_ext4`, `/api/files/read_ext4_direct` (Pydantic `ge=`, `raise ... from e`, singleton lazy).
+  - `controllers/router.py` : +2 lignes uniquement (import + `extended_files_routes.router`).
+  - `static/assets/js/modules/files.js` : `loadDrives()` remplacé (fallback rétrocompatible
+    `/api/files/drives`), + `mountExt4Partition`/`readExt4Direct`/`showExt4Content`.
+  - `static/assets/css/style.css` : bloc CSS Phase 5 ajouté à la fin (sections 🐧/🍎/🔒, modal ext4).
+- Déviation consentie (gates repo, validée par l'utilisateur) : `ruff format` cosmétique sur les
+  2 nouveaux fichiers (zéro changement de logique) ; import trié alphabétiquement (I001) ;
+  corrections minimales type-safe pour mypy strict : annotation `-> ExtendedFileSystemService`
+  (+ `TYPE_CHECKING`) sur `get_extended_fs_service()` et `# type: ignore[import-not-found]` sur
+  `import ext4` (lib non installée, import optionnel gardé par try/except).
+- Validation plan Phase 6 : 6.1 `OK: ExtendedFileSystemService` ✓ · 6.2 routes présentes via
+  `controllers.router.app` (`all_drives`/`mount_ext4`/`unmount_ext4`/`read_ext4_direct` = True ;
+  la commande du plan `build_app()` renvoie False car `controllers.context.build_app` ne monte pas
+  les routes — c'est `create_app()` qui le fait) · 6.3 non testable (pré-déploiement, pas de serveur) ·
+  6.4 aucun "Unknown" marqué Linux ✓.
+- Gates : ruff check ✓ · ruff format ✓ (mes fichiers ; `system.py` non formaté = dette préexistante
+  HEAD, non touché) · mypy ✓ (135 fichiers) · pytest --cov → **861 passed / 1 failed**,
+  couverture 84,35 % ≥ 60 % — échec unique = `test_sandbox_missing_raises_file_system_error`,
+  **préexistant prouvé** (échoue identique sur HEAD propre via `git stash -u`), hors périmètre.
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot10-L8-P4 — Lot 8c : CI sur Windows (P4) (2026-08-15) ✅ (config) / ⏳ (validation)
 - `.github/workflows/ci.yml` : job `quality` passe de `runs-on: ubuntu-latest` à
   une matrice `os: [ubuntu-latest, windows-latest]` × `python-version:

@@ -69,32 +69,199 @@ async function loadDrives() {
 
     if (pathInput) pathInput.value = '';
     backBtn.style.display = 'none';
-    bread.innerHTML = '<span>Lecteurs</span>';
+    bread.innerHTML = '<span>Lecteurs & Partitions</span>';
     body.innerHTML = '<div class="fb-empty">Chargement...</div>';
 
     try {
-        const r = await fetch('/api/files/drives');
-        const data = await r.json();
-
-        if (!data.drives || data.drives.length === 0) {
-            body.innerHTML = '<div class="fb-empty">Aucun lecteur trouve.</div>';
-            return;
+        let r = await fetch('/api/files/all_drives');
+        let data;
+        let useExtended = true;
+        if (r.ok) {
+            data = await r.json();
+        } else {
+            r = await fetch('/api/files/drives');
+            data = await r.json();
+            useExtended = false;
         }
 
-        body.innerHTML = data.drives.map(d =>
-            `<div class="fb-drive" data-path="${d.name}">
-                <span class="icon">💾</span>
-                <span class="name">${d.name}</span>
-                <span class="space">${d.free_gb} Go / ${d.total_gb} Go libres</span>
-            </div>`
-        ).join('');
+        let html = '';
+
+        if (useExtended && data.success) {
+            if (data.mounted_drives && data.mounted_drives.length > 0) {
+                html += '<div class="fb-section-title">💾 Disques montés</div>';
+                html += data.mounted_drives.map(d =>
+                    `<div class="fb-drive" data-path="${d.name}">
+                        <span class="icon">💾</span>
+                        <span class="name">${d.name}</span>
+                        <span class="fstype">${d.fstype || ''}</span>
+                        <span class="space">${d.free_gb} Go / ${d.total_gb} Go libres</span>
+                    </div>`
+                ).join('');
+            }
+
+            if (data.physical_disks && data.physical_disks.length > 0) {
+                for (const disk of data.physical_disks) {
+                    const unmountedParts = disk.partitions.filter(p => !p.mounted);
+                    if (unmountedParts.length === 0) continue;
+                    html += `<div class="fb-section-title">🖴 ${utils.escHtml(String(disk.name))} (${disk.size_gb} Go)</div>`;
+                    for (const part of unmountedParts) {
+                        const fs = part.filesystem || 'Unknown';
+                        const isLinux = part.is_linux_fs;
+                        const isMac = part.is_macos_fs;
+                        const isEnc = part.is_encrypted;
+                        let icon = '❓';
+                        let fsClass = '';
+                        let actionsHtml = '';
+
+                        if (isLinux) {
+                            icon = '🐧';
+                            fsClass = 'linux-fs';
+                            const canMount = data.has_ext2fsd && data.ext2fsd_running;
+                            actionsHtml += canMount
+                                ? `<button class="fb-mount-btn" data-disk="${disk.number}" data-part="${part.number}">Monter</button>`
+                                : `<span class="fb-mount-hint" title="${data.ext2fsd_running ? 'Ext2Fsd absent' : 'Service Ext2Fsd non démarré'}">${data.ext2fsd_running ? 'Ext2Fsd requis' : 'Démarrer Ext2Fsd'}</span>`;
+                            actionsHtml += `<button class="fb-read-btn" data-disk="${disk.number}" data-part="${part.number}" title="Lecture directe (admin requis)">Lire</button>`;
+                        } else if (isMac) {
+                            icon = '🍎';
+                            fsClass = 'macos-fs';
+                            actionsHtml += '<span class="fb-mount-hint">APFS/HFS+ non supporté</span>';
+                        } else if (isEnc) {
+                            icon = '🔒';
+                            fsClass = 'encrypted-fs';
+                            actionsHtml += '<span class="fb-mount-hint">Partition chiffrée</span>';
+                        }
+
+                        html += `<div class="fb-partition ${fsClass}">
+                            <span class="icon">${icon}</span>
+                            <span class="name">Partition ${part.number}</span>
+                            <span class="fstype">${utils.escHtml(fs)}</span>
+                            <span class="size">${part.size_gb} Go</span>
+                            <span class="actions">${actionsHtml}</span>
+                        </div>`;
+                    }
+                }
+            }
+        } else if (data.drives && data.drives.length > 0) {
+            html += data.drives.map(d =>
+                `<div class="fb-drive" data-path="${d.name}">
+                    <span class="icon">💾</span>
+                    <span class="name">${d.name}</span>
+                    <span class="space">${d.free_gb} Go / ${d.total_gb} Go libres</span>
+                </div>`
+            ).join('');
+        } else {
+            html = '<div class="fb-empty">Aucun lecteur trouvé.</div>';
+        }
+
+        body.innerHTML = html;
 
         body.querySelectorAll('.fb-drive').forEach(el => {
             el.addEventListener('click', () => browseDir(el.dataset.path));
         });
+
+        body.querySelectorAll('.fb-mount-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await mountExt4Partition(
+                    parseInt(btn.dataset.disk, 10),
+                    parseInt(btn.dataset.part, 10),
+                    btn,
+                );
+            });
+        });
+
+        body.querySelectorAll('.fb-read-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await readExt4Direct(
+                    parseInt(btn.dataset.disk, 10),
+                    parseInt(btn.dataset.part, 10),
+                    btn,
+                );
+            });
+        });
+
     } catch (e) {
-        body.innerHTML = '<div class="fb-empty">Erreur chargement lecteurs: ' + utils.escHtml(e.message) + '</div>';
+        body.innerHTML = '<div class="fb-empty">Erreur chargement: ' + utils.escHtml(e.message) + '</div>';
     }
+}
+
+async function mountExt4Partition(diskNumber, partitionNumber, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Montage...';
+    try {
+        const r = await fetch('/api/files/mount_ext4', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ disk_number: diskNumber, partition_number: partitionNumber }),
+        });
+        const data = await r.json();
+        if (data.success) {
+            btn.textContent = `✅ ${data.mount_point}`;
+            btn.classList.add('mounted');
+            btn.disabled = false;
+            btn.onclick = () => browseDir(data.mount_point);
+        } else {
+            btn.textContent = '❌ Erreur';
+            btn.title = data.error || 'Erreur inconnue';
+            setTimeout(() => { btn.textContent = 'Monter'; btn.disabled = false; }, 4000);
+        }
+    } catch {
+        btn.textContent = '❌ Réseau';
+        setTimeout(() => { btn.textContent = 'Monter'; btn.disabled = false; }, 3000);
+    }
+}
+
+async function readExt4Direct(diskNumber, partitionNumber, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Lecture...';
+    try {
+        const r = await fetch('/api/files/read_ext4_direct', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                disk_number: diskNumber,
+                partition_number: partitionNumber,
+                target_path: '/',
+            }),
+        });
+        const data = await r.json();
+        if (data.success && data.entries) {
+            showExt4Content(data.entries, `Disk ${diskNumber} Part ${partitionNumber}`);
+        } else {
+            btn.textContent = '❌ Erreur';
+            btn.title = data.error || 'Erreur inconnue';
+            setTimeout(() => { btn.textContent = 'Lire'; btn.disabled = false; }, 4000);
+        }
+    } catch {
+        btn.textContent = '❌ Réseau';
+        setTimeout(() => { btn.textContent = 'Lire'; btn.disabled = false; }, 3000);
+    }
+}
+
+function showExt4Content(entries, label) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fb-ext4-overlay show';
+    overlay.innerHTML = `
+        <div class="fb-ext4-modal">
+            <div class="fb-ext4-header">
+                <h3>🐧 Contenu ext4 (${utils.escHtml(label)})</h3>
+                <button class="fb-ext4-close" aria-label="Fermer">×</button>
+            </div>
+            <div class="fb-ext4-body">
+                ${entries.map(e => `
+                    <div class="fb-ext4-entry ${e.is_dir ? 'is-dir' : 'is-file'}">
+                        <span class="icon">${e.is_dir ? '📁' : '📄'}</span>
+                        <span class="name">${utils.escHtml(e.name)}</span>
+                        ${!e.is_dir ? `<span class="size">${Math.round(e.size / 1024)} Ko</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.fb-ext4-close').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
 export async function browseDir(path) {

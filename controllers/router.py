@@ -202,6 +202,7 @@ def _register_routes(app: FastAPI) -> None:
     from controllers.routes import diagnostic as diagnostic_routes
     from controllers.routes import diagnostic_ext as diagnostic_ext_routes
     from controllers.routes import documents as doc_routes
+    from controllers.routes import extended_files as extended_files_routes
     from controllers.routes import files as files_routes
     from controllers.routes import jarvis as jarvis_routes
     from controllers.routes import kill_coding as kill_coding_routes
@@ -220,6 +221,7 @@ def _register_routes(app: FastAPI) -> None:
         doc_routes.router,
         analytics_routes.router,
         files_routes.router,
+        extended_files_routes.router,
         pipelines_routes.router,
         code_review_routes.router,
         kill_coding_routes.router,
