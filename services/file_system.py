@@ -19,10 +19,6 @@ from config.paths import FILE_AUTHORIZED_PATHS, IS_WINDOWS
 
 _logger = logging.getLogger("jarvis.file_system")
 
-# Cache one-shot du chemin sandbox résolu (évite un double realpath à chaque appel
-# de _is_inside_sandbox — audit #13, dette mineure).
-_SANDBOX_RESOLVED_CACHE: dict[str, str] = {}
-
 
 class FileSystemError(Exception):
     """Erreur contrôlée du service fichier."""
@@ -102,33 +98,45 @@ class FileSystemService:
             resolved = os.path.realpath(str(pure))
         return resolved
 
-    @staticmethod
-    def _is_inside_sandbox(resolved: str) -> bool:
-        """Vérifie si le chemin est dans le sandbox JARVIS_FILES_SANDBOX_ROOT.
-        Retourne ``True``/``False``. Le sandbox est **toujours requis** :
-        la variable d'environnement JARVIS_FILES_SANDBOX_ROOT doit être définie.
-        En test, la fixture ``sandbox_root`` (tests/conftest.py) la positionne
-        sur un ``tmp_path`` (passé par pytest).
+    def _default_roots(self) -> list[str]:
+        """Aucune racine configurée : fail-closed conservé (ADR-011).
+
+        Comportement historique inchangé : sans ``JARVIS_FILES_SANDBOX_ROOT``,
+        toute opération est refusée avec le message dédié (aucune autorisation
+        possible).
         """
-        sandbox = os.environ.get("JARVIS_FILES_SANDBOX_ROOT")
-        if not sandbox:
-            raise FileSystemError("Sandbox non configuré : définissez JARVIS_FILES_SANDBOX_ROOT")
-        assert sandbox is not None
+        raise FileSystemError("Sandbox non configuré : définissez JARVIS_FILES_SANDBOX_ROOT")
 
-        # Cache du chemin sandbox résolu (une seule résolution par processus)
-        if sandbox not in _SANDBOX_RESOLVED_CACHE:
-            _SANDBOX_RESOLVED_CACHE[sandbox] = FileSystemService._resolve_real_path(sandbox)
-        sandbox_resolved = _SANDBOX_RESOLVED_CACHE[sandbox]
+    def _sandbox_roots(self) -> list[str]:
+        """Résout les racines autorisées (multi-périmètres ou wildcard)."""
+        raw = os.environ.get("JARVIS_FILES_SANDBOX_ROOT", "").strip()
 
-        try:
-            resolved_path = Path(resolved)
-            return resolved_path.is_relative_to(Path(sandbox_resolved))
-        except (AttributeError, ValueError):
-            # Fallback pour Python < 3.9 ou chemins sur volumes différents
+        # Wildcard : tous les lecteurs montés, résolus dynamiquement
+        if raw == "*":
             try:
-                return os.path.commonpath([resolved, sandbox_resolved]) == sandbox_resolved
+                import psutil
+
+                roots = [p.mountpoint for p in psutil.disk_partitions(all=False) if p.mountpoint]
+            except Exception:
+                roots = []
+            return [os.path.normpath(r) for r in roots] if roots else self._default_roots()
+
+        # Multi-périmètres séparés par os.pathsep (';' Windows, ':' Linux)
+        if raw:
+            parts = [p.strip() for p in raw.split(os.pathsep) if p.strip()]
+            return [os.path.normpath(p) for p in parts]
+
+        return self._default_roots()  # comportement actuel inchangé si variable absente
+
+    def _within_sandbox(self, path: str) -> bool:
+        p = os.path.normpath(path)
+        for root in self._sandbox_roots():
+            try:
+                if os.path.commonpath([p, root]) == root:
+                    return True
             except ValueError:
-                return False
+                continue  # lecteurs différents (C: vs D:)
+        return False
 
     def authorize_path(self, path: str) -> bool:
         """Autorise un chemin. Retourne ``False`` si le sandbox le refuse."""
@@ -171,7 +179,7 @@ class FileSystemService:
 
         resolved = self._resolve_real_path(path)
         try:
-            if self._is_inside_sandbox(resolved) is False:
+            if self._within_sandbox(resolved) is False:
                 return False, f"Hors du périmètre autorisé (JARVIS_FILES_SANDBOX_ROOT) : {resolved}"
         except FileSystemError as e:
             _logger.warning("Autorisation refusée : %s", e)
@@ -211,7 +219,7 @@ class FileSystemService:
         Retourne le chemin résolu. Lève ``FileSystemError`` si non autorisé.
         """
         resolved = self._resolve_real_path(path)
-        if self._is_inside_sandbox(resolved) is False:
+        if self._within_sandbox(resolved) is False:
             raise FileSystemError(f"Chemin non autorisé (hors sandbox) : {resolved}")
         resolved_path = Path(resolved)
         with self._lock:

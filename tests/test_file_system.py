@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -191,3 +192,32 @@ def test_find_files_truncated(fs: FileSystemService, sandbox_root: Path) -> None
     res = fs.find_files(str(d / "**" / "*.log"), max_results=1)
     assert res["success"] is True
     assert res["truncated"] is True
+
+
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="Multi-racines Windows (séparateur ';', lecteurs C:/D:) non applicables sous POSIX (Phase 7)",
+)
+def test_sandbox_multi_root_semicolon(fs: FileSystemService, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JARVIS_FILES_SANDBOX_ROOT", "C:\\;D:\\")
+    assert fs.authorize_path(r"D:\data") is True
+    assert fs.authorize_path(r"E:\x") is False
+
+
+def test_sandbox_wildcard(fs: FileSystemService, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import psutil
+
+    mounted = tmp_path / "mounted"
+    mounted.mkdir()
+    monkeypatch.setattr(psutil, "disk_partitions", lambda all=False: [SimpleNamespace(mountpoint=str(mounted))])
+    monkeypatch.setenv("JARVIS_FILES_SANDBOX_ROOT", "*")
+    assert fs.authorize_path(str(mounted / "data")) is True
+    assert fs.authorize_path(str(mounted.parent / "outside")) is False
+
+
+def test_sandbox_fail_closed_absent(fs: FileSystemService, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("JARVIS_FILES_SANDBOX_ROOT", raising=False)
+    assert fs.authorize_path(str(Path(os.getcwd()))) is False
+    res = fs.list_dir(str(Path(os.getcwd())))
+    assert res["success"] is False
+    assert res["error_type"] == "not_authorized"

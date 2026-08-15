@@ -6,6 +6,42 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot11-L2 — Sandbox multi-racines + wildcard `*` (plan verrouillé, Phase 7) (2026-08-15) ✅
+- Plan exécuté tel quel (1 fichier métier, `.env.example`, tests, BACKLOG) :
+  - `services/file_system.py` (unique fichier métier) : `_is_inside_sandbox` (racine
+    unique + cache `_SANDBOX_RESOLVED_CACHE`) remplacé par **3 méthodes** :
+    `_sandbox_roots()` (résolution unique des racines — wildcard `*` via
+    `psutil.disk_partitions(all=False)` résolu dynamiquement ; multi-périmètres séparés
+    par `os.pathsep` (`;` Windows / `:` Linux) ; `_default_roots()` sinon) +
+    `_within_sandbox()` (comparaison `os.path.commonpath([p, root]) == root`, `ValueError`
+    continuée = lecteurs différents `C:` vs `D:`). Les 2 call sites existants
+    (`authorize_path_verbose`, `_check_authorized` — donc authorize/list_dir/read_file/
+    find_files) passent tous par `_within_sandbox` ; message de refus inchangé
+    `Hors du périmètre autorisé (JARVIS_FILES_SANDBOX_ROOT) : {path}`.
+  - Fail-closed absent **inchangé** : `_default_roots()` lève le `FileSystemError`
+    historique (« Sandbox non configuré : définissez JARVIS_FILES_SANDBOX_ROOT ») —
+    zéro changement de comportement quand la variable est absente (règle 4 du plan).
+  - `.env.example` : bloc « Périmètre d'audit fichiers » documentant les 3 modes
+    (`C:\` / `C:\;D:\` / `*`), ligne activée `JARVIS_FILES_SANDBOX_ROOT=C:\`.
+  - Tests (+3 dans `tests/test_file_system.py`) : `test_sandbox_multi_root_semicolon`
+    (`C:\;D:\` autorise `D:\data`, refuse `E:\x` — skipif POSIX, sémantique lecteurs
+    Windows, convention repo Lot 0.3) ; `test_sandbox_wildcard` (`*` + monkeypatch
+    `psutil.disk_partitions` → racine montée autorisée, hors-racine refusée) ;
+    `test_sandbox_fail_closed_absent` (variable absente → authorize False + list_dir
+    `not_authorized`, comportement par défaut intact). Les 20 tests sandbox existants
+    restent verts.
+- Déviation mineure : aucune sur la logique ; seul ajustement d'écriture = le raw string
+  `r"C:\;D:\"` du plan n'est pas un littéral Python valide (backslash final) →
+  `"C:\\;D:\\"` (valeur identique). `import psutil` local dans `_sandbox_roots`
+  (dépendance déclarée, override mypy `ignore_missing_imports` déjà présent).
+- Validation : échec unique = `test_sandbox_missing_raises_file_system_error`,
+  **préexistant rappelé** — re-prouvé sur HEAD via `git stash push` (même `DID NOT RAISE`,
+  `authorize_path_verbose` capture le FileSystemError et retourne `False`) ; hors périmètre.
+- Gates : ruff check ✓ · ruff format ✓ (223/224 ; `controllers/routes/system.py` non
+  formaté = dette préexistante HEAD, non touché) · mypy ✓ (135 fichiers) · pytest --cov →
+  **864 passed / 1 failed**, couverture 84,31 % ≥ 60 % (3 nouveaux tests inclus).
+- Aucun commit (conforme AGENTS.md) — diff soumis à review utilisateur.
+
 ### MT-Lot11-L1 — Extended FS : accès disques/partitions non-montées (plan verrouillé) (2026-08-15) ✅
 - Plan exécuté tel quel (5 fichiers autorisés, zéro fonctionnalité ajoutée) :
   - `services/extended_file_system.py` (nouveau) : ExtendedFileSystemService — Get-Disk/Get-Partition
