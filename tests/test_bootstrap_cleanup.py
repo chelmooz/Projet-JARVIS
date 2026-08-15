@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Test that bootstrap cleanup runs before execv."""
-import unittest
-from unittest.mock import patch
+
 import os
 import sys
+import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.dependency_bootstrap import bootstrap_dependencies, _needs_relaunch, _relaunch
+from services.dependency_bootstrap import _needs_relaunch, _relaunch, bootstrap_dependencies
 
 
 class TestBootstrapCleanupStructure(unittest.TestCase):
@@ -30,14 +31,14 @@ class TestBootstrapCleanupStructure(unittest.TestCase):
     def test_bootstrap_dependencies_with_restart(self, mock_ensure_venv, mock__relaunch):
         """RED: When restart is needed, the function should handle it properly."""
         mock_ensure_venv.return_value = ("/path/to/python", True)
-        
+
         # This should not crash - it will call _relaunch which does os.execv
         # We just verify it doesn't crash on the mock path
         try:
             bootstrap_dependencies(logger=__import__("logging").Logger())
         except SystemExit:
             pass  # Expected due to os.execv in _relaunch
-        except Exception as e:
+        except Exception:
             # Other exceptions are OK for RED test
             pass
 

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Caractérisation des chemins agent_runner dans PipelineService."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from models import OnError, Pipeline, PipeStep
+from models import Pipeline, PipeStep
 from services.pipeline import PipelineService
 
 
 class MockRunner:
     """Runner factice qui retourne une réponse moke."""
+
     def __call__(self, agent_key: str, prompt: str, model: str | None = None) -> str:
         return "mocked"
 
@@ -73,7 +75,6 @@ def test_pipeline_agent_key_without_runner_raises() -> None:
 
 def test_pipeline_runner_with_model_selector() -> None:
     """Caractérisation : runner appelé avec modèle sélectionné par model_selector."""
-    runner_instance = None
 
     class ThreeParamRunner:
         def __init__(self) -> None:

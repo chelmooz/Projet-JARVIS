@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Test that select_model raises ValueError when no model available."""
-import sys
+
 import os
+import sys
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.selector import select_model, fallback_models, read_preferences
+from services.selector import select_model
 
 
 class TestSelectModelRaises(unittest.TestCase):

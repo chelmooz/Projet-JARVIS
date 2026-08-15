@@ -233,8 +233,7 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
     if log_service:
         log_service.log("WARN", f"Aucun modèle disponible pour l'agent '{agent_key}'")
     raise ValueError(
-        f"Aucun modèle disponible pour l'agent '{agent_key}'. "
-        "Vérifiez que Ollama est démarré avec au moins un modèle."
+        f"Aucun modèle disponible pour l'agent '{agent_key}'. Vérifiez que Ollama est démarré avec au moins un modèle."
     )
 
 

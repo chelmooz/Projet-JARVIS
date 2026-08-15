@@ -17,7 +17,6 @@ from services.adapters.protocols import IResponseJudge, ITraceStore, IVectorSear
 from services.pipeline_helpers import build_failure, build_hyde_query, has_fatal_error, is_stagnant
 from services.pipeline_steps import (
     NonCallableRunnerError,
-    _runner_supports_model,
     _should_retry,
     _wait_before_retry,
 )

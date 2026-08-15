@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Test that pipeline agent_key uses agent_runner."""
+
 import os
 import sys
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -31,7 +32,7 @@ class TestPipelineAgentRunner(unittest.TestCase):
         )
 
         # Créer un step avec agent_key
-        step = PipeStep(name="test_step", agent_key="cyber", prompt_template="Prompt: {task}")
+        PipeStep(name="test_step", agent_key="cyber", prompt_template="Prompt: {task}")
 
         # Assert - Vérifier que le runner est accessible
         self.assertIsNotNone(service._agent_runner)

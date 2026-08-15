@@ -39,6 +39,7 @@ CancelFn = Callable[[int], None]
 # Contrat minimal de l'agent supervisé (ISP : seule la méthode exécutée).
 # ---------------------------------------------------------------------------
 
+
 class AgentLike(Protocol):
     """Tout objet exposant ``run(task, model, context)`` peut être supervisé."""
 
@@ -48,6 +49,7 @@ class AgentLike(Protocol):
 # ---------------------------------------------------------------------------
 # Classe principal
 # ---------------------------------------------------------------------------
+
 
 class AgentSupervisor:
     """Exécute ``run()`` d'un agent sous garde-fou de timeout wall-clock."""
@@ -152,6 +154,7 @@ class AgentSupervisor:
 # ---------------------------------------------------------------------------
 # Utilitaires
 # ---------------------------------------------------------------------------
+
 
 def _agent_name(agent: AgentLike) -> str:
     """Nom lisible de l'agent pour les logs (lecture défensive).

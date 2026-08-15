@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Test that supervisor timeout actually stops the thread."""
-import sys
+
+import contextlib
 import os
+import sys
 import time
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -25,11 +27,11 @@ class TestSupervisorTimeout(unittest.TestCase):
                 return {"response": "completed"}
 
         # Act
-        with patch.object(SlowAgent, 'run', side_effect=KeyboardInterrupt("interrupt signal")):
-            try:
-                result = supervisor.run(SlowAgent(), "test task", "model1", {})
-            except KeyboardInterrupt:
-                pass
+        with (
+            patch.object(SlowAgent, "run", side_effect=KeyboardInterrupt("interrupt signal")),
+            contextlib.suppress(KeyboardInterrupt),
+        ):
+            supervisor.run(SlowAgent(), "test task", "model1", {})
 
         # Assert - the thread should have been given time to finish
         # (the exact behavior depends on the implementation)

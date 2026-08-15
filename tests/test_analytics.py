@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Test that analytics stats work correctly."""
-import sys
+
 import os
+import sys
 import unittest
-from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

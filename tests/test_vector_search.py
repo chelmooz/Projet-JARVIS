@@ -6,9 +6,7 @@ Aucun embedding réel, zéro I/O disque hors tmp_path.
 
 from __future__ import annotations
 
-import pytest
-
-from tests.conftest import FakeVector, fake_embedding, fake_vector
+from tests.conftest import FakeVector
 
 
 class TestVectorSearchEmpty:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test concurrent log writing to verify no data loss (race condition fix)."""
+
 import json
 import os
 import sys
@@ -8,6 +9,7 @@ import threading
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "services"))
 
 from log import LogService
+
 from config.constants import PROJECT_DIR
 
 
@@ -41,18 +43,15 @@ def test_log_concurrent_no_data_loss():
         data = json.load(f)
 
     assert isinstance(data, list), f"Expected list, got {type(data)}"
-    assert len(data) == num_threads, (
-        f"Expected {num_threads} log entries, got {len(data)}"
-    )
+    assert len(data) == num_threads, f"Expected {num_threads} log entries, got {len(data)}"
 
     # Vérifier que toutes les entrées sont uniques
     unique_messages = {entry["message"] for entry in data}
-    assert len(unique_messages) == num_threads, (
-        f"Expected {num_threads} unique messages, got {len(unique_messages)}"
-    )
+    assert len(unique_messages) == num_threads, f"Expected {num_threads} unique messages, got {len(unique_messages)}"
 
 
 if __name__ == "__main__":
     import os
+
     test_log_concurrent_no_data_loss()
     print("Test passed: concurrent log writes have no data loss")

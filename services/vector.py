@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import threading
 import time
 from typing import Any
@@ -486,9 +485,7 @@ class VectorService(VectorPort):
 
         return self._run_bounded_search(query, query_vec, top_k, now)
 
-    def _run_bounded_search(
-        self, query: str, query_vec: np.ndarray, top_k: int, now: float
-    ) -> list[dict[str, Any]]:
+    def _run_bounded_search(self, query: str, query_vec: np.ndarray, top_k: int, now: float) -> list[dict[str, Any]]:
         """Exécute la boucle de recherche bornée avec relance plafonnée (max 3 tentatives)."""
         with self._lock:
             docs = self._data["documents"]
