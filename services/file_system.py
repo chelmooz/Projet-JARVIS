@@ -159,7 +159,11 @@ class FileSystemService:
             return False
 
         resolved = self._resolve_real_path(path)
-        if self._is_inside_sandbox(resolved) is False:
+        try:
+            if self._is_inside_sandbox(resolved) is False:
+                return False
+        except FileSystemError as e:
+            _logger.warning("Autorisation refusée : %s", e)
             return False
         with self._lock:
             self._authorized.add(Path(resolved))
