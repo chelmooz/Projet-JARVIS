@@ -16,10 +16,9 @@ import logging
 import os
 import sys
 
-from services.log_adapter import to_step_logger
-from services.log import LogService
-from services.system import ensure_venv
 from services.launcher import ProcessManager
+from services.log_adapter import to_step_logger
+from services.system import ensure_venv
 
 
 def _needs_relaunch(target_python: str) -> bool:
@@ -40,20 +39,16 @@ def _cleanup_before_relaunch() -> None:
     """Ferme tous les resources avant remplacement de processus.
 
     1. Stopper ProcessManager si instancié
-    2. Flush et fermer LogService
-    3. Fermer sockets HTTP
+    2. Fermer sockets HTTP
+
+    LogService n'a rien à flush/fermer : chaque log() écrit de façon
+    atomique et synchrone (write_json_atomic), aucun état bufferisé
+    entre deux appels — pas de méthode close() sur cette classe.
     """
     # 1. Stopper ProcessManager si instancié
     try:
         pm = ProcessManager()
         pm.stop_all()
-    except Exception:
-        pass
-
-    # 2. Flush et fermer LogService
-    try:
-        log = LogService()
-        log.close()
     except Exception:
         pass
 

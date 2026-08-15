@@ -6,9 +6,6 @@ Tous les tests utilisent TestClient sans déclencher le lifespan complet
 
 from __future__ import annotations
 
-import json
-
-import pytest
 from fastapi.testclient import TestClient
 
 from controllers.router import create_app
@@ -64,6 +61,7 @@ class TestCreateAppContent:
     def test_create_app_returns_fastapi(self) -> None:
         app = create_app()
         from fastapi import FastAPI
+
         assert isinstance(app, FastAPI)
 
     def test_create_app_home_returns_welcome(self) -> None:

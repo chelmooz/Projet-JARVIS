@@ -107,7 +107,7 @@ class AppContext:
             inference=self.inference,
             memory=self.memory,
             model_selector=select_model,
-            agent_runner=lambda: self.agent_graph_factory(),  # WRAPPER
+            agent_runner=lambda: self._build_agent_graph(),  # WRAPPER
         )
 
         # 5. Orchestrateur (Composition Root finale)

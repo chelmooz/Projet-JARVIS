@@ -146,70 +146,16 @@ def create_app() -> FastAPI:
     app.state.status_cache = {"data": None, "ts": 0.0}
     app.state.status_lock = asyncio.Lock()
 
-# Enregistrement des middlewares et des routes.
+    # Enregistrement des middlewares et des routes.
     _register_middlewares(app)
     _register_routes(app)
-
-    return app
-
-    # Lazy import des sous-routeurs (désenchevêtrement 15.8)
-    from controllers.routes import agents as agents_routes
-    from controllers.routes import analytics as analytics_routes
-    from controllers.routes import beta_dashboard as beta_dashboard_routes
-    from controllers.routes import code_review as code_review_routes
-    from controllers.routes import conversations as conv_routes
-    from controllers.routes import diagnostic as diagnostic_routes
-    from controllers.routes import diagnostic_ext as diagnostic_ext_routes
-    from controllers.routes import documents as doc_routes
-    from controllers.routes import files as files_routes
-    from controllers.routes import jarvis as jarvis_routes
-    from controllers.routes import kill_coding as kill_coding_routes
-    from controllers.routes import pipelines as pipelines_routes
-    from controllers.routes import quality_audit as quality_audit_routes
-    from controllers.routes import skills as skills_routes
-
-    # Enregistrement des routeurs métier.
-    for sub_router in (
-        jarvis_routes.router,
-        agents_routes.router,
-        conv_routes.router,
-        diagnostic_routes.router,
-        diagnostic_ext_routes.router,
-        doc_routes.router,
-        analytics_routes.router,
-        files_routes.router,
-        pipelines_routes.router,
-        code_review_routes.router,
-        kill_coding_routes.router,
-        quality_audit_routes.router,
-        settings_routes.router,
-        skills_routes.router,
-    ):
-        _mount_router(app, sub_router)
-
-    # Beta dashboard (opt-in).
-    if os.environ.get("JARVIS_BETA_DASHBOARD") == "1":
-        _mount_router(app, beta_dashboard_routes.router)
-
-    # Routes système (extraites vers routes/system.py pour SRP)
-    from controllers.routes import system as system_routes
-
-    _mount_router(app, system_routes.router)
-
-    # Routes système inline (dette : à extraire vers routes/system.py)
-    app.get("/api/backend")(get_backend)
-    app.get("/api/models")(list_models)
-    app.get("/", response_model=None)(index)
-    app.get("/api/status")(get_status)
-    app.get("/api/metrics")(get_metrics)
-    # Enregistrement de la fonction module-level (plus de closure)
-    app.get("/{path:path}", response_model=None)(serve_static)
 
     return app
 
 
 def _register_middlewares(app: FastAPI) -> None:
     """Enregistrement des middlewares FastAPI sur l'application."""
+
     # Middleware d'authentification token mono-user
     @app.middleware("http")
     async def verify_token_middleware(
@@ -224,7 +170,7 @@ def _register_middlewares(app: FastAPI) -> None:
         ):
             return await call_next(request)
 
-# Skip token verification if OpenWebUI is disabled (no CORS needed either)
+        # Skip token verification if OpenWebUI is disabled (no CORS needed either)
         if os.environ.get("JARVIS_ENABLE_OPENWEBUI", "0") != "1":
             return await call_next(request)
 
@@ -286,6 +232,7 @@ def _register_routes(app: FastAPI) -> None:
     # Beta dashboard (opt-in).
     if os.environ.get("JARVIS_BETA_DASHBOARD") == "1":
         from controllers.routes import beta_dashboard as beta_dashboard_routes
+
         _mount_router(app, beta_dashboard_routes.router)
 
     # Routes système (extraites vers routes/system.py pour SRP)
