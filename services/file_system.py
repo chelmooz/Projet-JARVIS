@@ -132,8 +132,19 @@ class FileSystemService:
 
     def authorize_path(self, path: str) -> bool:
         """Autorise un chemin. Retourne ``False`` si le sandbox le refuse."""
+        ok, _ = self.authorize_path_verbose(path)
+        return ok
+
+    def authorize_path_verbose(self, path: str) -> tuple[bool, str | None]:
+        """Autorise un chemin, avec le motif de refus le cas échéant.
+
+        Source unique de la logique d'autorisation : ``authorize_path`` (utilisé
+        par kill_coding.py / code_review.py) délègue ici et ignore le motif ;
+        la route API (``/api/files/authorize``) l'utilise pour renvoyer une
+        erreur exploitable côté UI plutôt qu'un "inconnue" générique.
+        """
         if not path:
-            return False
+            return False, "Chemin vide"
 
         # Normalisation des séparateurs pour une analyse cohérente
         # (cast str() : PROJECT_DIR et consorts peuvent arriver en Path,
@@ -150,25 +161,26 @@ class FileSystemService:
         # ce garde-fou ne doit donc s'appliquer que hors Windows.
         if not IS_WINDOWS and re.match(r"^[A-Za-z]:", normalized_path):
             _logger.warning("Tentative de path traversal bloquée (lecteur Windows) : %s", path)
-            return False
+            return False, "Chemin Windows refusé sur cette plateforme"
 
         # Cas B : Rejet défensif de TOUTE tentative contenant ".." en substring
         # Neutralise les contournements de filtres naïfs (ex: "....//....//")
         if ".." in normalized_path:
             _logger.warning("Tentative de path traversal bloquée (séquence ..) : %s", path)
-            return False
+            return False, "Séquence '..' interdite"
 
         resolved = self._resolve_real_path(path)
         try:
             if self._is_inside_sandbox(resolved) is False:
-                return False
+                return False, f"Hors du périmètre autorisé (JARVIS_FILES_SANDBOX_ROOT) : {resolved}"
         except FileSystemError as e:
             _logger.warning("Autorisation refusée : %s", e)
-            return False
+            return False, str(e)
+
         with self._lock:
             self._authorized.add(Path(resolved))
         self._save_authorized()
-        return True
+        return True, None
 
     def is_authorized(self, path: str) -> bool:
         """Indique si un chemin est autorisé."""

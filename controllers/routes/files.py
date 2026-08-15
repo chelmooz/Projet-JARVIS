@@ -38,7 +38,8 @@ router = APIRouter()
 @router.post("/api/files/authorize")
 def authorize_path(body: AuthorizePathRequest, context: AppContext = Depends(get_app_context)) -> dict[str, Any]:
     assert context.file_system is not None
-    return {"success": context.file_system.authorize_path(body.path), "path": body.path}
+    success, error = context.file_system.authorize_path_verbose(body.path)
+    return {"success": success, "path": body.path, "error": error}
 
 
 @router.delete("/api/files/authorize")
