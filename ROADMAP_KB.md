@@ -1,6 +1,6 @@
 # Roadmap — Knowledge Base structurée & Intégration Triad (JARVIS)
 
-**Date** : 2026-08-16/17 · **HEAD** : `4dbb46d` · **Nature** : synthèse documentaire
+**Date** : 2026-08-16/17 · **HEAD** : `734616e` · **Nature** : synthèse documentaire
 (confrontation conversation ↔ code réel). Aucune ligne de code métier modifiée.
 
 > **Convention de preuve** : toute affirmation est accompagnée d'une preuve
@@ -128,19 +128,21 @@ une intention supposée. Le point d'incident est consigné en 0.5 et rappelé en
 
 ---
 
-## 3. Décisions ouvertes (à trancher par l'utilisateur, PAS par opencode)
+## 3. Décisions ouvertes — tranchées par l'utilisateur (2026-08-17)
 
-| # | Décision ouverte | Options | Bloque |
-|---|------------------|---------|--------|
-| O1 | **Mode d'intégration triad** | shadow (log only) / actif (remplace le verdict) / audit ponctuel (batch hors-ligne) | Phase 3 |
-| O2 | **Backend LazyGraphRAG** | adapter `VectorService` existant / lib externe (ex. Microsoft GraphRAG) / implémentation custom | Phase 3 |
-| O3 | **Portage Obsidian 3 plateformes** | Portable (Win) / `.app` (macOS) / AppImage (Linux) — **à valider empiriquement** (aucune trace dans le repo) | Phase 1 |
-| O4 | **Priorité datasets** | cyber (MITRE ATT&CK) en premier, confirmé ou non ? | Phase 1 |
-| O5 | **Pipeline de préparation datasets** | embarqué sur clé USB / pré-calcul externe (GPU) + import `.parquet` | Phase 2 |
-| O6 | **Forme de la knowledge base** | LLM Wiki type Karpathy (`okf/` ou `wiki/`) **ou** Autoresearch du mémo (keep/discard git, métrique = score triad) — deux pistes documentées dans la conversation, divergentes | Phase 1 |
+| # | Décision | Tranchement | Justification (Dev Senior) |
+|---|----------|-------------|----------------------------|
+| O1 | Mode d'intégration triad | ✅ **shadow (log only)** | `rag_judge.py` en production (ADR-008) non remplacé sans comparaison mesurée ; shadow = parallèle, logue sans agir ; après 2-4 semaines → comparer sur 100+ questions, puis garder/remplacer/compléter. Risque éliminé : zéro régression production |
+| O2 | Backend LazyGraphRAG | ✅ **adapter `VectorService` existant** | KISS : `search`/`update_score`/`consolidate` existent (`vector.py:353, 378, 463`) ; ajouter `traverse(concept) -> list[Page]` (embeddings → filtre `links_to` → top-k + voisins) ; lib externe (Microsoft GraphRAG) = overkill (8 h indexation), nouvelle dépendance, risque ADR-007 offline |
+| O3 | Portage Obsidian 3 plateformes | ⏳ **validation empirique d'abord** (plan tranché, choix d'outil suspendu au test) | Télécharger Portable (Win) / `.app` (macOS) / AppImage (Linux), tester sur clé USB (graphe fonctionnel) ; si OK → `tools/obsidian/` + `launch_obsidian.py` ; si KO → markdown brut + visualisation custom. Aucune preuve de faisabilité dans le repo |
+| O4 | Priorité datasets | ✅ **cyber (MITRE ATT&CK) en premier** | Cœur de JARVIS = audit sécurité (`@cyber`) ; STIX JSON structuré (techniques/tactiques déjà organisées) ; ~50 Mo raisonnable. Ordre : 1. MITRE (Phase 1) → 2. CodeSearchNet (Phase 2) → 3. CAIDA → 4. UCI Grid Stability → 5. COCO (Phase 5) |
+| O5 | Pipeline de préparation datasets | ✅ **pré-calcul GPU externe + import `.parquet`** | Qwen2.5-7B CPU = 1-2 h pour 1000 entrées vs 5-10 min sur RTX 4000+ ; `prepare_dataset.py` (JSONL → chunk → embeddings nomic GPU → `chunks.parquet` + `embeddings.parquet`) copiés sur clé USB, chargement instantané sans LLM ; Phase 2 : script d'ingest embarqué (plus lent, autonome) |
+| O6 | Forme de la knowledge base | ✅ **LLM Wiki Karpathy (pas Autoresearch)** | LLM Wiki = pages markdown structurées + liens sémantiques, Obsidian pour visualiser, exploitable par traversal programmatique ; Autoresearch (mémo Lot 13) = outil d'optimisation des prompts SKILL (keep/discard git), **pas une KB** ; complémentaires : KB en Phases 1-5, Autoresearch plus tard (Lot 13) |
 
-> Toute phase marquée **[NON VALIDÉ]** ci-dessous est **suspendue** à la décision correspondante.
-> Aucune implémentation avant tranchement (règle absolue).
+> Les phases marquées **[NON VALIDÉ PAR CODE]** ci-dessous sont désormais **planifiables**
+> (décisions O1-O6 tranchées le 2026-08-17), sauf O3 (choix Obsidian suspendu au test
+> empirique). Le marquage reste en vigueur jusqu'à ce qu'un code réel existe.
+> Aucune implémentation sans BACKLOG + validation utilisateur (règle absolue).
 
 ---
 
@@ -192,10 +194,11 @@ rag_judge.py (ADR-008, production, INCHANGÉ en mode shadow)
 
 ### Phase 1 — MVP LLM Wiki (1 dataset, ingest manuel, Obsidian) — **[NON VALIDÉ PAR CODE]**
 
-- **Objectif** : créer la structure wiki et ingérer manuellement 1 dataset (MITRE ATT&CK si O4
-  confirmé) pour valider le format avant toute automatisation.
-- **Prérequis** : décisions **O4** (priorité) et **O6** (forme : LLM Wiki vs Autoresearch) ;
-  Phase 0 livrée ; validation empirique Obsidian portable (O3).
+- **Objectif** : créer la structure wiki et ingérer manuellement MITRE ATT&CK (O4 tranchée)
+  pour valider le format avant toute automatisation.
+- **Prérequis** : décisions **O4** (MITRE en premier) et **O6** (LLM Wiki Karpathy) tranchées
+  (2026-08-17) ; Phase 0 livrée ; validation empirique Obsidian portable (O3 — plan tranché,
+  choix d'outil suspendu au test).
 - **Livrable** : `wiki/SCHEMA.md` + `wiki/log.md` + 10-15 pages
   (`wiki/pages/concepts/…`, `wiki/pages/procedures/…`) + Obsidian portable ouvrant `wiki/`
   (graphe navigable) + guide `docs/OBSIDIAN_USAGE.md`.
@@ -208,8 +211,8 @@ rag_judge.py (ADR-008, production, INCHANGÉ en mode shadow)
 ### Phase 2 — Automatisation ingest (WikiService) — **[NON VALIDÉ PAR CODE]**
 
 - **Objectif** : automatiser l'ingestion (JSONL → chunk → LLM → pages wiki → liens).
-- **Prérequis** : Phase 1 livrée (format wiki figé) ; décision **O5** (préparation embarquée vs
-  pré-calcul GPU externe).
+- **Prérequis** : Phase 1 livrée (format wiki figé) ; décision **O5** tranchée (pré-calcul GPU
+  externe + import `.parquet` ; script d'ingest embarqué en réserve pour Phase 2).
 - **Livrable** : `services/wiki_service.py` (`ingest(dataset_path)`) + `tests/test_wiki_service.py`
   (LLM 100 % mocké, convention repo) ; ingestion des 4 datasets restants (CodeSearchNet, CAIDA,
   UCI Grid Stability, COCO — D13).
@@ -224,13 +227,14 @@ rag_judge.py (ADR-008, production, INCHANGÉ en mode shadow)
 
 - **Objectif** : brancher le triad sur du contexte réel (chunks + pages wiki) et comparer ses
   verdicts à `rag_judge.py` sans modifier le comportement de production.
-- **Prérequis** : décisions **O1** (mode : shadow proposé, non acté) et **O2** (backend
-  LazyGraphRAG) ; Phase 2 livrée.
+- **Prérequis** : décisions **O1** (mode shadow) et **O2** (adapter `VectorService`, méthode
+  `traverse`) tranchées (2026-08-17) ; Phase 2 livrée.
 - **Ancrage code existant** : le triad (orchestrator.py) et le juge RAG (pipeline.py:149)
   existent ; le **branchement** lui-même (faire passer chunks + réponse au triad) n'existe pas —
   c'est le cœur de la phase. `run_pipeline` et `run_pipeline_with_revision` devront évoluer
   (signatures actuelles : `orchestrator.py:40`, `revision.py:9`) avec adaptation des tests L5-L7.
-- **Livrable** : `LazyGraphService.traverse(concept)` (ou équivalent selon O2) + triad recevant
+- **Livrable** : extension `VectorService.traverse(concept)` (O2 : embeddings → filtre
+  `links_to` → top-k + voisins) + triad recevant
   `(question, chunks, wiki_pages)` + comparaison shadow vs `rag_judge` sur 50 questions réelles +
   rapport `docs/triad-vs-ragjudge-analysis.md`.
 - **Critère de sortie** : 50 verdicts comparés ; recommandation documentée
@@ -255,8 +259,8 @@ rag_judge.py (ADR-008, production, INCHANGÉ en mode shadow)
 
 - **Objectif** : enrichir la wiki par agent selon le mapping D13 (CIC-IDS2017, UNSW-NB15, SQuAD,
   Alpaca, Google Cloud Trace, NREL Solar Power…).
-- **Prérequis** : Phases 0-2 livrées ; décision **O4** confirmée ; décision O5 actée (rythme et
-  lieu de pré-calcul).
+- **Prérequis** : Phases 0-2 livrées ; décisions **O4** (MITRE en premier) et **O5** (pré-calcul
+  GPU externe) tranchées (2026-08-17).
 - **Livrable** : 5+ datasets ingérés via `WikiService` (1 dataset/jour selon la conversation) ;
   200+ pages wiki.
 - **Critère de sortie** : spot-check humain par dataset ; lint Phase 4 vert ; gates vertes.
@@ -314,13 +318,12 @@ rag_judge.py (ADR-008, production, INCHANGÉ en mode shadow)
    tests 100 % mockés (zéro appel Ollama/réseau réel) ; commits en conventional commits
    (`feat|fix|docs|test|refactor(scope): MT-LotXX-LY — description`), après validation
    utilisateur uniquement.
-6. **Mode shadow par défaut pour toute nouveauté de jugement** tant que O1 n'est pas tranché :
-   rien ne remplace `rag_judge.py` en production sans comparaison mesurée (section 6.2).
+6. **Mode shadow acté (O1, 2026-08-17)** pour l'intégration triad : rien ne remplace
+   `rag_judge.py` en production sans comparaison mesurée (section 6.2).
 7. **Cette roadmap est mise à jour après chaque phase** (état réel, hash de commit, chiffres
    mesurés) — y compris le marquage `[NON VALIDÉ]` qui doit être levé par les preuves réelles.
 
 ---
 
-**Fin de la roadmap.** Prochaine action possible (hors périmètre de ce document) :
-trancher les décisions O1-O6, ou reprendre les micro-tâches Lot 12 en attente (L9 = branchement
-triad sur contexte réel, suspendu à O1).
+**Fin de la roadmap.** Décisions O1-O6 tranchées (2026-08-17). Prochaine action :
+**Phase 0 — Audit datasets** (MT-KB-L0), puis Phase 1 (MVP LLM Wiki MITRE ATT&CK).
