@@ -6,6 +6,27 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot12-L3 — agents/skills_eval/ : prompts SKILL judge/advocate/evaluator (2026-08-16) ✅
+- Sources (lecture seule) : `H:\ref-rag\src\agents\skills\{judge,advocate,evaluator}\SKILL.md`
+  (chemins consignés `skills/<role>.md` inexistants → structure réelle `skills/<role>/SKILL.md`,
+  découverte par `dir` ; docs/prompts-agents.md non nécessaire).
+- `agents/skills_eval/{judge,advocate,evaluator}.md` : **copies exactes** des SKILL.md sources,
+  vérifiées octet par octet (hash SHA-256 identiques aux 3 sources ; newline final `\n` ajouté
+  sur les copies — tailles 1860 / 1720 / 1987 octets).
+- `agents/skills_eval/__init__.py` (12 l.) : `load_skill_eval(role: str) -> str` —
+  docstring exacte de la spec MT ; résolution `Path(__file__).parent / f"{role}.md"` ;
+  `ValueError` si rôle ∉ {"judge", "advocate", "evaluator"}. **Imports : `from pathlib
+  import Path` UNIQUEMENT** (zéro import JARVIS, autonome comme eval_contracts.py).
+- `tests/test_skills_eval.py` (5 tests ≥ 4 requis) : judge/advocate/evaluator → texte non vide ;
+  rôle inconnu ("unknown") → ValueError ; contrats présents (judge_output_v1, advocate_output_v1,
+  evaluator_output_v1). → 5 passed.
+- Gates : ruff check ✓ · ruff format ✓ (229/230 — `controllers/routes/system.py` non formaté =
+  dette préexistante HEAD, non touché) · mypy ✓ (138 fichiers) · pytest --cov →
+  **878 passed / 1 failed**, couverture 84,48 % ≥ 60 % — échec unique =
+  `test_sandbox_missing_raises_file_system_error` préexistant (déjà documenté
+  MT-Lot11-L1/L2, hors périmètre).
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot12-L2 — agents/eval_contracts.py : contrats Pydantic (ref-rag adapté) (2026-08-16) ✅
 - Sources (lecture seule, classes Pydantic extraites uniquement — zéro logique agent) :
   `H:\ref-rag\src\agents\judge.py` (JudgeOutput), `advocate.py` (AdvocateOutput),
