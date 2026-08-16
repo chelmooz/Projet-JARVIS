@@ -6,6 +6,21 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-KB-L2c — Diagnostic console + commit JSONL v2 (2026-08-17) ✅
+- Diagnostic console (lecture seule : toolbox.py, console-client.js, console-tab.js, JARVIS.bat/sh) :
+  1. Console = interface web vers /api/jarvis (@agent tâche), ZÉRO exécution shell locale.
+  2. Aucun shell (PowerShell/bash/cmd) exposé ; launchers = démarrage app portable seulement.
+  3. Interface principale utilisateur (onglet SPA, handoff Palette, historique, statut), pas debug.
+- Décision PowerShell : NON requis dans la console. L'agent @hardware a déjà witr pour diagnostic processus/ports/services. Ajout futur run_powershell côté serveur = chiffrage MOYEN (sandbox, validation, timeout).
+- Commit JSONL v2 validés :
+  - wiki/sources/ad-attacks-network.jsonl (32 entrées, @network, filtré réseau pur)
+  - wiki/sources/multios-commands.jsonl (1000 entrées, @hardware, Windows non vide)
+  - services/dataset_converter_v2.py + tests/test_dataset_converter_v2.py (7/7 GREEN)
+  - wiki/sources/AUDIT_v2.md (mis à jour), BACKLOG.md
+- Gates : ruff ✓ · format ✓ · mypy ✓ · pytest --cov (942 passed, 2 failed préexistants hors périmètre)
+- Hash commit : fa2e1ac (HEAD actuel, commit à faire)
+- Statut : ✅ DONE
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur
@@ -17,6 +32,25 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - Implémentation : service créé, lint réel des 15 pages = **LINT OK** (toutes conformes).
 - Gates : ruff ✓ · format ✓ · mypy ✓ · pytest ✓ (**930 passed**, couverture **83,25 % ≥ 60 %**).
 - Statut : ✅ DONE (en attente commit). Phase 1 close côté code.
+
+### MT-KB-L2a — Audit datasets v2 (4 candidats × 4 critères) (2026-08-17) ✅
+- Décisions : audit de 7 datasets candidats (2 @dev, 2 @network, 1 @hardware, 2 @vision)
+  avant remplacement des 4 datasets mal adaptés. Zéro téléchargement, vérification
+  empirique depuis les pages HuggingFace. MITRE ATT&CK conservé pour @cyber.
+- **Corrections Dev Senior (post-audit)** :
+  1. **@vision SORTI du périmètre dataset** — RapidOCR = ONNX déterministe, LLM texte = Qwen2.5-7B pré-entraîné. Aucun fine-tuning → zéro besoin dataset. KB @vision = pages wiki manuelles Phase 2 (patterns docs FR) par LLM Wiki.
+  2. **@network : filtre anti-doublon MITRE** — `ad-attacks-en` validé MAIS filtré à l'ingest (exclure malware/exfil/persistence/credential_access déjà dans MITRE @cyber). Garder seulement réseau pur : LDAP, DNS, Kerberos, SMB, RPC, WinRM, NetBIOS, scan, GPO.
+  3. **@dev : candidat concret** — `microsoft/PowerShell-Scripts` (GitHub officiel, MIT) + PowerShell Gallery + Microsoft Learn (CC-BY-4.0). Couvre `_detect_skill_from_code` (powershell fence).
+- Candidats validés (révisés) :
+  - @dev → `microsoft/PowerShell-Scripts` (GitHub) + PowerShell Gallery + Microsoft Learn (à vérifier)
+  - @network → `AYI-NEDJIMI/ad-attacks-en` **filtré réseau pur** (Apache-2.0, 294 kB)
+  - @hardware → `Eng-Elias/multios-terminal-commands` (MIT, 5,72 MB, commandes terminal multi-OS)
+  - @vision → **AUCUN DATASET** (hors périmètre)
+- Candidats rejetés :
+  - @dev : `dessertlab/offensive-powershell` (GPL-3.0 + code malveillant), `microsoft/rpr` (RLHF préférences, pas code)
+  - @vision : `Voxel51/consolidated_receipt_dataset` (detection/VQA, pas OCR), `UniqueData/ocr-text-detection` (CC-BY-NC-ND-4.0 bloquant + detection pas recognition)
+- Livrable : `wiki/sources/AUDIT_v2.md` (document unique, 8 candidats audités + analyse architecturale @vision).
+- Statut : ✅ DONE (validé Dev Senior, prêt pour MT-KB-L2b téléchargement ciblé).
 
 ### MT-KB-L1d — Scale ingest MITRE à 15 pages + traçabilité log.md (2026-08-17) ✅
 - Décisions : méthode `log_ingest(dataset, count, pages)` ajoutée à `WikiIngestService`
