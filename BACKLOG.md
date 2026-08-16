@@ -6,6 +6,79 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-KB-BACKLOG-FIX — Rattrapage traçabilité KB (2026-08-17) ✅
+- **Date** : 2026-08-17
+- **Contexte** : Audit indépendant (Sonnet 5) a relevé l'absence de traçabilité des 4
+  micro-tâches KB de la Phase 0 (feuille de route, décisions O1-O6, audit datasets,
+  conversion JSONL) dans le journal — violation de la règle absolue de traçabilité.
+- **Tests** : `tests/test_backlog_completeness.py` (2 tests : présence des IDs KB dans le
+  BACKLOG, présence des hashes de commit). RED vérifié (**2 FAILED** — 4 IDs absents),
+  GREEN : **2/2 passed**.
+- **Implémentation** : ajout rétroactif des 4 entrées manquantes (`MT-ROADMAP-KB`,
+  `MT-ROADMAP-KB-O`, `MT-KB-L0`, `MT-KB-L0b`) avec hashes (`734616e`, `fb86f0d`,
+  `a2f94b6`) et descriptions issues de `ROADMAP_KB.md`/`AUDIT.md`.
+- **Gates** : ruff check ✓ · ruff format --check ✓ · mypy ✓ · pytest ✓.
+- **Statut** : ✅ DONE (en attente commit `docs(backlog): rétro-ajout MT KB`)
+
+### MT-KB-L1a — Arborescence Wiki + SCHEMA.md (2026-08-16) ✅
+- Décisions : structure `wiki/pages/{concepts,skills,procedures}`, SCHEMA.md avec frontmatter
+  YAML (O6, O2).
+- Tests : `tests/test_wiki_schema.py` (4 tests : dossiers, sections SCHEMA, frontmatter YAML,
+  log.md). RED vérifié (**4 FAILED** — dossiers/fichiers absents), GREEN : **4/4 passed**.
+- Implémentation : dossiers créés avec `.gitkeep`, `wiki/SCHEMA.md` rédigé, `wiki/log.md`
+  initialisé. Aucune page wiki créée (ingest MITRE = MT-KB-L1b).
+- ⚠️ Adaptation documentée : le fichier de test fourni violait les gates (imports inutilisés
+  `os`/`pytest`, annotations `-> None` manquantes, whitespace ligne 19, newline EOF) →
+  corrigé sans modifier les 4 tests ni leurs assertions.
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ · `pytest --cov` → **914 passed / 0 failed**,
+  couverture **83,18 % ≥ 60 %** ✓.
+- Statut : **DONE (en attente commit)**. Aucun commit (conforme AGENTS.md).
+
+### MT-ROADMAP-KB — Feuille de route KB structurée + intégration triad (2026-08-16) ✅
+- Décisions : création de `ROADMAP_KB.md` — feuille de route Knowledge Base structurée +
+  intégration triad, état des lieux **prouvé** (convention de preuve `fichier:ligne`,
+  commit, BACKLOG ou ADR) ; incident de spécifications inventées consigné en §0.5
+  (garde-fou, à ne pas effacer) ; sections 2-7 (décisions actées D1-D14, jalons O1-O6,
+  architecture cible, phases 0-5+X, hors périmètre, garde-fous).
+- Implémentation : `ROADMAP_KB.md` rédigé (aucune ligne de code métier modifiée).
+- Commit : `734616e` — "docs(roadmap): MT-ROADMAP-KB — feuille de route KB structurée +
+  intégration triad (état des lieux prouvé)".
+- Statut : ✅ **DONE** (commit `734616e`).
+
+### MT-ROADMAP-KB-O — Décisions O1-O6 tranchées (2026-08-16) ✅
+- Décisions : O1 triad **shadow (log only)** ; O2 LazyGraphRAG = **adapter `VectorService`**
+  (ajout `traverse(concept)`, pas de lib externe) ; O3 Obsidian = **validation empirique
+  d'abord** (portable Win/.app mac/AppImage Linux) ; O4 **MITRE ATT&CK en priorité** (cyber
+  d'abord, puis CodeSearchNet, CAIDA, UCI Grid, COCO) ; O5 **pré-calcul GPU externe +
+  import `.parquet`** ; O6 **LLM Wiki Karpathy** (pas Autoresearch). Tranchées par
+  l'utilisateur (`ROADMAP_KB.md` §3).
+- Implémentation : `ROADMAP_KB.md` §3 mis à jour (jalons de décision levés, phases
+  planifiables).
+- Commit : `fb86f0d` — "docs(roadmap): MT-ROADMAP-KB-O — décisions O1-O6 tranchées (triad
+  shadow, VectorService.traverse, MITRE en premier, pré-calcul GPU .parquet, LLM Wiki)".
+- Statut : ✅ **DONE** (commit `fb86f0d`).
+
+### MT-KB-L0 — Audit des 5 datasets candidats (Phase 0) (2026-08-16) ✅
+- Décisions : audit de faisabilité des 5 datasets par agent — MITRE ATT&CK Enterprise v19.1
+  (`@cyber`) ✅ GO ; CodeSearchNet (`@dev`) ⚠️ GO conditionnel (licences par dépôt) ; CAIDA
+  Topology (`@network`) ❌ RESTREINT (AUA incompatible redistribution clé USB) ; UCI Grid
+  Stability (`@hardware`) ✅ GO ; COCO 2017 (`@vision`) ✅ GO (annotations seules, images
+  non nécessaires). Tailles réelles, licences et verdicts vérifiés par téléchargement.
+- Implémentation : `wiki/sources/AUDIT.md` rédigé (tableau de synthèse + détail par
+  dataset + verdicts).
+- Commit : `a2f94b6` (audit livré avec le commit de conversion MT-KB-L0b).
+- Statut : ✅ **DONE** (commit `a2f94b6`).
+
+### MT-KB-L0b — Conversion datasets en JSONL (2026-08-16) ✅
+- Décisions : conversion des 5 datasets validés en JSONL (sous-ensembles ≤ 1000 entrées) +
+  documentation `AUDIT.md` et `PREPARATION.md` dans `wiki/sources/`.
+- Implémentation : 5 JSONL livrés — `mitre-attack.jsonl` (858 entrées, STIX → JSONL),
+  `codesearchnet-python.jsonl`, `grid-stability.jsonl`, `network-topology.jsonl`,
+  `coco-annotations.jsonl`.
+- Commit : `a2f94b6` — "data(kb): MT-KB-L0b — 5 datasets JSONL prêts pour ingest LLM Wiki
+  (MITRE, Grid, Network, CodeSearchNet, COCO)".
+- Statut : ✅ **DONE** (commit `a2f94b6`).
+
 ### MT-Lot12-L8 — Route API ``POST /api/cyber/analyze`` (2026-08-16) ✅
 - Décisions validées : endpoint dédié `POST /api/cyber/analyze` ; singleton service lazy
   (pattern `extended_files.py`) ; body `{"question": str, "max_revisions": int = 2}`
