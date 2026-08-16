@@ -6,6 +6,36 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot11-L1R6 — GREEN : whitelist disques pour read_ext4_direct (2026-08-16) ✅
+- Spec validée par l'utilisateur (7 décisions) : (1) source = nouvelle variable d'env
+  `JARVIS_EXT4_WHITELIST` (dédiée, séparée de `JARVIS_FILES_SANDBOX_ROOT`) ; (2) granularité
+  = par `disk_number` entier uniquement (`0,1,2`) ; (3) défaut **fail-closed strict** (variable
+  absente ou vide → tout refusé) ; (4) cas d'usage = audit PC cible depuis clé USB →
+  `JARVIS_EXT4_WHITELIST=0,1,2,3` ; (5) droits admin déjà vérifiés dans `_open_raw_disk()`
+  (inchangé) ; (6) refus = dict service `{"success": False, ...}` (200), pas de 403 ;
+  (7) périmètre = `read_ext4_direct` uniquement.
+- RED : +3 tests dans `tests/test_extended_file_system.py` — `whitelist_absente_refus`
+  (variable supprimée, disque 1 refusé, erreur contient « whitelist »/« autoris »,
+  **zéro appel `_open_raw_disk` vérifié**) ; `disk_non_whiteliste_refus` (`JARVIS_EXT4_WHITELIST=0`,
+  disque 1 refusé) ; `disk_whiteliste_succee` (`0,1` → lecture OK, mocks ext4/offset/
+  `_open_raw_disk`). RED vérifié : **2 failed / 0 passed** sur les 2 tests de refus (le code
+  tombait sur « Librairie `ext4` non installée » — aucune vérification whitelist).
+- GREEN (`services/extended_file_system.py`) : `_parse_whitelist()` (parse CSV → `set[int]`,
+  entrées invalides ignorées, vide → `set()` fail-closed) + `_is_disk_whitelisted()` ;
+  check inséré tout au début de `read_ext4_direct`, AVANT `import ext4` et `_open_raw_disk` ;
+  message : « Disque {n} non autorisé (whitelist) ». Rien d'autre touché.
+- Adaptation nécessaire : `test_read_ext4_direct_uses_correct_offset` (R1) appelait
+  `read_ext4_direct(1, 2, "/")` sans variable → `monkeypatch.setenv("JARVIS_EXT4_WHITELIST", "1")`
+  ajouté (le comportement fail-closed est conforme à la spec ; précédent : adaptation mock R4).
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ (1 fichier) · `pytest tests/test_extended_file_system.py`
+  → **15/15 passed** (12 existants + 3 nouveaux). ⚠️ La commande isolée du plan
+  (`--cov=services --cov-fail-under=60` sur un seul fichier) échoue **par construction**
+  (2,69 % : un seul fichier de tests vs tout `services/`) → gate réel = `pytest --cov` complet :
+  **900 passed / 1 failed**, couverture **83,60 % ≥ 60 %** — échec unique =
+  `test_sandbox_missing_raises_file_system_error` préexistant (documenté MT-Lot11-L1/L2,
+  hors périmètre).
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot11-L1R4 — GREEN : blacklist disque système dans mount_ext4_partition (2026-08-16) ✅
 - Spec validée par l'utilisateur (3 décisions) : (1) disque système = celui contenant la
   partition boot (lecteur `SystemDrive`, défaut `C:`) ; (2) refus = erreur service

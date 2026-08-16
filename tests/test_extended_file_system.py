@@ -268,6 +268,7 @@ def test_mount_ext4_partition_system_disk_detection_failure_falls_through(
 
 
 def test_read_ext4_direct_uses_correct_offset(svc: ExtendedFileSystemService, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JARVIS_EXT4_WHITELIST", "1")
     volume_calls: list[tuple[Any, int]] = []
 
     class FakeVolume:
@@ -289,6 +290,54 @@ def test_read_ext4_direct_uses_correct_offset(svc: ExtendedFileSystemService, mo
     assert result["entries"] == [{"name": "a.txt", "is_dir": False, "size": 5}]
     assert len(volume_calls) == 1
     assert volume_calls[0][1] == 1048576
+
+
+def test_read_ext4_direct_whitelist_absente_refus(
+    svc: ExtendedFileSystemService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[str] = []
+    monkeypatch.delenv("JARVIS_EXT4_WHITELIST", raising=False)
+    monkeypatch.setattr(svc, "_open_raw_disk", lambda path: opened.append(path) or FakeFile())
+
+    result = svc.read_ext4_direct(1, 1)
+
+    assert result["success"] is False
+    assert "whitelist" in result["error"] or "autoris" in result["error"]
+    assert opened == []
+
+
+def test_read_ext4_direct_disk_non_whiteliste_refus(
+    svc: ExtendedFileSystemService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JARVIS_EXT4_WHITELIST", "0")
+
+    result = svc.read_ext4_direct(1, 1)
+
+    assert result["success"] is False
+    assert "whitelist" in result["error"] or "autoris" in result["error"]
+
+
+def test_read_ext4_direct_disk_whiteliste_succee(
+    svc: ExtendedFileSystemService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("JARVIS_EXT4_WHITELIST", "0,1")
+
+    class FakeVolume:
+        def __init__(self, f: Any, offset: int) -> None:
+            pass
+
+        def inode_at(self, path: str) -> SimpleNamespace:
+            child = SimpleNamespace(is_dir=lambda: False, is_file=lambda: True, size=5)
+            return SimpleNamespace(is_dir=lambda: True, is_file=lambda: False, items=lambda: iter([("a.txt", child)]))
+
+    monkeypatch.setitem(sys.modules, "ext4", SimpleNamespace(Volume=FakeVolume))
+    monkeypatch.setattr(fs_module.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="1048576"))
+    monkeypatch.setattr(svc, "_open_raw_disk", lambda path: FakeFile())
+
+    result = svc.read_ext4_direct(1, 1, "/")
+
+    assert result["success"] is True
+    assert result["entries"] == [{"name": "a.txt", "is_dir": False, "size": 5}]
 
 
 def test_get_all_drives_extended_returns_contract(

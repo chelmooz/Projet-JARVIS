@@ -418,6 +418,25 @@ class ExtendedFileSystemService:
     # ------------------------------------------------------------------
     # Lecture directe via librairie Python `ext4`
     # ------------------------------------------------------------------
+    def _parse_whitelist(self) -> set[int]:
+        """Parse JARVIS_EXT4_WHITELIST en set de disk_numbers autorisés."""
+        raw = os.environ.get("JARVIS_EXT4_WHITELIST", "").strip()
+        if not raw:
+            return set()
+        result = set()
+        for item in raw.split(","):
+            item = item.strip()
+            if item:
+                try:
+                    result.add(int(item))
+                except ValueError:
+                    continue  # ignorer les entrées invalides
+        return result
+
+    def _is_disk_whitelisted(self, disk_number: int) -> bool:
+        """Vérifie si disk_number est dans JARVIS_EXT4_WHITELIST."""
+        return disk_number in self._parse_whitelist()
+
     def read_ext4_direct(
         self,
         disk_number: int,
@@ -429,6 +448,10 @@ class ExtendedFileSystemService:
         Nécessite : pip install ext4
         Nécessite : droits Administrateur (accès raw device).
         """
+        # Vérification whitelist (fail-closed)
+        if not self._is_disk_whitelisted(disk_number):
+            return {"success": False, "error": f"Disque {disk_number} non autorisé (whitelist)"}
+
         try:
             import ext4  # type: ignore[import-not-found]
         except ImportError:
