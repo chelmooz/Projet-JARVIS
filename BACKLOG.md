@@ -6,6 +6,34 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot12-L7 — Service CyberEval (port + implémentation) (2026-08-16) ✅
+- Décisions validées (après CoT) : endpoint dédié `POST /api/cyber/analyze` (L8) — rejet de
+  `/api/pipelines/run` (PipelineService = pipelines métier configurables, ADR-013) et
+  `/api/jarvis` (AgentGraph = 5 étapes différentes) ; format KISS `{"question": str}` →
+  `{"decision", "score", "reasoning", "revisions"}` (seul le verdict final compte pour l'UI,
+  `score` = `evaluator.final_score`) ; nouveau `CyberEvalPort` + `CyberEvalService`
+  (ADR-001 MVC + Ports) — rejet de `inference.py` (1 modèle, pas multi-agent) et
+  `PipelineService` (pas adapté).
+- ⚠️ **Déviation L6 anticipée et appliquée (autorisée par la consigne)** : `run_pipeline_with_revision`
+  modifié pour retourner `(result | None, revisions_count)` — le service a besoin du nombre de
+  tours de révision effectués pour le champ `revisions`. `agents/revision.py` : compteur
+  `revisions_done` incrémenté à chaque tour, retourné à la sortie (et `(None, 0)` si échec).
+  `tests/test_revision.py` : 5 tests adaptés au nouveau contrat (déballage `result, revisions`,
+  assertions `revisions == 0/1` ajoutées). Option A retenue (la plus propre), B et C rejetées.
+- Tests ajoutés (5, `tests/test_cyber_eval_service.py`, `run_pipeline_with_revision` mocké,
+  zéro appel Ollama) : réponse simplifiée (publish/0.85/OK/0) ; fail-closed
+  `{"decision": "reject", "score": 0.0, "reasoning": "Pipeline échoué", "revisions": 0}` ;
+  compteur de révisions propagé (`(tuple, 2)` → `revisions: 2`) ; `max_revisions=1` transmis
+  (`assert_called_once_with` exact) ; défaut `max_revisions=2`. RED vérifié
+  (ModuleNotFoundError), GREEN : **5/5 passed** (10/10 avec test_revision adaptés).
+- Implémentation : `ports/cyber_eval_port.py` — `CyberEvalPort(Protocol)` (`analyze(question,
+  max_revisions=2) -> dict[str, Any]`, jamais None, docstring du contrat fail-closed) ;
+  `services/cyber_eval_service.py` — `CyberEvalService.analyze()` réutilise L6, retour
+  simplifié, `reject` fail-closed si `result is None`.
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ (3 fichiers) · `pytest --cov` →
+  **905 passed / 0 failed**, couverture **83,16 % ≥ 60 %** ✓.
+- Statut : **DONE (en attente commit)**. Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot12-L6 — Boucle revise (niveau réponse) (2026-08-16) ✅
 - Décisions validées : `run_pipeline_with_revision(question, max_revisions=2) -> tuple |
   None` ; si `decision == "revise"` et budget > 0 → question enrichie
