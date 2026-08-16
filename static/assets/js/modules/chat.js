@@ -4,6 +4,7 @@
 import { state } from './state.js';
 import * as utils from './utils.js';
 import * as status from './status.js';
+import * as skills from './skills.js';
 import * as conversations from './conversations.js';
 
 const BADGE_ID = 'chat-image-badge';
