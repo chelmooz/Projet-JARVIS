@@ -6,6 +6,68 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot12-L2 — agents/eval_contracts.py : contrats Pydantic (ref-rag adapté) (2026-08-16) ✅
+- Sources (lecture seule, classes Pydantic extraites uniquement — zéro logique agent) :
+  `H:\ref-rag\src\agents\judge.py` (JudgeOutput), `advocate.py` (AdvocateOutput),
+  `evaluator.py` (EvaluatorOutput). Agents (JudgeAgent/AdvocateAgent/EvaluatorAgent)
+  et imports `src.*` non copiés (consigne MT).
+- `agents/eval_contracts.py` (nouveau, 47 l.) : 3 classes autonomes —
+  `JudgeOutput` (score 0-1, critique, checks_passed `Literal[factualite, coherence,
+  couverture, style]`, flags `Literal[hallucination_suspect, omission_source,
+  contradiction_interne]`, confidence) ; `AdvocateOutput` (score 0-1, faille,
+  claims_contested, hallucination_risk `Literal[low, medium, high]` = "low",
+  missing_context, confidence) ; `EvaluatorOutput` (decision `Literal[publish, revise,
+  reject]`, final_score 0-1, reasoning, revision_instructions optionnel,
+  verified_tier `Literal[machine-confirmed, unverified]` = "unverified", confidence).
+  Imports = `pydantic` + `typing.Literal` uniquement (autonome, aucun import JARVIS).
+  Zéro logique/méthode/fallback.
+- `tests/test_eval_contracts.py` (6 tests) : JudgeOutput valide OK ; score > 1.0 →
+  ValidationError ; score < 0.0 → ValidationError ; hallucination_risk "extreme" →
+  ValidationError ; EvaluatorOutput decision="publish" valide ; decision="delete" →
+  ValidationError. → 6 passed.
+- Gates : ruff check ✓ · ruff format ✓ (227/228 — `controllers/routes/system.py` non
+  formaté = dette préexistante HEAD, non touché) · mypy ✓ (137 fichiers) ·
+  pytest --cov → **873 passed / 1 failed**, couverture 84,46 % ≥ 60 % — échec unique =
+  `test_sandbox_missing_raises_file_system_error` préexistant (déjà documenté
+  MT-Lot11-L1/L2, hors périmètre).
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot12-L1 — agents/parsing.py : utilitaires de parsing JSON (ref-rag adapté) (2026-08-16) ✅
+- Source : `H:\ref-rag\src\agents\parsing.py` (copie + adaptation, zéro import de ref-rag).
+  ⚠️ Blocage initial : `H:\ref-rag` absent au premier sondage → STOP rapporté (règle 7/9),
+  dossier recréé par l'utilisateur à 15:02, reprise confirmée.
+- `agents/parsing.py` (nouveau, 62 l.) : `extract_json` (priorité bloc ```json``` → ``` ``` →
+  premier `{` / dernier `}`) + `parse_model[T: BaseModel]` (validation Pydantic, `None` au lieu
+  de lever). Imports = stdlib + pydantic uniquement (aucun import ref-rag à adapter).
+- Adaptations gates imposées par ruff : UP047 → syntaxe PEP 695 `parse_model[T: BaseModel]`
+  (TypeVar `_T` supprimé) ; UP049 renommé `T` (auto-fix) ; W292 newline final (auto-fix).
+- `tests/test_eval_parsing.py` (3 tests) : JSON valide → parse en modèle ; JSON noyé dans du
+  texte (fence ```json``` + préfixe/suffixe) → extrait et parse ; JSON cassé / non-JSON / vide →
+  `None`. → 3 passed.
+- Gates : ruff check ✓ · ruff format ✓ (225/226 — `controllers/routes/system.py` non formaté =
+  dette préexistante HEAD, non touché) · mypy ✓ (136 fichiers) · pytest --cov →
+  **867 passed / 1 failed**, couverture 84,49 % ≥ 60 % — échec unique =
+  `test_sandbox_missing_raises_file_system_error` préexistant (déjà documenté MT-Lot11-L1/L2,
+  hors périmètre). agents/parsing.py couvert à 86 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot11-L3 — Fix JS « skills is not defined » (Phase 8, plan verrouillé) (2026-08-15) ✅
+- Localisation par grep (avant toute modif) : `\bskills\b` → 3 usages suspects,
+  un seul fautif — `static/assets/js/modules/chat.js` **utilise** `skills.refreshSkills()`
+  (l.333 et l.345) **sans** import `skills` (bloc imports l.4-7 : state/utils/status/
+  conversations uniquement) → `ReferenceError: skills is not defined` au premier
+  message chat renvoyant `suggested_skill` (SSE `meta.suggested_skill` + JSON
+  `data.suggested_skill`). `app.js` (import l.10) et `skills.js` (définition) sains ;
+  pas de dépendance circulaire (skills.js n'importe pas chat.js — vérifié).
+- Correction unique appliquée (choix « module » du plan) : ajout de
+  `import * as skills from './skills.js';` en tête de `chat.js` (convention modules
+  voisins `./xxx.js`). Rien d'autre touché (app.js/skills.js/agents.js inchangés).
+- Gates : `npx vitest run` → **111 passed / 10 fichiers** (chat.test.js 3/3, aucune
+  régression) — `node_modules/` absent au départ (env local), `npm install` requis
+  avant run (aucun fichier versionné modifié). Validation navigateur (Ctrl+F5 +
+  message chat) : à faire côté utilisateur (pré-déploiement, pas de serveur local).
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot11-L2 — Sandbox multi-racines + wildcard `*` (plan verrouillé, Phase 7) (2026-08-15) ✅
 - Plan exécuté tel quel (1 fichier métier, `.env.example`, tests, BACKLOG) :
   - `services/file_system.py` (unique fichier métier) : `_is_inside_sandbox` (racine
