@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
@@ -40,6 +41,12 @@ class ReadExt4Request(BaseModel):
 _extended_fs_service = None
 
 
+def require_sandbox_configured() -> None:
+    """Fail-closed : 403 si JARVIS_FILES_SANDBOX_ROOT absent/vide."""
+    if not os.environ.get("JARVIS_FILES_SANDBOX_ROOT", "").strip():
+        raise HTTPException(status_code=403, detail="Sandbox non configuré (JARVIS_FILES_SANDBOX_ROOT)")
+
+
 def get_extended_fs_service() -> ExtendedFileSystemService:
     """Singleton du service (lazy init au premier appel)."""
     global _extended_fs_service
@@ -51,7 +58,9 @@ def get_extended_fs_service() -> ExtendedFileSystemService:
 
 
 @router.get("/api/files/all_drives")
-async def list_all_drives() -> dict[str, Any]:
+async def list_all_drives(
+    _: None = Depends(require_sandbox_configured),
+) -> dict[str, Any]:
     """Liste TOUS les disques physiques et leurs partitions."""
     try:
         return get_extended_fs_service().get_all_drives_extended()
@@ -61,7 +70,10 @@ async def list_all_drives() -> dict[str, Any]:
 
 
 @router.post("/api/files/mount_ext4")
-async def mount_ext4(req: MountExt4Request) -> dict[str, Any]:
+async def mount_ext4(
+    req: MountExt4Request,
+    _: None = Depends(require_sandbox_configured),
+) -> dict[str, Any]:
     """Monte une partition Linux via diskpart + service Ext2Fsd."""
     try:
         return get_extended_fs_service().mount_ext4_partition(
@@ -75,7 +87,10 @@ async def mount_ext4(req: MountExt4Request) -> dict[str, Any]:
 
 
 @router.post("/api/files/unmount_ext4")
-async def unmount_ext4(req: UnmountExt4Request) -> dict[str, Any]:
+async def unmount_ext4(
+    req: UnmountExt4Request,
+    _: None = Depends(require_sandbox_configured),
+) -> dict[str, Any]:
     """Retire la lettre d'une partition précédemment montée."""
     try:
         ok = get_extended_fs_service().unmount_ext4_partition(
@@ -89,7 +104,10 @@ async def unmount_ext4(req: UnmountExt4Request) -> dict[str, Any]:
 
 
 @router.post("/api/files/read_ext4_direct")
-async def read_ext4_direct(req: ReadExt4Request) -> dict[str, Any]:
+async def read_ext4_direct(
+    req: ReadExt4Request,
+    _: None = Depends(require_sandbox_configured),
+) -> dict[str, Any]:
     """Lecture directe ext4 via librairie Python (admin requis)."""
     try:
         return get_extended_fs_service().read_ext4_direct(

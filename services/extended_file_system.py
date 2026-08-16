@@ -9,6 +9,7 @@ from __future__ import annotations
 import ctypes
 import json
 import logging
+import os
 import platform
 import re
 import string
@@ -44,6 +45,36 @@ class ExtendedFileSystemService:
         self._mounted_ext4: dict[str, str] = {}
 
     # ------------------------------------------------------------------
+    # Coutures de testabilité (aucune logique métier)
+    # ------------------------------------------------------------------
+    def _run_subprocess(
+        self,
+        args: list[str],
+        *,
+        timeout: float,
+        input: str | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Exécute une commande externe (couture mockable en tests)."""
+        if platform.system() == "Windows":
+            return subprocess.run(
+                args,
+                input=input,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        return subprocess.run(args, input=input, capture_output=True, text=True, timeout=timeout)
+
+    def _open_raw_disk(self, path: str) -> Any:
+        """Ouvre un disque brut en lecture binaire (couture mockable en tests)."""
+        return open(path, "rb")
+
+    def _get_volume_info(self, path: str, fs_name: Any) -> int:
+        """Appel Win32 GetVolumeInformationW (couture mockable en tests)."""
+        return int(ctypes.windll.kernel32.GetVolumeInformationW(path, None, 0, None, None, None, fs_name, 256))
+
+    # ------------------------------------------------------------------
     # Détection des disques physiques
     # ------------------------------------------------------------------
     def list_all_physical_disks(self) -> list[dict[str, Any]]:
@@ -56,17 +87,14 @@ class ExtendedFileSystemService:
         """Liste via PowerShell Get-Disk + Get-Partition."""
         disks: list[dict[str, Any]] = []
         try:
-            result = subprocess.run(
+            result = self._run_subprocess(
                 [
                     "powershell",
                     "-NoProfile",
                     "-Command",
                     "Get-Disk | Select-Object Number, FriendlyName, Size, PartitionStyle | ConvertTo-Json -Depth 3",
                 ],
-                capture_output=True,
-                text=True,
                 timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return disks
@@ -97,7 +125,7 @@ class ExtendedFileSystemService:
         """Liste toutes les partitions d'un disque (montées ou non)."""
         partitions: list[dict[str, Any]] = []
         try:
-            result = subprocess.run(
+            result = self._run_subprocess(
                 [
                     "powershell",
                     "-NoProfile",
@@ -106,10 +134,7 @@ class ExtendedFileSystemService:
                     "Select-Object PartitionNumber, DriveLetter, Size, Type, Offset | "
                     "ConvertTo-Json -Depth 3",
                 ],
-                capture_output=True,
-                text=True,
                 timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return partitions
@@ -176,7 +201,7 @@ class ExtendedFileSystemService:
         try:
             fs_name = ctypes.create_unicode_buffer(256)
             path = f"{drive_letter}:\\"
-            ret = ctypes.windll.kernel32.GetVolumeInformationW(path, None, 0, None, None, None, fs_name, 256)
+            ret = self._get_volume_info(path, fs_name)
             if ret and fs_name.value:
                 return fs_name.value
             return "Unknown"
@@ -187,7 +212,7 @@ class ExtendedFileSystemService:
         """Identifie un FS par lecture des magic bytes sur le disque brut."""
         try:
             raw_path = f"\\\\.\\PhysicalDrive{disk_number}"
-            with open(raw_path, "rb") as f:
+            with self._open_raw_disk(raw_path) as f:
                 header = f.read(max(sig[2] + len(sig[0]) for sig in FS_SIGNATURES) + 64)
         except (PermissionError, FileNotFoundError, OSError) as e:
             _logger.debug("Impossible de lire %s : %s", raw_path, e)
@@ -205,12 +230,7 @@ class ExtendedFileSystemService:
         """Fallback Linux via lsblk."""
         disks: list[dict[str, Any]] = []
         try:
-            result = subprocess.run(
-                ["lsblk", "-Jb", "-o", "NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,PKNAME"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            result = self._run_subprocess(["lsblk", "-Jb", "-o", "NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,PKNAME"], timeout=10)
             if result.returncode != 0:
                 return disks
             data = json.loads(result.stdout)
@@ -250,6 +270,34 @@ class ExtendedFileSystemService:
     # ------------------------------------------------------------------
     # Montage via diskpart + Ext2Fsd service
     # ------------------------------------------------------------------
+    def _system_disk_number(self) -> int | None:
+        """Numéro du disque physique contenant la partition boot (lecteur système).
+
+        ``None`` si la détection échoue (fail-open : le montage reste possible).
+        """
+        # `SystemDrive` est le nom officiel de la variable Windows (camelCase).
+        system_drive = os.environ.get("SystemDrive") or "C:"  # noqa: SIM112
+        drive_letter = system_drive.rstrip(":\\")
+        try:
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    f"Get-Partition -DriveLetter {drive_letter} | Get-Disk | Select-Object -ExpandProperty Number",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return None
+            return int(result.stdout.strip())
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError) as e:
+            _logger.warning("Détection disque système échouée : %s", e)
+            return None
+
     def mount_ext4_partition(
         self,
         disk_number: int,
@@ -267,15 +315,20 @@ class ExtendedFileSystemService:
                 "error": "Montage automatique non supporté sous Linux (déjà natif)",
             }
 
+        # Blacklist : jamais monter le disque physique du système d'exploitation
+        system_disk = self._system_disk_number()
+        if system_disk is not None and disk_number == system_disk:
+            return {
+                "success": False,
+                "mount_point": None,
+                "error": (
+                    f"Disque {disk_number} = disque système (blacklisté) : montage refusé pour protéger Windows."
+                ),
+            }
+
         # Vérifier que le service Ext2Fsd est démarré
         try:
-            svc_check = subprocess.run(
-                ["sc", "query", "Ext2Fsd"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
+            svc_check = self._run_subprocess(["sc", "query", "Ext2Fsd"], timeout=5)
             if "RUNNING" not in svc_check.stdout.upper():
                 return {
                     "success": False,
@@ -305,14 +358,7 @@ class ExtendedFileSystemService:
         # Assigner la lettre via diskpart
         script = f"select disk {disk_number}\nselect partition {partition_number}\nassign letter={mount_letter}\n"
         try:
-            result = subprocess.run(
-                ["diskpart"],
-                input=script,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
+            result = self._run_subprocess(["diskpart"], input=script, timeout=30)
             output = (result.stdout or "").lower() + (result.stderr or "").lower()
             if result.returncode != 0 or "successfully" not in output:
                 return {
@@ -340,14 +386,7 @@ class ExtendedFileSystemService:
             return False
         try:
             script = f"select disk {disk_number}\nselect partition {partition_number}\nremove\n"
-            result = subprocess.run(
-                ["diskpart"],
-                input=script,
-                capture_output=True,
-                text=True,
-                timeout=15,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
+            result = self._run_subprocess(["diskpart"], input=script, timeout=15)
             if result.returncode == 0:
                 del self._mounted_ext4[key]
                 return True
@@ -400,7 +439,7 @@ class ExtendedFileSystemService:
 
         # Récupérer l'offset exact de la partition
         try:
-            result = subprocess.run(
+            result = self._run_subprocess(
                 [
                     "powershell",
                     "-NoProfile",
@@ -409,10 +448,7 @@ class ExtendedFileSystemService:
                     f"-PartitionNumber {partition_number} | "
                     "Select-Object -ExpandProperty Offset",
                 ],
-                capture_output=True,
-                text=True,
                 timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return {
@@ -425,7 +461,7 @@ class ExtendedFileSystemService:
 
         raw_path = f"\\\\.\\PhysicalDrive{disk_number}"
         try:
-            with open(raw_path, "rb") as f:
+            with self._open_raw_disk(raw_path) as f:
                 volume = ext4.Volume(f, offset=offset)
                 inode = volume.inode_at(target_path)
                 if inode.is_dir():
@@ -494,13 +530,7 @@ class ExtendedFileSystemService:
         ext2fsd_available = EXT2FSD_DIR.joinpath("Ext2Fsd.exe").exists()
         if platform.system() == "Windows":
             try:
-                svc_check = subprocess.run(
-                    ["sc", "query", "Ext2Fsd"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
+                svc_check = self._run_subprocess(["sc", "query", "Ext2Fsd"], timeout=5)
                 ext2fsd_running = "RUNNING" in svc_check.stdout.upper()
             except Exception:
                 ext2fsd_running = False

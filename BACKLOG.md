@@ -6,6 +6,129 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot11-L1R4 — GREEN : blacklist disque système dans mount_ext4_partition (2026-08-16) ✅
+- Spec validée par l'utilisateur (3 décisions) : (1) disque système = celui contenant la
+  partition boot (lecteur `SystemDrive`, défaut `C:`) ; (2) refus = erreur service
+  (HTTP 200, `success: False`), pas de 403 — cohérent avec les autres erreurs métier ;
+  (3) périmètre = `mount_ext4_partition` uniquement (`read_ext4_direct` lecture seule,
+  `unmount_ext4` session-only).
+- RED : +3 tests dans `tests/test_extended_file_system.py` — `rejects_system_disk`
+  (Get-Partition -DriveLetter → "1", montage disque 1 refusé, erreur contient « système »,
+  `_mounted_ext4` vide, commande PowerShell vérifiée) ; `allows_non_system_disk`
+  (détection → "0", disque 1 monté OK) ; `system_disk_detection_failure_falls_through`
+  (stdout non numérique → fail-open → erreur Ext2Fsd inchangée). RED vérifié : 1 failed /
+  2 passed (seul `rejects_system_disk` échouait : montage autorisé).
+- GREEN (`services/extended_file_system.py`) : `_system_disk_number()` — PowerShell
+  `Get-Partition -DriveLetter <SystemDrive> | Get-Disk | Select-Object -ExpandProperty
+  Number`, `None` si échec (fail-open, warning logué) ; check blacklist inséré après le
+  garde Linux, AVANT la vérification Ext2Fsd ; message : « Disque {n} = disque système
+  (blacklisté) : montage refusé pour protéger Windows. »
+- Adaptation nécessaire : le mock de `test_mount_ext4_partition_assigns_letter_via_diskpart`
+  (R1) ne gérait pas le nouvel appel de détection → branche `Get-Partition -DriveLetter`
+  → "0" ajoutée (le comportement service était correct : fail-open documenté).
+- Ruff : `SystemDrive` est le nom officiel de la variable Windows (camelCase) → `# noqa:
+  SIM112` sur la ligne (fausse alerte, `SYSTEMDRIVE` n'existe pas sur Windows).
+- Gates : ruff check ✓ · ruff format ✓ (mes 2 fichiers ; `system.py` = dette préexistante
+  HEAD non touchée) · mypy ✓ (138 fichiers) · pytest --cov → **897 passed / 1 failed**,
+  couverture 83,59 % ≥ 60 % — échec unique = `test_sandbox_missing_raises_file_system_error`
+  préexistant (documenté MT-Lot11-L1/L2, hors périmètre). R1 (12) + R2 (7) verts.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot11-L1R3 — GREEN : authorization (sandbox) sur les 4 routes (2026-08-16) ✅
+- `controllers/routes/extended_files.py` (seul fichier métier modifié, 3 ajouts
+  localisés) : `import os` ; `require_sandbox_configured()` (dépendance FastAPI,
+  fail-closed — 403 « Sandbox non configuré (JARVIS_FILES_SANDBOX_ROOT) » si la
+  variable est absente/vide après `strip()`) ; `_: None = Depends(...)` ajouté aux
+  4 routes (`all_drives`, `mount_ext4`, `unmount_ext4`, `read_ext4_direct`).
+- Aucun changement de contrat : payloads Pydantic, singleton lazy, enveloppe
+  try/except inchangés. Les 3 tests `*_with_authorization_returns_200` (R2) passent
+  toujours (fixture `sandbox_root` définit la variable).
+- GREEN vérifié : `pytest tests/test_extended_files_routes.py` → **7/7 passed**
+  (4 RED → 403 + 3 avec authorization → 200).
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ (138 fichiers) · pytest --cov →
+  **894 passed / 1 failed**, couverture 83,57 % ≥ 60 % — échec unique =
+  `test_sandbox_missing_raises_file_system_error` préexistant (documenté
+  MT-Lot11-L1/L2, hors périmètre). Tests R1 (9) et R2 (7) inclus, tous verts.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot11-L1R2 — Tests RED routes extended_files (authorization requise) (2026-08-16) ✅
+- `tests/test_extended_files_routes.py` (nouveau, 7 tests HTTP) : audit validé — les
+  4 routes `/api/files/{all_drives,mount_ext4,unmount_ext4,read_ext4_direct}` n'exigent
+  AUCUNE authorization sandbox (retournent 200 sans `JARVIS_FILES_SANDBOX_ROOT`).
+- Sémantique « authorization » = sandbox `FileSystemService` (pattern `code_review.py` :
+  403 « Chemin non autorisé (hors sandbox) ») : « sans authorization » = variable
+  `JARVIS_FILES_SANDBOX_ROOT` absente (fixture `_without_authorization`,
+  `monkeypatch.delenv`) ; « avec » = fixture `sandbox_root` (conftest).
+- Mock : `FakeExtendedService` (réponses déterministes, zéro disque/PowerShell)
+  injecté via `monkeypatch.setattr(extended_files_routes, "_extended_fs_service", ...)`
+  (singleton module, même mécanisme que l'implémentation).
+- RED vérifié : **4 failed / 3 passed** — les 4 `*_requires_authorization` échouent
+  (200 au lieu de 403, conformément à l'audit) ; les 3 `*_with_authorization_returns_200`
+  passent (200 + contrat JSON via le mock). GREEN à venir dans une micro-tâche R3
+  (hors périmètre ici : Étape 2 = vérifier RED uniquement).
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ (138 fichiers) · pytest --cov →
+  **890 passed / 5 failed** (4 = RED attendus de ce fichier + 1 préexistant
+  `test_sandbox_missing_raises_file_system_error`, documenté MT-Lot11-L1/L2),
+  couverture 83,60 % ≥ 60 %.
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot11-L1R1 — Tests RED sur ExtendedFileSystemService (2026-08-16) ✅
+- `tests/test_extended_file_system.py` (nouveau, 9 tests) : rétrofit de couverture
+  sur l'implémentation livrée en MT-Lot11-L1 (aucun fichier métier touché) —
+  mocks `subprocess`/`psutil`/`ctypes`/`open`, zéro PowerShell ni accès disque réel :
+  1) `test_list_all_physical_disks_calls_get_disk` (Get-Disk appelé) ·
+  2) `test_list_all_physical_disks_returns_disks_with_partitions` (1 disque + 2 partitions) ·
+  3) `test_list_partitions_windows_calls_get_partition` (Get-Partition -DiskNumber 1) ·
+  4) `test_detect_fs_windows_calls_get_volume_information` (fake `ctypes.windll`,
+     `GetVolumeInformationW` reçoit `C:\`) · 5) `test_identify_fs_by_signature_reads_raw_disk`
+     (lecture `\\.\PhysicalDrive0` + magic ext à l'offset 1080) ·
+  6) `test_mount_ext4_partition_checks_service_running` (sc query STOPPED → erreur contrôlée) ·
+  7) `test_mount_ext4_partition_assigns_letter_via_diskpart` (script envoyé :
+     `select disk 1\nselect partition 2\nassign letter=E\n` — sans `:` final,
+     conforme implémentation) · 8) `test_read_ext4_direct_uses_correct_offset`
+     (fake module `ext4` via `sys.modules`, `Volume(f, offset=1048576)` vérifié) ·
+  9) `test_get_all_drives_extended_returns_contract` (7 clés du contrat figé).
+- Fixtures : `svc` (instance neuve par test) ; `windows_env` (platform→Windows +
+  `CREATE_NO_WINDOW=0` raising=False pour portabilité POSIX) ; `FakeFile`
+  (context manager pour le `with open(...)` réel de l'implémentation).
+- RED initial : 3 échecs = bugs de **mock** (pas de l'implémentation) — fake `open`
+  non context manager (2 tests), assertion script avec `:` final erronée (l'implémentation
+  envoie `assign letter=E\n` sans `:`) → fakes corrigés, 9/9 pass.
+- Gates : ruff check ✓ · ruff format ✓ · mypy ✓ (138 fichiers) · pytest --cov →
+  **887 passed / 1 failed**, couverture 83,45 % ≥ 60 % — échec unique =
+  `test_sandbox_missing_raises_file_system_error` préexistant (déjà documenté
+  MT-Lot11-L1/L2, hors périmètre).
+- Aucun commit (conforme AGENTS.md).
+
+### MT-Lot11-L1R1 — Tests ExtendedFileSystemService + coutures de testabilité (2026-08-16) ✅
+- **Déviation rapportée — prémisse du plan invalide, RED inobservable** : `tests/test_extended_file_system.py`
+  (9 tests, existait déjà en arbre de travail non commité — session antérieure) passe **9/9 dès le
+  premier run** contre le code actuel (0,18 s). Cause : le service était **déjà mockable** au niveau
+  module (`subprocess.run`, `builtins.open`, `ctypes.windll`, `psutil` — le monkeypatch intercepte
+  les appels directs existants) ; le postulat du plan « méthodes non mockables ou logique manquante »
+  ne tient pas. Aucun ImportError/AssertionError possible → étape 2/4 du plan (RED) sans objet.
+  Les tests restent précieux : filet de régression sur le comportement actuel pour L1R3/L1R4.
+- Tests (9/9, conforme spec du plan, mocks subprocess/psutil/ctypes/open, fixture `windows_env`
+  = `platform.system`→Windows + `CREATE_NO_WINDOW` injecté — compatible CI Linux) : Get-Disk
+  appelé + structure disque ; structure disque + 2 partitions ; Get-Partition -DiskNumber X ;
+  GetVolumeInformationW ("C:\\" → "NTFS") ; lecture raw disk magic bytes ext (offset 1080) ;
+  `sc query Ext2Fsd` non-RUNNING → erreur contrôlée ; diskpart (script select disk/partition/
+  assign + `_mounted_ext4` mis à jour) ; `read_ext4_direct` offset 1048576 passé à `ext4.Volume` ;
+  contrat `get_all_drives_extended` (7 clés, has_ext2fsd/ext2fsd_running mockés).
+- `services/extended_file_system.py` (uniquement, +41/−51) : **extraction zéro logique** — 3 coutures
+  mockables : `_run_subprocess()` (centralise capture_output/text/timeout + creationflags Windows via
+  `getattr(..., 0)`, 8 call sites), `_open_raw_disk()` (2 call sites), `_get_volume_info()` (appel
+  Win32 extrait). Mêmes kwargs/chemins qu'avant ; `int()` sur le retour ctypes (mypy strict
+  no-any-return). Vérifié : les mocks `subprocess.run` existants interceptent toujours via le wrapper.
+- Post-extraction : 9/9 verts (0,21 s) — filet de régression intact.
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ (138 fichiers) · pytest --cov →
+  **887 passed / 1 failed** — échec unique = `test_sandbox_missing_raises_file_system_error`
+  préexistant (documenté MT-Lot11-L1/L2, hors périmètre) · couverture **83,46 % ≥ 60 %**
+  (baisse vs 84,48 % attendue : le module, jamais importé en session test auparavant, entre
+  désormais dans la mesure — +511 lignes dénominateur pour ~40 % couvertes).
+- Prochaine étape : MT-Lot11-L1R2 (tests RED sur routes — authorization required).
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot12-L3 — agents/skills_eval/ : prompts SKILL judge/advocate/evaluator (2026-08-16) ✅
 - Sources (lecture seule) : `H:\ref-rag\src\agents\skills\{judge,advocate,evaluator}\SKILL.md`
   (chemins consignés `skills/<role>.md` inexistants → structure réelle `skills/<role>/SKILL.md`,
