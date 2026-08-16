@@ -6,6 +6,24 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot11-L1R5 — RE-AUDIT go/nogo final (vérification des 5 points) (2026-08-16) ✅
+- Tâche de vérification empirique — zéro ligne de code métier modifiée (lecture seule des 4
+  fichiers + runs de tests + gates). Matrice de verdict (preuves concrètes, pas d'affirmations) :
+- | # | Point de l'audit | Preuve | Verdict |
+  |---|---|--------|--------|
+  | 1 | Zéro test sur Extended FS | `pytest tests/test_extended_file_system.py tests/test_extended_files_routes.py -v` → **22/22 passed** (15 service R1/R4/R6 + 7 routes R2) | ✅ |
+  | 2 | Aucune autorisation sur les 4 routes | `controllers/routes/extended_files.py` : `Depends(require_sandbox_configured)` l.62 (`list_all_drives`), l.75 (`mount_ext4`), l.92 (`unmount_ext4`), l.109 (`read_ext4_direct`) — dépendance fail-closed l.44-47 (403 si `JARVIS_FILES_SANDBOX_ROOT` absent/vide) ; 4 tests `*_requires_authorization` verts | ✅ |
+  | 3 | `read_ext4_direct` sans whitelist | `services/extended_file_system.py` l.451-453 : check `_is_disk_whitelisted` en TÊTE de la méthode, AVANT `import ext4` (l.456) et avant `_open_raw_disk` ; `_parse_whitelist` (l.421-434) fail-closed (variable absente/vide → `set()` vide → tout refusé) ; 3 tests R6 verts (absente → refus, non-whitelisté → refus, whitelisté → succès) | ✅ |
+  | 4 | `mount_ext4` peut cibler disque 0 | l.319-327 : `_system_disk_number()` appelé en tête (PowerShell `Get-Partition -DriveLetter <SystemDrive> \| Get-Disk`), refus si `disk_number == system_disk` (« blacklisté »), AVANT le check Ext2Fsd (l.330) ; 3 tests R4 verts (reject / allow / fail-open détection) | ✅ |
+  | 5 | Sandbox `*` cosmétique si L1 non sécurisé | Les 3 garde-fous sont indépendants de la valeur de `JARVIS_FILES_SANDBOX_ROOT` : R3 bloque au niveau ROUTE si variable absente/vide ; R4 bloque le disque système au montage (basé sur `SystemDrive`, pas la sandbox) ; R6 bloque la lecture hors `JARVIS_EXT4_WHITELIST` (**variable séparée**, fail-closed — `*` dans la sandbox n'ouvre AUCUN disque en lecture directe sans whitelist explicite). Vérifié : `ExtendedFileSystemService` ne lit JAMAIS `JARVIS_FILES_SANDBOX_ROOT` (seuls `os.environ.get` = `SystemDrive` l.279 et `JARVIS_EXT4_WHITELIST` l.423) | ✅ |
+- Gates mesurées : `ruff check .` → **All checks passed!** ✓ · `ruff format --check .` → 231/232
+  (seul `controllers/routes/system.py` non formaté = dette préexistante HEAD documentée, non
+  touchée, hors Cible) ✓ · `mypy` → **Success: no issues found in 138 source files** ✓ ·
+  `pytest --cov` → **901 passed / 0 failed**, couverture **83,60 % ≥ 60 %** ✓.
+- Verdict global : **GO — 5/5 points ✅**. Remédiations R1-R4, R6 + CLEANUP toutes vérifiées
+  empiriquement ; premier run complet sans échec depuis le début du Lot 11.
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot11-CLEANUP — Fix test_sandbox_missing_raises_file_system_error (2026-08-16) ✅
 - Diagnostic (cause de l'échec, re-produit seul : `DID NOT RAISE FileSystemError`) : le test
   attendait une **exception publique** `FileSystemError` de `authorize_path` quand
