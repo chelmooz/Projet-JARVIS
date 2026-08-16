@@ -199,6 +199,7 @@ def _register_routes(app: FastAPI) -> None:
     from controllers.routes import beta_dashboard as beta_dashboard_routes
     from controllers.routes import code_review as code_review_routes
     from controllers.routes import conversations as conv_routes
+    from controllers.routes import cyber_eval as cyber_eval_routes
     from controllers.routes import diagnostic as diagnostic_routes
     from controllers.routes import diagnostic_ext as diagnostic_ext_routes
     from controllers.routes import documents as doc_routes
@@ -224,6 +225,7 @@ def _register_routes(app: FastAPI) -> None:
         extended_files_routes.router,
         pipelines_routes.router,
         code_review_routes.router,
+        cyber_eval_routes.router,
         kill_coding_routes.router,
         quality_audit_routes.router,
         settings_routes.router,

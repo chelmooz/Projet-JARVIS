@@ -6,6 +6,31 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot12-L8 — Route API ``POST /api/cyber/analyze`` (2026-08-16) ✅
+- Décisions validées : endpoint dédié `POST /api/cyber/analyze` ; singleton service lazy
+  (pattern `extended_files.py`) ; body `{"question": str, "max_revisions": int = 2}`
+  (validation Pydantic, 422 natif si question vide/absente, `ge=0 le=10` pour
+  max_revisions) ; réponse = dict de `analyze()` directement (pas d'Envelope) ; pas
+  d'auth/sandbox (service autonome, aucun accès disque) ; router enregistré via le
+  Composition Root `controllers/router.py` (`_register_routes` + `_mount_router`).
+- Diagnostic : pattern singleton confirmé (`controllers/routes/extended_files.py` l.41-57 :
+  `_service = None` + getter lazy avec import différé) ; enregistrement = `controllers/
+  router.py::_register_routes` (imports lazy + tuple monté par `_mount_router`) ;
+  pattern de test = `monkeypatch.setattr(routes_module, "_service", Fake)` +
+  `TestClient(create_app())` (test_extended_files_routes.py) ; `cyber_eval.py` inexistant.
+- Tests ajoutés (5, `tests/test_cyber_eval_routes.py`, `FakeCyberEvalService` via singleton
+  module, zéro appel Ollama) : 200 + dict identique ; `max_revisions=1` transmis (calls
+  enregistrés) ; défaut `max_revisions=2` ; `{"question": ""}` → 422 ; `{}` → 422.
+  RED vérifié (ImportError « cannot import name cyber_eval »), GREEN : **5/5 passed**.
+- Implémentation : `controllers/routes/cyber_eval.py` — `AnalyzeRequest(BaseModel)`
+  (`question: str` min_length=1, `max_revisions: int` ge=0 le=10 défaut 2),
+  `get_cyber_eval_service()` lazy (TYPE_CHECKING + import différé, style extended_files),
+  route async → `analyze(req.question, max_revisions=req.max_revisions)` ;
+  `controllers/router.py` — import lazy + `cyber_eval_routes.router` ajouté au tuple monté.
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ (2 fichiers) · `pytest --cov` →
+  **910 passed / 0 failed**, couverture **83,18 % ≥ 60 %** ✓.
+- Statut : **DONE (en attente commit)**. Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot12-L7 — Service CyberEval (port + implémentation) (2026-08-16) ✅
 - Décisions validées (après CoT) : endpoint dédié `POST /api/cyber/analyze` (L8) — rejet de
   `/api/pipelines/run` (PipelineService = pipelines métier configurables, ADR-013) et
