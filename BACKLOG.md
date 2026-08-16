@@ -6,6 +6,85 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot12-L6 — Boucle revise (niveau réponse) (2026-08-16) ✅
+- Décisions validées : `run_pipeline_with_revision(question, max_revisions=2) -> tuple |
+  None` ; si `decision == "revise"` et budget > 0 → question enrichie
+  `question + "\n\n[Instructions de révision]:\n" + revision_instructions`, rappel de
+  `run_pipeline`, décrément ; retourne la DERNIÈRE exécution réussie (pas la meilleure —
+  KISS) ; `None` si une exécution échoue ; `decision != "revise"` → retour immédiat ;
+  réutilisation de `run_pipeline` L5 (zéro duplication).
+- Diagnostic : `EvaluatorOutput.decision` (`Literal["publish", "revise", "reject"]`) +
+  `revision_instructions: str | None = None` confirmés (`agents/eval_contracts.py`) ;
+  `run_pipeline(question)` lu (`agents/orchestrator.py`) ; `agents/revision.py` inexistant.
+- ⚠️ Adaptation de test documentée (conforme au contrat L2, pas STOP) : la consigne utilisait
+  `decision = "accept"`, invalide pour le `Literal` de `EvaluatorOutput` (ValidationError
+  prouvée au 1er run GREEN : « Input should be 'publish', 'revise' or 'reject' ») →
+  remplacé par `"publish"` dans les tests 1/2/5 (même comportement testé : ≠ "revise").
+- Tests ajoutés (5, `tests/test_revision.py`, `run_pipeline` mocké, zéro appel Ollama) : pas
+  de révision si decision ≠ revise (1 seul appel) ; révision déclenchée sur "revise" puis
+  "publish" (2 appels, 2ème tuple retourné) ; `max_revisions=1` → 2 appels max ; `None` si le
+  pipeline échoue ; question enrichie capturée (`"question\n\n[Instructions de révision]:\n
+  Ajouter source"`). RED vérifié (ModuleNotFoundError), GREEN : **5/5 passed**.
+- Implémentation (`agents/revision.py`) : `run_pipeline_with_revision()` — boucle `while
+  True` avec sortie explicite (`decision != "revise"` ou budget épuisé → retour du résultat ;
+  `None` propagé) ; `evaluator.revision_instructions or ""` pour le champ optionnel ;
+  `current_question` reconstruite à partir de la question originale (conforme décision).
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ (1 fichier) · `pytest --cov` →
+  **900 passed / 0 failed**, couverture **83,13 % ≥ 60 %** ✓.
+- Statut : **DONE (en attente commit)**. Aucun commit (conforme AGENTS.md).
+
+### MT-Lot12-L5 — Orchestrateur multi-agents (judge → advocate → evaluator) (2026-08-16) ✅
+- Décisions validées : `run_pipeline(question) -> tuple[JudgeOutput, AdvocateOutput,
+  EvaluatorOutput] | None` ; `None` si UN seul des 3 agents échoue (`generate_json` → `None`
+  ou `parse_model` → `None`) ; prompts par concaténation simple (judge : skill + Question ;
+  advocate : + « Judge output:\n{judge_json} » ; evaluator : + « Judge:\n » + « Advocate:\n ») ;
+  `json.dumps(..., ensure_ascii=False)` (français) ; zéro import JARVIS dans le module.
+- Diagnostic : champs des 3 contrats lus (`agents/eval_contracts.py`) ; `load_skill_eval(role)`
+  lit `{role}.md` (`agents/skills_eval/__init__.py`, lève ValueError si rôle inconnu) ;
+  `parse_model[T](model_cls, text)` — **signature réelle de L1 = modèle en 1er arg, texte en
+  2e** ; `agents/orchestrator.py` inexistant.
+- ⚠️ Déviation mineure documentée (conforme aux décisions, pas STOP) : la structure fournie
+  appelait `parse_model(judge_dict, JudgeOutput)` (ordre inversé) — corrigé en
+  `parse_model(JudgeOutput, json.dumps(judge_dict, ensure_ascii=False))`, car `parse_model` de
+  L1 attend un **texte** (`extract_json` fait du regex, TypeError sur un dict — prouvé par
+  `TypeError: expected string or bytes-like object, got 'dict'` au premier run GREEN, puis
+  corrigé). Utilisation réelle de `parse_model` L1 conservée, comme validé.
+- Tests ajoutés (5, `tests/test_orchestrator.py`, `generate_json` + `load_skill_eval` mockés,
+  zéro appel Ollama) : succès → 3 instances Pydantic ; échec judge → `None` ; échec advocate →
+  `None` ; échec evaluator → `None` ; vérification des 3 prompts concaténés (format exact
+  validé). RED vérifié (ModuleNotFoundError), GREEN : **5/5 passed**.
+- Implémentation (`agents/orchestrator.py`) : `run_pipeline()` + 3 helpers privés de
+  construction de prompts (`_judge_prompt`, `_advocate_prompt`, `_evaluator_prompt` — DRY,
+  concaténations simples conformes aux décisions). Enchaînement strict judge → advocate →
+  evaluator, short-circuit `None` à chaque étape. Aucune exception ne fuit.
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ (1 fichier) · `pytest --cov` →
+  **895 passed / 0 failed**, couverture **83,10 % ≥ 60 %** ✓.
+- Statut : **DONE (en attente commit)**. Aucun commit (conforme AGENTS.md).
+
+### MT-Lot12-L4 — Client Ollama : generate_json + unload VRAM (2026-08-16) ✅
+- Décisions validées : URL Ollama `http://localhost:11434` (`JARVIS_OLLAMA_URL`), modèle par
+  défaut `qwen2.5:7b` (`JARVIS_OLLAMA_MODEL`), timeout 120 s (`generate_json`) / 10 s (`unload`),
+  `generate_json` → dict JSON extrait ou `None`, `unload` → `True`/`False` sans exception,
+  zéro import JARVIS (module autonome comme L2), `httpx` synchrone (déjà en dépendance :
+  `requirements.lock` `httpx==0.28.1`).
+- Diagnostic : `extract_json(text: str) -> dict[str, Any] | None` lu dans `agents/parsing.py`
+  (priorité bloc ```json, puis ```, puis premier `{`→dernier `}`) ; `agents/ollama_client.py`
+  inexistant ; `httpx` présent → pas de `urllib`.
+- Tests ajoutés (5, `tests/test_ollama_client.py`, HTTP 100 % mocké via
+  `patch("agents.ollama_client.httpx.post")`) : `generate_json` → dict extrait d'un bloc
+  ```json (verdict GO) ; `generate_json` → `None` si réponse sans JSON ; `generate_json` →
+  `None` sur `httpx.ConnectError` (aucune levée) ; `unload` → `True` sur 200 ; `unload` →
+  `False` sur `httpx.ReadTimeout`. RED vérifié (ModuleNotFoundError), GREEN : **5/5 passed**.
+- Implémentation (`agents/ollama_client.py`) : `_ollama_url()` / `_model()` (env + défauts),
+  `generate_json(prompt, system=None)` → POST `/api/generate` `{"model", "prompt",
+  "stream": False}` (+ `system` optionnel), `response.json()` → `extract_json()` ; `unload()`
+  → POST `/api/generate` `{"model", "keep_alive": 0}`. Exceptions capturées
+  (`httpx.HTTPError`, `ValueError`, `OSError`) — aucune ne fuit des deux fonctions publiques.
+  Réutilise `extract_json` de L2 (pas de duplication).
+- Gates : ruff check ✓ · ruff format --check ✓ · mypy ✓ (1 fichier) · `pytest --cov` →
+  **906 passed / 0 failed**, couverture **83,64 % ≥ 60 %** ✓.
+- Statut : **DONE (en attente commit)**. Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot11-L1R5 — RE-AUDIT go/nogo final (vérification des 5 points) (2026-08-16) ✅
 - Tâche de vérification empirique — zéro ligne de code métier modifiée (lecture seule des 4
   fichiers + runs de tests + gates). Matrice de verdict (preuves concrètes, pas d'affirmations) :
