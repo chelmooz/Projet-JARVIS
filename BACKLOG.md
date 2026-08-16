@@ -6,6 +6,32 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-Lot11-CLEANUP — Fix test_sandbox_missing_raises_file_system_error (2026-08-16) ✅
+- Diagnostic (cause de l'échec, re-produit seul : `DID NOT RAISE FileSystemError`) : le test
+  attendait une **exception publique** `FileSystemError` de `authorize_path` quand
+  `JARVIS_FILES_SANDBOX_ROOT` est absent. Or la chaîne est : `authorize_path` →
+  `authorize_path_verbose` → `_within_sandbox` → `_sandbox_roots` → `_default_roots`
+  **lève** `FileSystemError` (l.108) → capturé **immédiatement** dans `authorize_path_verbose`
+  (`except FileSystemError` l.184-186, log « Autorisation refusée » prouvé au run) →
+  `return False, str(e)`. Aucune méthode publique ne laisse échapper l'exception
+  (`_check_authorized` lève mais tous ses appelants capturent → `error_type=not_authorized`).
+- Conclusion : **Scénario A — test mal écrit**, service correct. Le `FileSystemError` interne
+  est un mécanisme de contrôle (exception → réponse structurée), pas une exception publique ;
+  le comportement fail-closed + message dédié est documenté (ADR-011, docstring
+  `_default_roots`) et déjà verrouillé par `test_sandbox_fail_closed_absent` (MT-Lot11-L2 avait
+  re-prouvé sur HEAD : « `authorize_path_verbose` capture le FileSystemError et retourne False »).
+- Correction appliquée (`tests/test_file_system.py` uniquement, **zéro changement service**) :
+  test renommé `test_sandbox_missing_returns_dedicated_refusal` et adapté au contrat réel —
+  `authorize_path` → False (aucune exception) ; `authorize_path_verbose` → `(False, message)`
+  avec « Sandbox non configuré » ; `list_dir` → `success: False` + « Sandbox non configuré »
+  dans l'erreur (valeur ajoutée vs `test_sandbox_fail_closed_absent` : vérifie le **message
+  dédié** du refus). Mécanisme `os.environ.pop`/`finally` conservé. Import mort `FileSystemError`
+  retiré (F401).
+- Gates : `pytest tests/test_file_system.py` → **24/24 passed** · ruff check ✓ · ruff format ✓ ·
+  mypy ✓ · `pytest --cov` → **901 passed / 0 failed** (premier run complet sans échec depuis
+  MT-Lot11-L1), couverture **83,60 % ≥ 60 %**.
+- Aucun commit (conforme AGENTS.md).
+
 ### MT-Lot11-L1R6 — GREEN : whitelist disques pour read_ext4_direct (2026-08-16) ✅
 - Spec validée par l'utilisateur (7 décisions) : (1) source = nouvelle variable d'env
   `JARVIS_EXT4_WHITELIST` (dédiée, séparée de `JARVIS_FILES_SANDBOX_ROOT`) ; (2) granularité

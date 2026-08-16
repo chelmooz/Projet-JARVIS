@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from services.file_system import FileSystemError, FileSystemService
+from services.file_system import FileSystemService
 
 
 @pytest.fixture
@@ -50,11 +50,16 @@ def test_authorize_symlink_outside_skips_if_unprivileged(fs: FileSystemService, 
     assert fs.authorize_path(str(link)) is False
 
 
-def test_sandbox_missing_raises_file_system_error(fs: FileSystemService) -> None:
+def test_sandbox_missing_returns_dedicated_refusal(fs: FileSystemService) -> None:
     saved = os.environ.pop("JARVIS_FILES_SANDBOX_ROOT", None)
     try:
-        with pytest.raises(FileSystemError):
-            fs.authorize_path(str(Path(os.getcwd())))
+        assert fs.authorize_path(str(Path(os.getcwd()))) is False
+        ok, error = fs.authorize_path_verbose(str(Path(os.getcwd())))
+        assert ok is False
+        assert "Sandbox non configuré" in (error or "")
+        res = fs.list_dir(str(Path(os.getcwd())))
+        assert res["success"] is False
+        assert "Sandbox non configuré" in res["error"]
     finally:
         if saved is not None:
             os.environ["JARVIS_FILES_SANDBOX_ROOT"] = saved
