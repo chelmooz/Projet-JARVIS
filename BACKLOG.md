@@ -6,6 +6,63 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
+- Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
+  `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur
+  minimal du wiki_lint.py de Phase 4. Obsidian (O3) = tâche humaine, runbook donnée à
+  l'utilisateur (pas pour opencode).
+- Tests : 5 tests dans `tests/test_wiki_lint_service.py` (page valide, frontmatter absent,
+  titre UUID, agent non normalisé, section manquante). RED : ModuleNotFoundError.
+  GREEN : **5/5 passed**. Non-régression : 9 tests ingest toujours verts.
+- Implémentation : service créé, lint réel des 15 pages = **LINT OK** (toutes conformes).
+- Gates : ruff ✓ · format ✓ · mypy ✓ · pytest ✓ (**930 passed**, couverture **83,25 % ≥ 60 %**).
+- Statut : ✅ DONE (en attente commit). Phase 1 close côté code.
+
+### MT-KB-L1d — Scale ingest MITRE à 15 pages + traçabilité log.md (2026-08-17) ✅
+- Décisions : méthode `log_ingest(dataset, count, pages)` ajoutée à `WikiIngestService`
+  (append bloc daté dans wiki/log.md, `date.today()`). Scale 3→15 pages. Obsidian reporté
+  à MT-KB-L1e (le cœur Phase 1 = 10-15 pages d'abord).
+- Tests : 1 test ajouté (`test_log_ingest_appends_to_log_md`, fixture tmp_path). RED :
+  1 FAILED (AttributeError méthode absente) / 8 passed. GREEN : **9/9 passed** (non-régression ✓).
+- Implémentation : `log_ingest` branchée, script `ingest_mitre_15.py` (temporaire non
+  commité), 15 pages MITRE générées, log.md enrichi (bloc daté, 15 fichiers listés).
+- Gates : ruff ✓ · format ✓ · mypy ✓ · pytest ✓ (**925 passed**, couverture **83,29 % ≥ 60 %**).
+- Statut : ✅ DONE (en attente commit). Obsidian = MT-KB-L1e.
+
+### MT-KB-L1c — Fix extraction titre + normalisation agent (2026-08-17) ✅
+- Décisions : helpers `_extract_title` (priorité name > préfixe text avant ':' > id) et
+  `_normalize_agent` (ajout '@' si absent, pas de duplication). Fix déterministe, zéro LLM.
+  Report Phase 2 refusé par le Dev Senior (titres UUID = wiki inutilisable en Phase 1).
+- Tests : 5 tests ajoutés à `tests/test_wiki_ingest_service.py` (extraction titre, fallback,
+  non-régression name, agent @, pas de duplication). RED vérifié (**2 FAILED** — les 2
+  comportements manquants : titre depuis text, agent sans @ ; les 3 autres nouveaux tests
+  couvrent des comportements déjà corrects et passaient avant implémentation, cas de
+  non-régression), GREEN : **8/8 passed**.
+- Implémentation : service corrigé (helpers `_extract_title`/`_normalize_agent` branchés dans
+  `ingest_entry`, variable `metadata` locale retirée, `str(prefix)` pour mypy no-any-return),
+  3 pages MITRE régénérées avec titres humains (`/etc/passwd and /etc/shadow`, `ARP Cache
+  Poisoning`, `AS-REP Roasting`) et `agent: "@cyber"`.
+- Gates : ruff ✓ · format ✓ · mypy ✓ · pytest ✓ (**924 passed**, couverture **83,27 % ≥ 60 %**).
+- Statut : ✅ DONE (en attente commit). Obsidian reporté à MT-KB-L1d.
+
+### MT-KB-L1b — Ingest MITRE ATT&CK (3 premières pages concepts) (2026-08-17) ✅
+- Décisions : `services/wiki_ingest_service.py` avec méthodes `ingest_entry`, `ingest_entry_to_file`,
+  `ingest_batch`. Phase 1 = pas d'appel LLM (texte brut JSONL comme contenu). Type par défaut =
+  concept. Nommage = `{id}.md`.
+- Tests : `tests/test_wiki_ingest_service.py` (3 tests : markdown valide, création fichier, batch).
+  RED vérifié (**3 FAILED** — ModuleNotFoundError), GREEN : **3/3 passed**.
+- ⚠️ Adaptation de test documentée : l'assertion du chemin fourni était POSIX-only
+  (`"wiki/pages/..." in str(file_path)`) — sur Windows `str()` produit des backslashes →
+  remplacée par `file_path.as_posix() == "wiki/pages/concepts/T1059-test.md"` (comportement
+  testé identique). Gates : `import pytest` inutilisé retiré, W293/W292 corrigés (ruff --fix).
+- Implémentation : Service créé, 3 premières pages MITRE générées dans `wiki/pages/concepts/`
+  (`attack-pattern--d0b4fcdb…`, `attack-pattern--cabe189c…`, `attack-pattern--3986e7fd…`).
+- ⚠️ Constat empirique (à trancher Phase 2) : les entrées MITRE réelles n'ont pas de clé `name`
+  dans `metadata` (tactic/detection/platforms seulement) → `title` = UUID STIX (fallback) et
+  `agent: "cyber"` sans `@` — le nom réel de la technique est le préfixe du `text` avant `:`.
+- Gates : ruff ✓ · format ✓ · mypy ✓ · pytest ✓ (**919 passed**, couverture **83,24 % ≥ 60 %**).
+- Statut : ✅ DONE (en attente commit). Script `scripts/ingest_first_3.py` temporaire non commité.
+
 ### MT-KB-BACKLOG-FIX — Rattrapage traçabilité KB (2026-08-17) ✅
 - **Date** : 2026-08-17
 - **Contexte** : Audit indépendant (Sonnet 5) a relevé l'absence de traçabilité des 4

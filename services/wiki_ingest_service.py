@@ -1,0 +1,142 @@
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+
+class WikiIngestService:
+    """Service pour ingérer des entrées JSONL dans la Knowledge Base Wiki."""
+
+    def __init__(self, wiki_root: Path = Path("wiki")) -> None:
+        self.wiki_root = wiki_root
+        self.pages_dir = wiki_root / "pages" / "concepts"
+        self.pages_dir.mkdir(parents=True, exist_ok=True)
+
+    def ingest_entry(self, entry: dict[str, Any]) -> str:
+        """
+        Génère le markdown complet pour une entrée JSONL.
+
+        Args:
+            entry: Dictionnaire avec clés id, agent, source, text, metadata
+
+        Returns:
+            String markdown complet avec frontmatter YAML
+        """
+        entry_id = entry["id"]
+        source = entry["source"]
+        text = entry["text"]
+
+        title = self._extract_title(entry)
+        agent = self._normalize_agent(str(entry["agent"]))
+
+        # Frontmatter YAML
+        frontmatter = f"""---
+id: {entry_id}
+title: "{title}"
+type: concept
+agent: "{agent}"
+tags: []
+sources: ["{source}:{entry_id}"]
+links_to: []
+created: 2026-08-17
+updated: 2026-08-17
+---"""
+
+        # Résumé (150 premiers caractères)
+        summary = text[:150] + "..." if len(text) > 150 else text
+
+        # Markdown complet
+        markdown = f"""{frontmatter}
+
+# {title}
+
+## Résumé
+{summary}
+
+## Contenu
+{text}
+
+## Liens
+(Aucun lien pour l'instant — sera enrichi en Phase 2)
+
+## Sources
+- `{source}#{entry_id}`
+"""
+        return markdown
+
+    def _extract_title(self, entry: dict[str, Any]) -> str:
+        """
+        Extrait un titre humain de l'entrée.
+
+        Priorité : metadata.name > préfixe du text avant ':' > id (fallback).
+        """
+        metadata = entry.get("metadata", {})
+        name = metadata.get("name")
+        if name:
+            return str(name)
+
+        text = entry.get("text", "")
+        if ":" in text:
+            prefix = text.split(":", 1)[0].strip()
+            if prefix:
+                return str(prefix)
+
+        return str(entry["id"])
+
+    def _normalize_agent(self, agent: str) -> str:
+        """Normalise l'agent avec le préfixe '@' (convention SCHEMA.md)."""
+        if agent.startswith("@"):
+            return agent
+        return f"@{agent}"
+
+    def ingest_entry_to_file(self, entry: dict[str, Any]) -> Path:
+        """
+        Génère et écrit la page dans wiki/pages/concepts/.
+
+        Args:
+            entry: Entrée JSONL à ingérer
+
+        Returns:
+            Path du fichier créé
+        """
+        markdown = self.ingest_entry(entry)
+        file_path = self.pages_dir / f"{entry['id']}.md"
+        file_path.write_text(markdown, encoding="utf-8")
+        return file_path
+
+    def ingest_batch(self, entries: list[dict[str, Any]], max_entries: int = 3) -> list[Path]:
+        """
+        Traite un lot d'entrées et retourne les chemins des fichiers créés.
+
+        Args:
+            entries: Liste d'entrées JSONL
+            max_entries: Nombre maximum d'entrées à traiter
+
+        Returns:
+            Liste des Paths des fichiers créés
+        """
+        paths = []
+        for entry in entries[:max_entries]:
+            path = self.ingest_entry_to_file(entry)
+            paths.append(path)
+        return paths
+
+    def log_ingest(self, dataset: str, count: int, pages: list[Path]) -> None:
+        """
+        Trace une opération d'ingest dans wiki/log.md (append, pas overwrite).
+
+        Args:
+            dataset: Nom du dataset source (ex: "mitre-attack.jsonl")
+            count: Nombre de pages ingérées
+            pages: Liste des chemins des pages créées
+        """
+        log_path = self.wiki_root / "log.md"
+        timestamp = date.today().isoformat()
+
+        entry = f"\n## {timestamp} — Ingest {dataset}\n"
+        entry += f"- Pages créées : {count}\n"
+        entry += "- Fichiers :\n"
+        for page in pages:
+            entry += f"  - `{page.name}`\n"
+
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(entry)
