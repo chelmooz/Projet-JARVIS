@@ -23,10 +23,12 @@ class TestToolboxCapability:
     def toolbox_with_bin(self, temp_bin_dir: Path) -> Toolbox:
         """Toolbox avec chemin bin injecté."""
         # On doit patcher le chemin BIN_DIR utilisé par DiagnosticExtService
-        with patch("services.diagnostic_ext.config.BIN_DIR", str(temp_bin_dir)):
-            with patch("services.diagnostic_ext.config.CONFIG_PATH", str(Path("config") / "diagnostic_tools.yaml")):
-                diagnostic = DiagnosticExtService()
-                return Toolbox(diagnostic_service=diagnostic)
+        with (
+            patch("services.diagnostic_ext.config.BIN_DIR", str(temp_bin_dir)),
+            patch("services.diagnostic_ext.config.CONFIG_PATH", str(Path("config") / "diagnostic_tools.yaml")),
+        ):
+            diagnostic = DiagnosticExtService()
+            return Toolbox(diagnostic_service=diagnostic)
 
     def test_describe_tools_only_deployed_binaries(self, toolbox_with_bin: Toolbox, temp_bin_dir: Path) -> None:
         """Avec bin/ vide → describe_tools() ANNOTE les outils non déployés ; avec witr.exe factice présent → witr listé SANS annotation."""
@@ -48,7 +50,9 @@ class TestToolboxCapability:
             assert "witr" in desc2, "witr déployé devrait être listé"
             # Vérifier que "non disponible" n'est pas adjacent à witr
             witr_idx = desc2.find("witr")
-            assert "non disponible" not in desc2[max(0, witr_idx - 50):witr_idx + 50], "witr déployé ne devrait pas avoir l'annotation 'non disponible'"
+            assert "non disponible" not in desc2[max(0, witr_idx - 50) : witr_idx + 50], (
+                "witr déployé ne devrait pas avoir l'annotation 'non disponible'"
+            )
 
     def test_capability_probe_reports_missing(self, toolbox_with_bin: Toolbox) -> None:
         """capability_report() retourne {outil: bool} pour chaque entrée de diagnostic_tools.yaml."""
@@ -72,31 +76,49 @@ class TestToolboxCapability:
         mock_inference.query.return_value = "test"
         mock_inference.get_active_backend.return_value = "ollama"
 
-        with patch("services.diagnostic_ext.config.BIN_DIR", str(temp_bin_dir)):
-            with patch("services.diagnostic_ext.config.CONFIG_PATH", str(Path("config") / "diagnostic_tools.yaml")):
-                agents = create_agents(mock_inference, None)
-                hardware_agent = agents["hardware"]
+        with (
+            patch("services.diagnostic_ext.config.BIN_DIR", str(temp_bin_dir)),
+            patch("services.diagnostic_ext.config.CONFIG_PATH", str(Path("config") / "diagnostic_tools.yaml")),
+        ):
+            agents = create_agents(mock_inference, None)
+            hardware_agent = agents["hardware"]
 
-                domain_prompt = hardware_agent._domain_prompt or ""
-                full_prompt = domain_prompt.lower()
+            domain_prompt = hardware_agent._domain_prompt or ""
+            full_prompt = domain_prompt.lower()
 
-                # Ne doit PAS promettre d'invocation directe d'outils DIAGNOSTIQUES
-                forbidden_direct = [
-                    "utilise l'outil", "use the tool", "invoke", "appelle", "call",
-                    "why_running", "pspy64"
-                ]
-                for f in forbidden_direct:
-                    assert f not in full_prompt, f"Promesse d'invocation directe interdite '{f}' dans prompt hardware: {domain_prompt}"
+            # Ne doit PAS promettre d'invocation directe d'outils DIAGNOSTIQUES
+            forbidden_direct = [
+                "utilise l'outil",
+                "use the tool",
+                "invoke",
+                "appelle",
+                "call",
+                "why_running",
+                "pspy64",
+            ]
+            for f in forbidden_direct:
+                assert f not in full_prompt, (
+                    f"Promesse d'invocation directe interdite '{f}' dans prompt hardware: {domain_prompt}"
+                )
 
-                # "witr" PEUT apparaître comme nom d'outil dans la liste descriptive
-                # mais pas comme promesse d'invocation directe ("utilise witr", "call witr", etc.)
-                # "netstat -ano" est autorisé car cité comme commande NATIVE de repli (pas outil toolbox)
+            # "witr" PEUT apparaître comme nom d'outil dans la liste descriptive
+            # mais pas comme promesse d'invocation directe ("utilise witr", "call witr", etc.)
+            # "netstat -ano" est autorisé car cité comme commande NATIVE de repli (pas outil toolbox)
 
-                # Doit décrire le mécanisme réel : auto-déclenchement par mots-clés + repli
-                assert "automatique" in full_prompt or "mots-clé" in full_prompt or "mot-clé" in full_prompt or "keyword" in full_prompt, \
-                    "Prompt doit mentionner le déclenchement automatique par mots-clés"
-                assert "déployé" in full_prompt or "disponible" in full_prompt or "native" in full_prompt or "repli" in full_prompt or "fallback" in full_prompt, \
-                    "Prompt doit mentionner la condition de déploiement ou le repli honnête"
+            # Doit décrire le mécanisme réel : auto-déclenchement par mots-clés + repli
+            assert (
+                "automatique" in full_prompt
+                or "mots-clé" in full_prompt
+                or "mot-clé" in full_prompt
+                or "keyword" in full_prompt
+            ), "Prompt doit mentionner le déclenchement automatique par mots-clés"
+            assert (
+                "déployé" in full_prompt
+                or "disponible" in full_prompt
+                or "native" in full_prompt
+                or "repli" in full_prompt
+                or "fallback" in full_prompt
+            ), "Prompt doit mentionner la condition de déploiement ou le repli honnête"
 
 
 if __name__ == "__main__":

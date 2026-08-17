@@ -26,6 +26,7 @@ from services.memory import MemoryService
 from services.metrics import MetricsService
 from services.orchestrator import OrchestratorService
 from services.pipeline import PipelineService
+from services.rag_judge import LlmResponseJudge
 from services.router import AgentRouter
 from services.selector import select_model, select_vision_model
 from services.toolbox import Toolbox
@@ -106,11 +107,13 @@ class AppContext:
         self.agent_supervisor = AgentSupervisor()
 
         # 7. Pipeline (dépend de inference, memory)
+        judge = LlmResponseJudge(llm_adapter=self.inference._adapter())
         self.pipeline = PipelineService(
             inference=self.inference,
             memory=self.memory,
             model_selector=select_model,
             agent_runner=lambda: self._build_agent_graph(),  # WRAPPER
+            judge=judge,
         )
 
         # 5. Orchestrateur (Composition Root finale)

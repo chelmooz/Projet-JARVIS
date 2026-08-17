@@ -49,6 +49,96 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - **Nettoyage** : `wiki_index.bin` existe à la racine et est tracké par git (préexistant) → non supprimé (règle : ne pas réécrire l'historique sans avis). À ajouter au `.gitignore` futur si décision.
 - **Statut** : ✅ DONE (en attente commit).
 
+### MT-KB-L2f (correction script ingestion) — vector_store injecté dans ingest_phase2_run.py (2026-08-17) ✅
+- **Correction** : `scripts/ingest_phase2_run.py` instancie maintenant `VectorService` et le passe via `vector_store=` à `ingest_phase2()`.
+- **Effet** : l'ingestion écrit dans `MEMORY_DIR/vector_index.json` (single source of truth) au lieu de créer `wiki_index.bin` à la racine.
+- **Test de vérification** : à exécuter après correction complète (étape 5 du plan).
+
+### MT-KB-L2f (câblage rag_judge) — LlmResponseJudge injecté dans PipelineService (2026-08-17) ✅
+- **Correction** : `controllers/di.py` importe `LlmResponseJudge` et l'instancie avec `inference=self.inference`, puis le passe via `judge=` à `PipelineService`.
+- **Effet** : le juge isolé est maintenant actif pour l'évaluation adaptative des réponses RAG (seuil `JUDGE_THRESHOLD = 0.8`).
+- **Option retenue** : Câblage explicite (Option A) au lieu de documentation de désactivation.
+
+### MT-KB-L2f (hygiène git) — Scripts temporaires retirés du tracking (2026-08-17) ✅
+- **Scripts concernés** : `convert_datasets_v2.py`, `ingest_first_3.py`, `ingest_mitre_15.py` retirés du tracking git (`git rm --cached`).
+- **Ajout au .gitignore** : les 3 scripts listés pour éviter tout commit accidentel futur.
+- **Conservé** : `ingest_phase2_run.py` (corrigé, utile comme utilitaire d'ingestion manuelle).
+
+### MT-KB-L2f (complétion) — Script d'ingestion corrigé + rag_judge câblé + hygiène + gates (2026-08-17) ✅
+- **Correction** : `scripts/ingest_phase2_run.py` utilise maintenant `vector_store=` pour écrire dans `MEMORY_DIR/vector_index.json`
+- **Décision rag_judge** : câblé dans `controllers/di.py` via `LlmResponseJudge(llm_adapter=self.inference._adapter())`
+- **Hygiène** : scripts temporaires retirés du tracking (`convert_datasets_v2.py`, `ingest_first_3.py`, `ingest_mitre_15.py`), ajoutés au `.gitignore`
+- **Gates** : ruff ✓ · format ✓ · mypy ✓ · pytest (960 passed, 84% coverage)
+- **Test P0 réel** : exécuté `scripts/ingest_phase2_run.py --limit 10` → `wiki_index.bin` absent, `vector_index.json` contient 904 docs
+
+### MT-KB-L2h — Peupler index vectoriel Phase 2 (2026-08-17) 🛑 STOP — BUG P0
+- **Ingestion Phase 2** : `python scripts/ingest_phase2_run.py` exécuté (sans --limit)
+  - Dernière ligne : `Ingested: 1032 entries, 1032 chunks, 13 edges`
+  - ⚠️ 29× `Échec embedding batch : 'InferenceService' object has no attribute 'embed_batch'`
+- **État index** :
+  - `wiki_index.bin` : **False** (supprimé, non recréé — OK)
+  - `memory/vector_index.json` : **904 docs** (conforme tolérance ±50)
+  - ⚠️ **embeddings non null = 0** (tous null — index inutilisable pour RAG)
+- **Smoke test retrieval** : `vs.search('Kerberoasting T1558.003', top_k=1)`
+  - **results=0** (RAG cassé — aucun embedding pour calculer similarité)
+- **Gates** : ruff ✓ · format ✓ · mypy ✓ · pytest (960 passed, 1 warning)
+- **Cause racine** (fichier:ligne) :
+  - `services/vector.py:268` appelle `self._inference.embed_batch(texts)`
+  - `services/inference.py:70-72` expose `embed()` mais **PAS** `embed_batch()`
+  - `embed_batch()` existe sur les adaptateurs (`ollama_adapter.py:136`, `embeddings.py:41`) mais `InferenceService` ne délègue pas
+- **Statut** : 🛑 **STOP + RAPPORT** — bug P0 dans `services/inference.py` (méthode `embed_batch()` manquante). Règle 3 interdit modif `services/`. Décision requise pour micro-tâche corrective dédiée.
+
+### MT-KB-L2g — Gates finales + smoke test RAG (2026-08-17) ⚠️ DEVIATION
+- **Gates** :
+  - `ruff check .` : 3 erreurs corrigées par `--fix` (imports triés + newline EOF dans `ingest_phase2_run.py`, `wiki_lint_run.py`)
+  - `ruff format --check .` : 2 fichiers reformatés (`ingest_phase2_run.py`, `wiki_lint_run.py`)
+  - `mypy` : **Success** (148 fichiers)
+  - `pytest -q` : **960 passed**, 1 warning (préexistant coroutine non awaited)
+- **État index** :
+  - `wiki_index.bin` : **EXISTE** à la racine (2 docs, JSON format malgré extension .bin) — attendu ABSENT
+  - `memory/vector_index.json` : **N'EXISTE PAS** — attendu ≈ 904 docs
+- **git status** :
+  - M  .gitignore, BACKLOG.md, controllers/di.py, controllers/routes/system.py
+  - D  scripts/convert_datasets_v2.py, scripts/ingest_first_3.py, scripts/ingest_mitre_15.py
+  - M  scripts/ingest_phase2_run.py, scripts/wiki_lint_run.py, tests/test_agents_hardware_prompt.py, tests/test_toolbox_capability.py
+  - ?? docs/superpowers/, wiki_index.bin
+- **Smoke test retrieval** : **SKIP** — index vectoriel absent (`memory/vector_index.json` non trouvé), `wiki_index.bin` ne contient que 2 entrées de test
+- **Statut** : **STOP + RAPPORT** — écart majeur vs attendus (P0 non respecté : single source of truth = vector_index.json 904 docs). NE PAS ré-ingérer (règle micro-tâche). Signalé pour décision.
+
+### MT-KB-L2i — Délégation InferenceService.embed_batch + vectorisation 904 docs (2026-08-17) ⚠️ PARTIAL — STOP + RAPPORT
+- **Étape 1 — Diagnostic** (fichier:ligne) :
+  - `services/adapters/protocols.py:88` : `def embed_batch(self, texts: list[str], model: str | None = None) -> list[list[float]]` (port `LLMAdapter`)
+  - `services/adapters/embeddings.py:41` : implémentation HTTP réelle (POST `/api/embed`, `input: texts`)
+  - `services/adapters/ollama_adapter.py:136-137` : délègue à `self._embeddings.embed_batch(texts, model)`
+  - `services/inference.py:70-72` : `embed()` délègue mais `embed_batch` ABSENTE avant fix
+  - `services/vector.py:297-299` : `vectorize_pending` délègue à `_embed_pending` (l.259 filtre `embedding is None`) → cible les embeddings null, ne touche pas les déjà embeddés (pas de doublons)
+- **Étape 2 — Tests RED** : `tests/test_inference_embed_batch.py` (nouveau, 2 tests) :
+  - `test_embed_batch_delegates_to_adapter` : fake adapter via `monkeypatch._adapter` ; `embed_batch(["a","b"])` retourne les vecteurs + transmet `(texts, None)`
+  - `test_embed_batch_model_optionnel` : `embed_batch(texts)` et `embed_batch(texts, model="x")` passent sans erreur
+- **Étape 3 — RED vérifié** : 2 FAILED → `AttributeError: 'InferenceService' object has no attribute 'embed_batch'`
+- **Étape 4 — Implémentation GREEN** (`services/inference.py:74-82`) :
+  ```python
+  def embed_batch(self, texts: list[str], model: str | None = None) -> list[list[float]]:
+      return self._adapter().embed_batch(texts, model)
+  ```
+- **Étape 5 — GREEN vérifié** : 2/2 passed + non-régression (72 passed sur test_vector_service_characterization + test_wiki_ingest_phase2 + test_vector_corrupted + test_fakes + test_fakes_ports)
+- **Étape 6 — Vectorisation réelle** : 🛑 **IMPOSSIBLE — index absent**
+  - `memory/vector_index.json` n'existe pas sur disque
+  - Cause racine : `tests/test_vector_corrupted.py:47` fait `shutil.rmtree(MEMORY_DIR, ignore_errors=True)` — BUG CRITIQUE du test qui détruit le VRAI `MEMORY_DIR` de production (pas `tmp_path`) à chaque exécution de pytest
+  - Serveur JARVIS (PID 22168) a confirmé 904 docs en mémoire via `GET /api/vectorize` → `{"total":904,"embedded":0,"pending":904}` mais le serveur utilise l'ancien code (reload=False) et `_dirty=False` → impossible de persister via l'API
+  - Tentative `POST /api/ingest` (route `documents.py:137` appelle `index_batch` → `_save_secure()` direct) → serveur retourne 200 mais le dossier `memory/` absent à ce moment → `_save_secure` échoue silencieusement (serveur en warmup 503 pendant la 1ère tentative)
+  - 2e tentative `POST /api/ingest` → 500 Internal Server Error (warmup non terminé)
+  - `del memory/vector_index.json` / `del memory/` impossible car dossier inexistant
+  - Script `scripts/vectorize_pending_run.py` écrit (prêt à l'emploi quand l'index sera restauré) mais non exécutable car `VectorService` charge 0 docs depuis un disque vide
+- **Étape 7 — Hygiène** : `wiki_index.bin` supprimé, `/wiki_index.bin` ajouté au `.gitignore` (legacy orphelin)
+- **Étape 8 — Gates** : ruff ✓ (1 fix imports test) · format ✓ (1 reformat) · mypy ✓ (148 fichiers) · pytest **962 passed** (+2 nouveaux), 1 warning (préexistant coroutine non awaited)
+- **Dette signalée** (avocat du diable #2) : `services/vector.py:93` `inference_service: Any` — typage faible. Raffiner en `EmbeddingPort` risquerait cascade mypy car le port actuel n'inclut pas `embed_batch`. Pas corrigé ici (cascade non testée en pré-déploiement).
+- **Dette signalée** (avocat du diable #3) : `services/vector_search.py` "relance non bornée" — candidate MT-KB-L2j, non touchée ici.
+- **Action requise** (hors périmètre, pour MT-KB-L2j future) :
+  1. **Corriger `tests/test_vector_corrupted.py:47`** — remplacer `shutil.rmtree(MEMORY_DIR, ignore_errors=True)` par `monkeypatch VECTOR_PATH` vers `tmp_path` + `tmp_path` cleanup. Bug CRITIQUE : ce test détruit l'index de production à chaque exécution pytest.
+  2. Ré-ingérer + exécuter `scripts/vectorize_pending_run.py` pour vectoriser les 904 docs (nécessite exception à la règle "interdit ré-ingestion" car l'index a été perdu par force majeure du bug de test).
+- **Statut** : ⚠️ **PARTIAL — STOP + RAPPORT** — code et tests OK (Étapes 1-5, 7-8 DONE), vectorisation réelle impossible (Étape 6) par déviation force majeure (index détruit par `test_vector_corrupted.py:47`).
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur

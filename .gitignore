@@ -35,3 +35,11 @@ memory/metrics.json
 memory/vector_index.json
 
 memory/conversations.json
+
+# Scripts temporaires d'ingestion (non commités)
+scripts/convert_datasets_v2.py
+scripts/ingest_first_3.py
+scripts/ingest_mitre_15.py
+
+# Artefact legacy de l'index vectoriel (raccourci obsolète — single source of truth = memory/vector_index.json)
+wiki_index.bin

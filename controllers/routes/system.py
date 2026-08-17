@@ -57,7 +57,9 @@ async def health(request: Request) -> JSONResponse:
 # =============================================================================
 
 
-async def _status_events(request: Request, heartbeat_every: int = 15, max_duration: int = 60) -> AsyncIterator[dict[str, Any]]:
+async def _status_events(
+    request: Request, heartbeat_every: int = 15, max_duration: int = 60
+) -> AsyncIterator[dict[str, Any]]:
     """Flux SSE : statut courant puis heartbeats jusqu'à déconnexion ou ``max_duration``.
 
     Le client SSE (EventSource, cf. status.js) se reconnecte automatiquement

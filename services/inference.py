@@ -71,6 +71,16 @@ class InferenceService(ChatPort, MultimodalPort, EmbeddingPort, ModelRegistryPor
         """Génère un embedding vectoriel pour le texte donné."""
         return self._adapter().embed(text, model)
 
+    def embed_batch(self, texts: list[str], model: str | None = None) -> list[list[float]]:
+        """Génère les embeddings pour plusieurs textes en un seul appel backend.
+
+        Délègue à ``LLMAdapter.embed_batch`` (POST /api/embed d'Ollama, ``input: texts``).
+        Aligné sur le protocole ``services/adapters/protocols.py:88`` et les adaptateurs
+        (``ollama_adapter.py:136``, ``embeddings.py:41``). Permet à ``VectorService._embed_pending``
+        de calculer les embeddings par lot (taille 32) au lieu d'un appel HTTP par texte.
+        """
+        return self._adapter().embed_batch(texts, model)
+
     def ping(self) -> bool:
         """Vérifie si le backend Ollama est accessible."""
         return self._adapter().ping()

@@ -29,12 +29,11 @@ class TestHardwarePromptHonestCapabilities:
         full_prompt = domain_prompt.lower()
 
         # NE DOIT PAS promettre d'invocation directe
-        forbidden_direct = [
-            "utilise l'outil", "use the tool", "invoke", "appelle", "call",
-            "why_running", "pspy64"
-        ]
+        forbidden_direct = ["utilise l'outil", "use the tool", "invoke", "appelle", "call", "why_running", "pspy64"]
         for f in forbidden_direct:
-            assert f not in full_prompt, f"Promesse d'invocation directe interdite '{f}' dans le prompt hardware: {domain_prompt}"
+            assert f not in full_prompt, (
+                f"Promesse d'invocation directe interdite '{f}' dans le prompt hardware: {domain_prompt}"
+            )
 
         # PEUT mentionner les noms d'outils réels (witr, smartctl, etc.) dans la liste descriptive
         # mais seulement comme outils qui se déclenchent automatiquement
@@ -48,16 +47,25 @@ class TestHardwarePromptHonestCapabilities:
         full_prompt = domain_prompt.lower()
 
         # Doit mentionner le déclenchement automatique par mots-clés
-        assert "automatique" in full_prompt or "mots-clé" in full_prompt or "mot-clé" in full_prompt or "keyword" in full_prompt, \
-            "Prompt doit mentionner le déclenchement automatique par mots-clés"
+        assert (
+            "automatique" in full_prompt
+            or "mots-clé" in full_prompt
+            or "mot-clé" in full_prompt
+            or "keyword" in full_prompt
+        ), "Prompt doit mentionner le déclenchement automatique par mots-clés"
 
         # Doit mentionner la condition de déploiement
-        assert "déployé" in full_prompt or "disponible" in full_prompt, \
+        assert "déployé" in full_prompt or "disponible" in full_prompt, (
             "Prompt doit mentionner la condition de déploiement des binaires"
+        )
 
         # Doit mentionner le repli honnête (commandes natives)
-        assert "native" in full_prompt or "repli" in full_prompt or "fallback" in full_prompt or "honnêtement" in full_prompt, \
-            "Prompt doit mentionner le repli honnête (commandes natives)"
+        assert (
+            "native" in full_prompt
+            or "repli" in full_prompt
+            or "fallback" in full_prompt
+            or "honnêtement" in full_prompt
+        ), "Prompt doit mentionner le repli honnête (commandes natives)"
 
     def test_hardware_prompt_references_real_tool_names(self, mock_inference: MagicMock) -> None:
         """Le prompt hardware PEUT lister les noms d'outils réels (witr, smartctl, etc.) comme outils disponibles."""
@@ -70,8 +78,9 @@ class TestHardwarePromptHonestCapabilities:
         # Les noms d'outils réels de la toolbox peuvent apparaître
         real_tool_names = ["smartctl", "psinfo", "psloglist", "handle", "psping", "psservice", "witr"]
         # Au moins un nom d'outil réel devrait être mentionné
-        assert any(tool in full_prompt for tool in real_tool_names), \
+        assert any(tool in full_prompt for tool in real_tool_names), (
             f"Prompt devrait mentionner au moins un nom d'outil réel parmi {real_tool_names}"
+        )
 
     def test_cyber_prompt_no_phantom_tools(self, mock_inference: MagicMock) -> None:
         """Même vérification pour CyberAgent (contrôle) : pas de promesse d'invocation directe."""
