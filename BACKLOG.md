@@ -29,6 +29,26 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - Gates : ruff ✓ · format ✓ · mypy ✓ · pytest --cov (**946 passed, 2 failed préexistants**, couverture **83,47 % ≥ 60 %**).
 - Statut : ✅ DONE (en attente commit).
 
+### MT-KB-L2f — Single source of truth de l'index vectoriel (correction désync RAG P0) (2026-08-17) ✅
+- **Diagnostic** (fichier:ligne) :
+  - `services/wiki_ingest_service.py:186` écrivait `wiki_index.bin` (racine) via `VectorIndex`.
+  - `services/vector.py:53` lit `MEMORY_DIR/vector_index.json` via `VectorService`.
+  - Deux fichiers, deux classes, jamais synchronisés → « Documents vectorisés : 0 » et RAG inopérant.
+  - `VectorService` API d'écriture : `index_batch(docs)`, `vectorize_pending()`, `flush()` — le store runtime embedde lui-même (pas de double-embedding).
+  - `config/paths.py:35` : `MEMORY_DIR = ROOT / "memory"` (constant, non overridable par test).
+- **Tests RED** : 2 nouveaux tests dans `test_wiki_ingest_phase2.py` :
+  - `test_ingest_indexes_into_injected_store` : fake store injecté → `index_batch` appelé avec metadata (id/agent/source) ; aucun `wiki_index.bin` créé.
+  - `test_ingest_no_stray_index_file` : après ingest, aucun `.bin` orphelin dans wiki_root.
+- **Implémentation GREEN** : `services/wiki_ingest_service.py::ingest_phase2(vector_store=...)` :
+  - Si `vector_store` fourni → écriture batch dans le store runtime (`index_batch` + `vectorize_pending`), single source of truth = `MEMORY_DIR/vector_index.json`.
+  - Si absent → mode legacy `wiki_index.bin` (inchangé pour les 7 tests existants).
+  - Pas de double-embedding : le store runtime calcule les embeddings via `_embed_pending()`.
+  - Validation schéma 5 clés, chunking 512/64, stats, edges MITRE conservés.
+- **Résultat** : 9/9 tests passed (7 anciens + 2 nouveaux).
+- **Gates** : ruff ✓ · format ✓ · mypy ✓ · pytest (960 passed, 1 warning préexistant, 3 échecs witr HORS périmètre listés explicitement).
+- **Nettoyage** : `wiki_index.bin` existe à la racine et est tracké par git (préexistant) → non supprimé (règle : ne pas réécrire l'historique sans avis). À ajouter au `.gitignore` futur si décision.
+- **Statut** : ✅ DONE (en attente commit).
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur

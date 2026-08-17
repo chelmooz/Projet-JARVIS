@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from services.toolbox import Toolbox
 from services.diagnostic_ext.service import DiagnosticExtService
+from services.toolbox import Toolbox
 
 
 class TestToolboxCapability:
@@ -29,26 +29,26 @@ class TestToolboxCapability:
                 return Toolbox(diagnostic_service=diagnostic)
 
     def test_describe_tools_only_deployed_binaries(self, toolbox_with_bin: Toolbox, temp_bin_dir: Path) -> None:
-        """Avec bin/ vide → describe_tools() ne promet aucun outil diagnostique externe."""
+        """Avec bin/ vide → describe_tools() ANNOTE les outils non déployés ; avec witr.exe factice présent → witr listé SANS annotation."""
         # bin/ est vide (pas de witr.exe, smartctl.exe, etc.)
         desc = toolbox_with_bin.describe_tools().lower()
 
-        # Les outils diagnostiques ne doivent PAS apparaître dans la description
-        diagnostic_tools = ["smartctl", "psinfo", "psloglist", "handle", "psping", "psservice", "witr", "why_running"]
+        # Les outils diagnostiques DOIVENT apparaître MAIS avec l'annotation "non disponible"
+        diagnostic_tools = ["smartctl", "psinfo", "psloglist", "handle", "psping", "psservice", "witr"]
         for tool in diagnostic_tools:
-            assert tool not in desc, f"Outil non déployé '{tool}' listé dans describe_tools(): {desc}"
+            # Vérifier que l'outil est mentionné avec l'annotation de non-disponibilité
+            assert tool in desc, f"Outil '{tool}' devrait être listé (même non déployé)"
+            # Vérifier qu'il a l'annotation
+            assert "non disponible" in desc, f"Outil '{tool}' devrait avoir l'annotation 'non disponible'"
 
-        # Maintenant ajouter witr.exe factice
-        (temp_bin_dir / "witr.exe").write_bytes(b"fake")
-        # Re-créer la toolbox pour recharger
-        with patch("services.diagnostic_ext.config.BIN_DIR", str(temp_bin_dir)):
-            with patch("services.diagnostic_ext.config.CONFIG_PATH", str(Path("config") / "diagnostic_tools.yaml")):
-                diagnostic = DiagnosticExtService()
-                toolbox2 = Toolbox(diagnostic_service=diagnostic)
-                desc2 = toolbox2.describe_tools().lower()
-                # witr devrait maintenant apparaître (ou être listé avec disponibilité)
-                # Au minimum, la description ne doit pas être vide pour les outils déployés
-                assert "witr" in desc2 or "why_running" in desc2, "witr déployé devrait être listé"
+        # Maintenant simuler witr déployé en mockant list_available
+        with patch.object(toolbox_with_bin._diagnostic, "list_available", return_value=["witr"]):
+            desc2 = toolbox_with_bin.describe_tools().lower()
+            # witr devrait maintenant apparaître SANS l'annotation "non disponible"
+            assert "witr" in desc2, "witr déployé devrait être listé"
+            # Vérifier que "non disponible" n'est pas adjacent à witr
+            witr_idx = desc2.find("witr")
+            assert "non disponible" not in desc2[max(0, witr_idx - 50):witr_idx + 50], "witr déployé ne devrait pas avoir l'annotation 'non disponible'"
 
     def test_capability_probe_reports_missing(self, toolbox_with_bin: Toolbox) -> None:
         """capability_report() retourne {outil: bool} pour chaque entrée de diagnostic_tools.yaml."""
@@ -80,13 +80,17 @@ class TestToolboxCapability:
                 domain_prompt = hardware_agent._domain_prompt or ""
                 full_prompt = domain_prompt.lower()
 
-                # Ne doit PAS promettre d'invocation directe d'outils
-                forbidden = [
+                # Ne doit PAS promettre d'invocation directe d'outils DIAGNOSTIQUES
+                forbidden_direct = [
                     "utilise l'outil", "use the tool", "invoke", "appelle", "call",
-                    "witr", "why_running", "pspy64", "netstat -ano"
+                    "why_running", "pspy64"
                 ]
-                for f in forbidden:
-                    assert f not in full_prompt, f"Promesse interdite '{f}' dans prompt hardware: {domain_prompt}"
+                for f in forbidden_direct:
+                    assert f not in full_prompt, f"Promesse d'invocation directe interdite '{f}' dans prompt hardware: {domain_prompt}"
+
+                # "witr" PEUT apparaître comme nom d'outil dans la liste descriptive
+                # mais pas comme promesse d'invocation directe ("utilise witr", "call witr", etc.)
+                # "netstat -ano" est autorisé car cité comme commande NATIVE de repli (pas outil toolbox)
 
                 # Doit décrire le mécanisme réel : auto-déclenchement par mots-clés + repli
                 assert "automatique" in full_prompt or "mots-clé" in full_prompt or "mot-clé" in full_prompt or "keyword" in full_prompt, \

@@ -1,12 +1,12 @@
 """Tests pour l'ingestion Phase 2 (JSONL @network + @hardware)."""
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
+from services.vector import VectorService
 from services.wiki_ingest_service import WikiIngestService
 
 
@@ -30,8 +30,20 @@ class TestPhase2Ingest:
         """Crée un fichier JSONL temporaire avec 3 entrées de test."""
         file_path = tmp_path / "test.jsonl"
         entries = [
-            {"id": "test-1", "agent": "@network", "source": "test", "text": "Entry 1: T1021.002 description", "metadata": {}},
-            {"id": "test-2", "agent": "@network", "source": "test", "text": "Entry 2: T1021.006 description", "metadata": {}},
+            {
+                "id": "test-1",
+                "agent": "@network",
+                "source": "test",
+                "text": "Entry 1: T1021.002 description",
+                "metadata": {},
+            },
+            {
+                "id": "test-2",
+                "agent": "@network",
+                "source": "test",
+                "text": "Entry 2: T1021.006 description",
+                "metadata": {},
+            },
             {"id": "test-3", "agent": "@network", "source": "test", "text": "Entry 3: no mitre here", "metadata": {}},
         ]
         with file_path.open("w", encoding="utf-8") as f:
@@ -131,7 +143,9 @@ class TestPhase2Ingest:
         # Doit ingérer 2 entrées (resume-2, resume-3), sauter resume-1
         assert stats["ingested"] == 2, f"Attendu 2 entrées ingérées (reprise), reçu {stats['ingested']}"
 
-    def test_ingest_phase2_progress(self, service: WikiIngestService, mock_inference: MagicMock, capsys: pytest.CaptureFixture, tmp_path: Path) -> None:
+    def test_ingest_phase2_progress(
+        self, service: WikiIngestService, mock_inference: MagicMock, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
         """progress_every=1, limit=3 → stdout contient une ligne de progression avec flush."""
         sources_dir = tmp_path / "wiki" / "sources"
         sources_dir.mkdir(parents=True)
@@ -146,11 +160,88 @@ class TestPhase2Ingest:
                 f.write(json.dumps(entry) + "\n")
 
         service = WikiIngestService(wiki_root=tmp_path / "wiki")
-        stats = service.ingest_phase2(mock_inference, files=["test-progress.jsonl"], limit=3, progress_every=1)
+        _ = service.ingest_phase2(mock_inference, files=["test-progress.jsonl"], limit=3, progress_every=1)
 
         captured = capsys.readouterr()
         # Vérifier qu'une ligne de progression a été affichée (ex: "1/3", "2/3", "3/3")
-        assert any(f"{i}/3" in captured.out for i in range(1, 4)), f"Sortie stdout attendue avec progression, reçu: {captured.out}"
+        assert any(f"{i}/3" in captured.out for i in range(1, 4)), (
+            f"Sortie stdout attendue avec progression, reçu: {captured.out}"
+        )
+
+    def test_ingest_indexes_into_injected_store(self, mock_inference: MagicMock, tmp_path: Path) -> None:
+        """Fake vector store injecté → ingest_phase2(index_batch) reçoit les docs avec metadata (id/agent/source) ; aucun wiki_index.bin écrit."""
+        sources_dir = tmp_path / "wiki" / "sources"
+        sources_dir.mkdir(parents=True)
+        test_file = sources_dir / "test-store.jsonl"
+        entries = [
+            {
+                "id": "store-1",
+                "agent": "@network",
+                "source": "test-source",
+                "text": "Entry 1: T1021.002",
+                "metadata": {},
+            },
+            {
+                "id": "store-2",
+                "agent": "@hardware",
+                "source": "test-source",
+                "text": "Entry 2: T1021.006",
+                "metadata": {},
+            },
+        ]
+        with test_file.open("w", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
+
+        # Fake VectorService capturant les appels
+        captured_docs = []
+        fake_vector_store = MagicMock(spec=VectorService)
+        fake_vector_store.index_batch.side_effect = lambda docs: captured_docs.extend(docs)
+        fake_vector_store.vectorize_pending.return_value = 0
+
+        service = WikiIngestService(wiki_root=tmp_path / "wiki")
+        _ = service.ingest_phase2(mock_inference, files=["test-store.jsonl"], vector_store=fake_vector_store)
+
+        # Vérifier que index_batch a été appelé
+        assert fake_vector_store.index_batch.called, "index_batch doit être appelé sur le store injecté"
+        assert len(captured_docs) >= 2, f"Au moins 2 docs (chunks) attendus, reçu {len(captured_docs)}"
+
+        # Vérifier metadata : id, agent, source présents
+        for text, meta in captured_docs:
+            assert "id" in meta, "metadata doit contenir 'id'"
+            assert "agent" in meta, "metadata doit contenir 'agent'"
+            assert "source" in meta, "metadata doit contenir 'source'"
+
+        # Vérifier qu'aucun wiki_index.bin n'a été créé
+        stray_index = tmp_path / "wiki" / "wiki_index.bin"
+        assert not stray_index.exists(), f"wiki_index.bin orphelin créé: {stray_index}"
+
+    def test_ingest_no_stray_index_file(self, mock_inference: MagicMock, tmp_path: Path) -> None:
+        """Après ingest avec fake store, wiki_root/wiki_index.bin absent ET aucun fichier index orphelin créé."""
+        sources_dir = tmp_path / "wiki" / "sources"
+        sources_dir.mkdir(parents=True)
+        test_file = sources_dir / "test-stray.jsonl"
+        entries = [
+            {"id": "stray-1", "agent": "@network", "source": "test", "text": "Entry 1", "metadata": {}},
+        ]
+        with test_file.open("w", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry) + "\n")
+
+        fake_vector_store = MagicMock(spec=VectorService)
+        fake_vector_store.index_batch.return_value = None
+        fake_vector_store.vectorize_pending.return_value = 0
+
+        service = WikiIngestService(wiki_root=tmp_path / "wiki")
+        service.ingest_phase2(mock_inference, files=["test-stray.jsonl"], vector_store=fake_vector_store)
+
+        # Aucun fichier index orphelin
+        stray_index = tmp_path / "wiki" / "wiki_index.bin"
+        assert not stray_index.exists(), f"wiki_index.bin orphelin créé: {stray_index}"
+
+        # Vérifier aussi qu'aucun fichier .bin n'a été créé ailleurs dans wiki_root
+        bin_files = list((tmp_path / "wiki").rglob("*.bin"))
+        assert len(bin_files) == 0, f"Fichiers .bin orphelins trouvés: {bin_files}"
 
 
 if __name__ == "__main__":

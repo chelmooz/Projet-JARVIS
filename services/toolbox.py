@@ -149,7 +149,7 @@ class Toolbox:
         """
         available = set(self._diagnostic.list_available())
         report = {}
-        for tool_name in _DIAGNOSTIC_TOOLS.keys():
+        for tool_name in _DIAGNOSTIC_TOOLS:
             report[tool_name] = tool_name in available
         return report
 

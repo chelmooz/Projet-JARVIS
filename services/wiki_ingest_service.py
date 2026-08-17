@@ -154,6 +154,7 @@ updated: 2026-08-17
         limit: int | None = None,
         resume: bool = False,
         progress_every: int = 50,
+        vector_store: Any | None = None,
     ) -> dict[str, int]:
         """
         Ingestion Phase 2 : ad-attacks-network.jsonl + multios-commands.jsonl.
@@ -164,6 +165,8 @@ updated: 2026-08-17
             limit: Nombre maximum d'entrées à ingérer (None = toutes)
             resume: Si True, saute les entrées déjà dans le checkpoint
             progress_every: Afficher progression tous les N entrées (0 = désactivé)
+            vector_store: Store vectoriel runtime (VectorService) pour indexation directe.
+                         Si fourni, écrit dans le store runtime au lieu de wiki_index.bin.
 
         Returns:
             Dict avec stats : {ingested, chunks, edges}
@@ -180,16 +183,23 @@ updated: 2026-08-17
             except (json.JSONDecodeError, OSError):
                 processed_ids = set()
 
-        embedder = Embedder(inference_service)
-        vector_index = VectorIndex(
-            data={"documents": [], "embedding_dim": 768},
-            path="wiki_index.bin",
-            lock=__import__("threading").RLock(),
-        )
+        use_runtime_store = vector_store is not None
+
+        if not use_runtime_store:
+            # Mode legacy : Embedder + VectorIndex local (wiki_index.bin) - à supprimer plus tard
+            embedder = Embedder(inference_service)
+            vector_index = VectorIndex(
+                data={"documents": [], "embedding_dim": 768},
+                path="wiki_index.bin",
+                lock=__import__("threading").RLock(),
+            )
 
         total_ingested = 0
         total_chunks = 0
         total_edges = 0
+
+        # Collecter tous les chunks pour batch runtime
+        batch_documents: list[tuple[str, dict[str, Any]]] = []
 
         # Compter le total d'entrées pour la progression
         total_entries = 0
@@ -240,16 +250,27 @@ updated: 2026-08-17
                     # Chunking : 512 tokens ≈ 2048 chars, overlap 64 tokens ≈ 256 chars
                     chunks = chunk_text(entry["text"], chunk_size=2048, overlap=256, doc_id=entry["id"])
 
-                    # Embeddings et indexation
-                    for chunk in chunks:
-                        embedder.embed(chunk["text"])
-                        metadata = {
-                            **entry,
-                            "chunk_index": chunk["metadata"]["chunk_index"],
-                            "total_chunks": chunk["metadata"]["total_chunks"],
-                        }
-                        vector_index.add_document(chunk["text"], metadata)
-                        total_chunks += 1
+                    if use_runtime_store:
+                        # Mode runtime : collecter chunks bruts, le store embedde lui-même (pas de double-embedding)
+                        for chunk in chunks:
+                            metadata = {
+                                **entry,
+                                "chunk_index": chunk["metadata"]["chunk_index"],
+                                "total_chunks": chunk["metadata"]["total_chunks"],
+                            }
+                            batch_documents.append((chunk["text"], metadata))
+                            total_chunks += 1
+                    else:
+                        # Mode legacy : embedder local + VectorIndex local
+                        for chunk in chunks:
+                            embedder.embed(chunk["text"])
+                            metadata = {
+                                **entry,
+                                "chunk_index": chunk["metadata"]["chunk_index"],
+                                "total_chunks": chunk["metadata"]["total_chunks"],
+                            }
+                            vector_index.add_document(chunk["text"], metadata)
+                            total_chunks += 1
 
                     # Liens croisés MITRE : chercher Txxxxxx dans le texte ET metadata
                     text_matches = re.findall(r"\bT\d{4,5}(?:\.\d+)?\b", entry["text"])
@@ -265,8 +286,14 @@ updated: 2026-08-17
                 if limit is not None and total_ingested >= limit:
                     break
 
-        # Persister l'index
-        vector_index.save()
+        if use_runtime_store and batch_documents:
+            # Écrire en batch dans le store runtime (single source of truth)
+            assert vector_store is not None  # mypy: guaranteed by use_runtime_store
+            vector_store.index_batch(batch_documents)
+            vector_store.vectorize_pending()
+        elif not use_runtime_store:
+            # Mode legacy : persister l'index local
+            vector_index.save()
 
         # Progression finale
         if progress_every > 0:
