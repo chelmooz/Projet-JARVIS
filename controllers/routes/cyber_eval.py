@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter
@@ -36,7 +37,8 @@ def get_cyber_eval_service() -> CyberEvalService:
 @router.post("/api/cyber/analyze")
 async def analyze(req: AnalyzeRequest) -> dict[str, Any]:
     """Évalue une question via le pipeline multi-agents judge→advocate→evaluator."""
-    return get_cyber_eval_service().analyze(req.question, max_revisions=req.max_revisions)
+    service = get_cyber_eval_service()
+    return await asyncio.to_thread(service.analyze, req.question, req.max_revisions)
 
 
 __all__ = ["router"]

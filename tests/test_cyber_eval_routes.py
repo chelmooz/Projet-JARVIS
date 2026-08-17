@@ -6,10 +6,13 @@ Ollama réel). Validation Pydantic du body testée nativement (422).
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from controllers.router import create_app
 from controllers.routes import cyber_eval as cyber_eval_routes
@@ -45,7 +48,7 @@ def test_analyze_endpoint_passes_max_revisions(client: TestClient) -> None:
     resp = client.post("/api/cyber/analyze", json={"question": "test", "max_revisions": 1})
     assert resp.status_code == 200
     fake = cyber_eval_routes._service
-    assert fake is not None
+    assert isinstance(fake, FakeCyberEvalService)
     assert fake.calls == [("test", 1)]
 
 
@@ -54,7 +57,7 @@ def test_analyze_endpoint_default_max_revisions(client: TestClient) -> None:
     resp = client.post("/api/cyber/analyze", json={"question": "test"})
     assert resp.status_code == 200
     fake = cyber_eval_routes._service
-    assert fake is not None
+    assert isinstance(fake, FakeCyberEvalService)
     assert fake.calls == [("test", 2)]
 
 
@@ -68,3 +71,52 @@ def test_analyze_endpoint_rejects_missing_question(client: TestClient) -> None:
     """Question absente → 422 (validation Pydantic)."""
     resp = client.post("/api/cyber/analyze", json={})
     assert resp.status_code == 422
+
+
+class SlowCyberEvalService:
+    """Service simulant une latence de 2s (ex: appels Ollama)."""
+
+    def analyze(self, question: str, max_revisions: int = 2) -> dict[str, Any]:
+        time.sleep(2)
+        return {"decision": "publish", "score": 0.85, "reasoning": "OK", "revisions": 0}
+
+
+@pytest.fixture
+def slow_app(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """App FastAPI avec un service lent (simule latence Ollama)."""
+    monkeypatch.setattr(cyber_eval_routes, "_service", SlowCyberEvalService())
+    return create_app()
+
+
+@pytest.mark.asyncio
+async def test_analyze_does_not_block_event_loop(slow_app: Any) -> None:
+    """POST /api/cyber/analyze ne doit pas bloquer GET /api/status (event loop libre)."""
+    transport = ASGITransport(app=slow_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Lancer les deux requêtes en parallèle
+        async def call_analyze() -> tuple[int, dict[str, Any]]:
+            """Lance la requête analyse (lente)."""
+            resp = await client.post("/api/cyber/analyze", json={"question": "test"})
+            return resp.status_code, resp.json()
+
+        async def call_status() -> tuple[int, float]:
+            """Lance la requête status (doit être rapide < 500ms)."""
+            start = time.time()
+            resp = await client.get("/api/status")
+            elapsed = time.time() - start
+            return resp.status_code, elapsed
+
+        # Exécuter en parallèle
+        analyze_task = asyncio.create_task(call_analyze())
+        status_task = asyncio.create_task(call_status())
+        analyze_result, status_result = await asyncio.gather(analyze_task, status_task)
+
+        # Vérifier que /api/status répond vite (< 500ms) même pendant le sleep de 2s
+        status_code, elapsed = status_result
+        assert status_code == 200, f"/api/status a échoué: {status_code}"
+        assert elapsed < 0.5, f"/api/status bloqué {elapsed:.2f}s (event loop gelé par analyse)"
+
+        # Vérifier que l'analyse finit bien
+        analyze_code, analyze_json = analyze_result
+        assert analyze_code == 200
+        assert analyze_json["decision"] == "publish"
