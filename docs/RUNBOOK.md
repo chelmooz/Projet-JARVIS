@@ -138,3 +138,51 @@ tar czf backup-$(date +%Y%m%d).tar.gz memory/ logs/ config/
 # Windows (PowerShell)
 Compress-Archive -Path memory, logs, config -DestinationPath backup-$(Get-Date -Format yyyyMMdd).zip
 ```
+
+## Déploiement KB (Reconstruction de l'index vectoriel)
+
+L'index vectoriel (`memory/vector_index.json`) n'est **pas** commité dans git (taille > 100 Mo, limite GitHub 100 Mo/fichier). Il est reconstruit à la demande depuis les sources JSONL (`wiki/sources/*.jsonl`) qui, elles, sont versionnées.
+
+### Reconstruction complète (nécessite Ollama running)
+
+```bash
+# 1. Verifier qu'Ollama tourne (port 11436)
+curl http://localhost:11436/api/tags
+
+# 2. Lancer la reconstruction (une seule commande)
+python scripts/rebuild_index_run.py
+```
+
+Sortie attendue :
+```
+=== Reconstruction de l'index vectoriel KB ===
+AVANT: total=XXX embedded=XXX pending=XXX
+Sources manquantes détectées: [...]
+Ingestion de <source>...
+  <source>: N entrées, N chunks, N edges
+...
+Total ingéré: N entrées, N chunks, N edges
+=== Vectorisation des documents en attente ===
+AVANT vectorisation: total=XXX embedded=XXX pending=XXX
+APRÈS vectorisation: total=XXX embedded=XXX pending=0
+Vectorisés: N documents
+Smoke test 'Kerberoasting T1558.003' (top_k=1): results=1
+  id=... agent=... score=...
+=== Index KB reconstruit avec succès ===
+```
+
+### Comportement
+
+- **Détection intelligente** : compare les sources JSONL (`wiki/sources/*.jsonl`) à l'index existant via `metadata.source`. Seules les sources manquantes sont ingérées (pas de ré-ingestion, pas de doublons grâce à la déduplication O(1) par hash SHA-256 du texte).
+- **Vectorisation** : `vectorize_pending()` calcule les embeddings par lots de 32 (batch `embed_batch` MT-KB-L2i). Si `pending=0`, rien à faire.
+- **Fail-open Ollama** : si Ollama n'est pas joignable (port 11436), le script affiche un message clair et sort sans modifier l'index.
+- **Idempotent** : relancer le script ne ré-ingère pas les sources déjà présentes.
+
+### Sur clef USB (déploiement terrain)
+
+L'index vectoriel (`memory/vector_index.json`) **est déjà présent** sur la clef USB prête à l'emploi. **Aucune reconstruction nécessaire** — il suffit de lancer `launchers/JARVIS.bat` (Windows) ou `./launchers/JARVIS.sh` (Linux/Mac). Ollama doit être disponible (fourni dans `bin/win/ollama.exe` ou `bin/linux/ollama`).
+
+La reconstruction n'est nécessaire que si :
+- L'index a été corrompu/supprimé
+- De nouvelles sources JSONL ont été ajoutées dans `wiki/sources/`
+- On veut forcer une ré-vectorisation complète (supprimer `memory/vector_index.json` avant relance)

@@ -259,6 +259,25 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - **Périmètre respecté** : aucun `services/**`, `scripts/**`, `wiki/sources/**` modifié. Fichiers modifiés : `tests/test_analytics.py` (extension isolation), `BACKLOG.md` (cette entrée). Pas de ré-ingestion, pas de vectorisation (script `vectorize_pending_run.py` non ré-exécuté — `pending=4` laissé tel quel par serveur live).
 - **Statut** : ✅ **DONE** — 2/2 tests isolés (cohérence L2j), gate pytest verte (965/0), index intact. Prêt pour commit/push `main` (MT-KB-L2n).
 
+### MT-KB-L2n v2 — Rebuild KB 1 commande + runbook déploiement (2026-08-17) ✅
+- **Contexte** : index vectoriel (`memory/vector_index.json`) ≈ 16,7 Ko/doc → plafond GitHub 100 Mo/fichier ≈ 6 k docs → index hors git (gitignoré). Sources JSONL = source unique (ADR-013). Objectif : reconstruction en 1 commande + runbook déploiement.
+- **Étape 1 — Diagnostic** : `scripts/ingest_phase2_run.py` + `scripts/vectorize_pending_run.py` + `VectorIndex.add_document` (SHA-256 O(1) dedup) + liste `wiki/sources/*.jsonl` (7 fichiers). Index actuel : 911 docs (911 embedded, 0 pending).
+- **Étape 2-3 — RED** : `tests/test_rebuild_index_run.py` créé (3 tests `missing_sources` : tout manquant / rien manquant / partiel). 3 failed confirmés.
+- **Étape 4 — GREEN** : `scripts/rebuild_index_run.py` implémenté :
+  - `missing_sources(sources_dir, index_docs)` avec `SOURCE_MAP` explicite (filename stem → source HF réel dans JSONL).
+  - Ingestion sélective des sources manquantes uniquement (dédup SHA-256 O(1) garantit pas de doublons).
+  - `vectorize_pending()` (batch 32, `embed_batch` MT-KB-L2i).
+  - Fail-open Ollama : message clair + index inchangé si 11436 DOWN.
+  - AVANT/APRÈS stats + smoke test `Kerberoasting T1558.003` → top-1 `@hardware` score>0.
+- **Étape 5 — Gates + non-régression L2j** :
+  - `pytest tests/test_rebuild_index_run.py -v` → 3 passed.
+  - `pytest tests/test_pipeline_steps_characterization.py tests/test_agent_graph_characterization.py -q` → vert (pas de régression).
+  - `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓.
+  - `pytest -q` → **968 passed, 1 warning** (préexistant coroutine `_shutdown_sequence`). Index PRE/POST identique (`911/911/0`).
+- **Étape 6 — Doc** : `docs/RUNBOOK.md` section « Déploiement KB » ajoutée (procédure clone → `python scripts/rebuild_index_run.py` ; sur clef USB index déjà présent).
+- **Périmètre respecté** : `scripts/rebuild_index_run.py` (nouveau), `tests/test_rebuild_index_run.py` (nouveau), `docs/RUNBOOK.md`, `BACKLOG.md`. Pas de modification `graph/agent_graph.py`, `services/vector*.py`, `tests/test_analytics.py`, JSONL sources. Ollama/serveur non redémarrés.
+- **Statut** : ✅ **DONE** — Index reconstruit (911 docs, 911 embedded, 0 pending), runbook documenté, gates vertes, commit/push `main`.
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur
