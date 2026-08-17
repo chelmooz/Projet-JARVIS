@@ -139,6 +139,77 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
   2. Ré-ingérer + exécuter `scripts/vectorize_pending_run.py` pour vectoriser les 904 docs (nécessite exception à la règle "interdit ré-ingestion" car l'index a été perdu par force majeure du bug de test).
 - **Statut** : ⚠️ **PARTIAL — STOP + RAPPORT** — code et tests OK (Étapes 1-5, 7-8 DONE), vectorisation réelle impossible (Étape 6) par déviation force majeure (index détruit par `test_vector_corrupted.py:47`).
 
+### MT-KB-L2j (étapes 1-3 : diagnostic + tests RED isolés) — Isoler test_vector_corrupted.py (2026-08-17) ⚠️ DEVIATION — STOP + RAPPORT
+- **Périmètre exécuté** : Étapes 1-3 uniquement (Diagnostic LECTURE SEULE + création `tests/test_vector_corrupted_isolated.py` + vérification RED). Étapes GREEN (modif `test_vector_corrupted.py`) et restauration (ré-ingest + `vectorize_pending_run.py`) NON fournies dans l'énoncé (message coupé après la commande pytest de l'Étape 3).
+- **Étape 1 — Diagnostic** (fichier:ligne) :
+  - `tests/test_vector_corrupted.py:8` — `sys.path.insert(0, .../services)` (hack → importe le module top-level `vector`, distinct de `services.vector`).
+  - `tests/test_vector_corrupted.py:10` — `from vector import VECTOR_PATH, VectorService` (mypy `[import-not-found]` sur `vector` — dette préexistante, hors `files` mypy car `tests/` exclu).
+  - `tests/test_vector_corrupted.py:12,19,22-24,35,37,41-43,47` — importe `MEMORY_DIR` depuis `config.paths`, **CRÉE** (`os.makedirs`) / **ÉCRIT** (`open(...,"wb").write(b'{"documents"')`) / **INSTANCIE VectorService 2×** sur le VRAI `VECTOR_PATH` (non monkeypatché → archive le vrai `vector_index.json` en `.corrupted.<ts>`) / **DÉTRUIT** (`shutil.rmtree(MEMORY_DIR, ignore_errors=True)` à la ligne 47 — bug CRITIQUE qui efface tout `memory/` dont `vector_index.json` 904 docs + `metrics.json`).
+  - `tests/test_vector_corrupted.py:15` — signature : `def test_vector_load_corrupted_no_loop():` (non typée).
+  - `services/vector.py:53` — `VECTOR_PATH = os.path.join(MEMORY_DIR, "vector_index.json")` (constante module, lue à `__init__` time → monkeypatchable).
+  - `services/vector.py:30` — `from config.constants import ..., MEMORY_DIR, ...` (re-export de `config.paths:35` `MEMORY_DIR = ROOT / "memory"`).
+  - `services/vector.py:102` — `os.makedirs(os.path.dirname(VECTOR_PATH), exist_ok=True)` (utilise valeur courante de `VECTOR_PATH` → monkeypatch effectif).
+  - `services/vector.py:139-159` — `_load_secure` : JSON corrompu → `_archive_corrupted_file` (renommage `.corrupted.<ts>`) → `{"documents": [], "embedding_dim": None}` (vide).
+  - `services/vector.py:544-557` — `stats()` retourne `"total": len(docs)` → assertion `stats()["total"] == 0` valide.
+  - `services/vector.py:199-202` — `_ensure_dimension` (appelé en `__init__`) n'appelle **pas** `embed` (vérifie `embedding_dim` seulement).
+  - `tests/test_vector_service_characterization.py:71` — pattern isolé de référence : `monkeypatch.setattr(vector_module, "VERTEX_PATH", str(vpath))` + `tmp_path`. Lignes `:137` et `:160` prouvent que « corrupted → archived → total=0 » est un comportement DÉJÀ correct et testé (version isolée existante du test historique).
+  - État disque : `memory/` existe, contient `metrics.json` (production) — `os.listdir(MEMORY_DIR)` réussit.
+- **Étape 2 — Tests RED** : `tests/test_vector_corrupted_isolated.py` (nouveau, 3 tests) créé. Helpers : `_StubInference` (embed/embed_batch 768-dim constants) + `_run_corrupted_index_isolated(tmp_path, monkeypatch)` (monkeypatch string form `"services.vector.VECTOR_PATH"` vers `tmp_path/vector_index.json`, écrit `b'{"documents"'`, instancie `VectorService`).
+  - `test_corrupted_index_is_recognized_without_touching_production` : assert `stats()["total"] == 0` (index corrompu = vide).
+  - `test_production_memory_dir_untouched_after_test` : capture `sorted(os.listdir(MEMORY_DIR))` AVANT/APRÈS → assert identiques (le vrai dossier n'est pas modifié).
+  - `test_no_rmtree_on_production_path` : `inspect.getsource(tests.test_vector_corrupted)` → assert AUCUN pattern `shutil.rmtree(MEMORY_DIR` / `shutil.rmtree(str(MEMORY_DIR)` / `os.rmdir(MEMORY_DIR` / `os.rmdir(str(MEMORY_DIR)` dans le source du test historique.
+- **Étape 3 — Vérification RED — DÉVIATION vs attendu** :
+  - Attendu énoncé : « 3 FAILED ». Sortie brute `python -m pytest tests/test_vector_corrupted_isolated.py -v` :
+    ```
+    tests/test_vector_corrupted_isolated.py::test_no_rmtree_on_production_path FAILED [ 33%]
+    tests/test_vector_corrupted_isolated.py::test_corrupted_index_is_recognized_without_touching_production PASSED [ 66%]
+    tests/test_vector_corrupted_isolated.py::test_production_memory_dir_untouched_after_test PASSED [100%]
+    FAILED tests/test_vector_corrupted_isolated.py::test_no_rmtree_on_production_path
+    ========================= 1 failed, 2 passed in 0.59s =========================
+    ```
+  - **Résultat réel : 1 failed, 2 passed** (PAS 3 failed).
+  - **Explication principielle** :
+    - `test_no_rmtree_on_production_path` = seul RED authentique : `test_vector_corrupted.py:47` contient encore `shutil.rmtree(MEMORY_DIR` → `AssertionError` ( garde-fou qui échouera jusqu'au fix GREEN de `test_vector_corrupted.py`).
+    - `test_corrupted_index_is_recognized_without_touching_production` = PASS car VectorService archive DÉJÀ les fichiers corrompus (`services/vector.py:139-159`) → `stats()["total"]==0`. Comportement existant correct, déjà prouvé par `test_vector_service_characterization.py:137,160` (test de caractérisation, pas un missing-feature test — ne peut pas être RED sans changer la spec).
+    - `test_production_memory_dir_untouched_after_test` = PASS car `_run_corrupted_index_isolated` utilise `tmp_path`+monkeypatch et ne touche PAS le vrai `MEMORY_DIR` (`before == after`).
+  - Conclusion : la spec des 3 tests est correctement implémentée ; l'attente « 3 FAILED » est une sous-estimation — seuls 1 des 3 tests peut être RED par construction (les 2 autres caractérisent l'isolation qui fonctionne déjà). Aucun tweak forcé pour artificiellement faire échouer Tests 1-2 (respect literal de la spec utilisateur).
+- **Gates** :
+  - `python -m ruff check tests/test_vector_corrupted_isolated.py tests/test_vector_corrupted.py` → `All checks passed!` ✓
+  - `python -m ruff format --check tests/test_vector_corrupted_isolated.py` → `1 file already formatted` ✓ (après 3 folds sous limite 120)
+  - `python -m mypy` (gate projet, no-args, `files` de `pyproject.toml:67` exclut `tests/`) → `Success: no issues found in 148 source files` ✓. NB : `python -m mypy tests/test_vector_corrupted_isolated.py` (hors gate projet) fait surface 5 erreurs mypy DANS le test historique `test_vector_corrupted.py` (sys.path hack `from vector import` + fonctions non typées) — préexistantes, seront éliminées par le fix GREEN (remplacement du hack par `from services.vector import` + annotations de types).
+  - `python -m pytest tests/test_vector_corrupted_isolated.py -v` → **1 failed, 2 passed** (pytest intentionally RED par design : Test 3 est le garde-fou GREEN-phase).
+- **Périmètre respecté** : aucun fichier `services/`, aucun JSONL `wiki/sources/`, aucun autre test modifié. Seul ajout : nouveau `tests/test_vector_corrupted_isolated.py`. `scripts/ingest_phase2_run.py` et `scripts/vectorize_pending_run.py` non exécutés (étapes restauration non fournies).
+- **Pas de commit** (conforme AGENTS.md).
+- **Action requise** (hors périmètre exécuté) :
+  1. **Étape 4 (GREEN) non fournie** — modifier `tests/test_vector_corrupted.py` (dans scope autorisé) pour remplacer `shutil.rmtree(MEMORY_DIR)` (ligne 47) + le hack `sys.path/from vector import` (lignes 8-10) + `os.makedirs(MEMORY_DIR)` (ligne 19) + écriture sur `VECTOR_PATH` réel (lignes 22-24) par : isolation `tmp_path` + `monkeypatch.setattr("services.vector.VECTOR_PATH", str(tmp_path/"vector_index.json"))` + import propre `from services.vector import VectorService` + annotations de types. Après ce fix : `test_vector_corrupted.py:47` (rmtree) disparaît → `test_no_rmtree_on_production_path` PASS (les 3 tests deviennent GREEN, + les 5 erreurs mypy legacy disparaissent).
+  2. **Étape 5 (restauration index)** non fournie — ré-exécuter `scripts/ingest_phase2_run.py` puis `scripts/vectorize_pending_run.py` pour reconstruire `memory/vector_index.json` (904 docs) avec embeddings (nécessite exception à la règle « interdit ré-ingestion » par force majeure du bug de test historique).
+  3. Décision utilisateur requise pour enchaîner sur l'Étape 4 (GREEN) — la phase RED (Étapes 1-3) est terminée avec déviation documentée (1 failed au lieu de 3 failed), micro-tâche STOP conformément à la règle « Déviation → STOP + rapport ».
+- **Statut** : ⚠️ **DEVIATION — STOP + RAPPORT** — Étapes 1-3 DONE (diagnostic + tests RED isolés créés et vérifiés), déviation sur le compte RED attendu (1/3 vs 3/3) expliquée principedement (Tests 1-2 = caractérisation d'un comportement déjà correct, Test 3 = seul garde-fou authentiquement RED). Étapes 4 (GREEN) et 5 (restauration) en attente d'énoncé / décision.
+
+### MT-KB-L2j (complément Étape 4 GREEN) — Isolation finale de `tests/test_vector_corrupted.py` (2026-08-17) ✅
+- **Contexte** : suite de l'entrée précédente (RED Étapes 1-3, DÉVIATION). Exécute l'Étape 4 (GREEN) autorisée par énoncé : modifier uniquement `tests/test_vector_corrupted.py` + `BACKLOG.md`, puis commit/push `main`. Restauration de l'index (Étape 5) reste explicitement PENDING.
+- **GREEN** : `tests/test_vector_corrupted.py` réécrit (52 → 72 lignes) — 8 changements imposés par l'énoncé, tous appliqués :
+  1. `sys.path.insert(...)` supprimé (l.8 historique).
+  2. `from vector import VECTOR_PATH, VectorService` → `from services.vector import VectorService` (l.10 historique, import propre mypy OK).
+  3. `tmp_path`+`monkeypatch` (fixtures pytest) — signature typée `(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None`.
+  4. `monkeypatch.setattr("services.vector.VECTOR_PATH", str(tmp_path / "vector_index.json"))` redirige `__init__`/`_load_secure`/`_save_secure`/`_archive_corrupted_file` vers `tmp_path`.
+  5. JSON corrompu `b'{"documents"'` écrit uniquement dans `tmp_path/vector_index.json`.
+  6. `os.makedirs(MEMORY_DIR, ...)` supprimé.
+  7. `shutil.rmtree(MEMORY_DIR, ...)` supprimé.
+  8. Aucun pattern destructif littéral restant — `test_no_rmtree_on_production_path` (via `inspect.getsource`) confirme l'absence de `shutil.rmtree(MEMORY_DIR` / `shutil.rmtree(str(MEMORY_DIR)` / `os.rmdir(MEMORY_DIR` / `os.rmdir(str(MEMORY_DIR)`. La note historique du docstring du test reformule explicitement `shutil.rmtree` *ciblant* `MEMORY_DIR` pour casser la signature textuelle.
+- **Intention préservée + renforcée** :
+  - Corrompu reconnu/archivé : 1er `VectorService(_StubInference())` → `_load_secure` échoue le parse → `_archive_corrupted_file` renomme `vector_index.json` → `vector_index.json.corrupted.<ts>` dans `tmp_path`.
+  - Pas de boucle : `assert len(archived) == 1` (au lieu de `>= 1` historique) — le 2e appel ne trouve aucun `vector_index.json` restant, donc aucun nouvel archivage. Assertion exactement 1 archive = « no loop » effectif.
+  - Index vide ensuite : `assert svc.stats()["total"] == 0` (ajouté).
+- **Note disque** : le test historique avait détruit `memory/` par `shutil.rmtree` à chaque exécution pytest → le test isolé `test_production_memory_dir_untouched_after_test` (`os.listdir(MEMORY_DIR)` direct) levait initialement `FileNotFoundError`. Décision utilisateur validée : `mkdir H:\Projet-JARVIS\memory` (dossier vide, sans `vector_index.json`) — recréation du conteneur détruit, **PAS** restauration d'index (le fichier reste absent). Git ne suit pas les dossiers vides → invisible au commit. Permet `before == after == []`.
+- **Vérifications** :
+  - `pytest tests/test_vector_corrupted_isolated.py -v` → **3 passed** (`test_no_rmtree_on_production_path`, `test_production_memory_dir_untouched_after_test`, `test_corrupted_index_is_recognized_without_touching_production`).
+  - `pytest tests/test_vector_corrupted.py -v` → **1 passed** (`test_vector_load_corrupted_no_loop`).
+- **Gates** : `ruff check .` ✓ · `ruff format --check .` ✓ (1 reformat appliqué : collapsage assertion multi-ligne < 120 chars) · `mypy` ✓ (les 5 erreurs mypy legacy sur `test_vector_corrupted.py` — sys.path hack + non-typage — éliminées par le GREEN) · `pytest -q` → **965 passed, 1 warning** (warning préexistant `coroutine '_shutdown_sequence' was never awaited` dans `test_warmup_shutdown.py:26`, inchangé depuis MT-KB-L2i). 0 failed.
+- **Périmètre respecté** : aucun `services/**`, `scripts/**`, `wiki/sources/**`, aucun autre test modifié, aucune ré-ingestion, aucune vectorisation. Fichiers modifiés : `tests/test_vector_corrupted.py`, `tests/test_vector_corrupted_isolated.py` (ajouté au tracking git — créé en RED phase), `BACKLOG.md`. Dossier `memory/` recréé vide, hors-git.
+- **Dette pending** (Étape 5 NON incluse) : restauration de `memory/vector_index.json` (904 docs + embeddings via `embed_batch`) — nécessite exception à la règle « interdit ré-ingestion » par force majeure du bug de test historique. Exécuter `scripts/ingest_phase2_run.py` puis `scripts/vectorize_pending_run.py`.
+- **Statut** : ✅ **DONE** pour l'isolation (4 tests verts sur les 2 fichiers, gates vertes, commit/push `main`). 🛑 **PENDING** : restauration de `memory/vector_index.json` (904 docs + embeddings).
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur
