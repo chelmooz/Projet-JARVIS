@@ -134,9 +134,15 @@ def main() -> int:
             print(f"ATTENTION: {jsonl_path} introuvable, ignoré.")
             continue
 
+        # Skip @vision sources (ADR-010: vision=RapidOCR, pas de dataset RAG)
+        if source == "coco-annotations":
+            print(f"SKIP {source}: agent=@vision (RapidOCR, pas de dataset RAG)")
+            continue
+
         print(f"Ingestion de {source}...")
         stats = service.ingest_phase2(
             inference_svc,
+            files=[f"{source}.jsonl"],
             vector_store=vector_store,
             limit=None,
             resume=False,

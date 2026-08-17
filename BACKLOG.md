@@ -278,6 +278,29 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - **Périmètre respecté** : `scripts/rebuild_index_run.py` (nouveau), `tests/test_rebuild_index_run.py` (nouveau), `docs/RUNBOOK.md`, `BACKLOG.md`. Pas de modification `graph/agent_graph.py`, `services/vector*.py`, `tests/test_analytics.py`, JSONL sources. Ollama/serveur non redémarrés.
 - **Statut** : ✅ **DONE** — Index reconstruit (911 docs, 911 embedded, 0 pending), runbook documenté, gates vertes, commit/push `main`.
 
+### MT-KB-L2p — Corriger l'ingestion par source réelle dans rebuild_index_run.py (2026-08-17) ✅
+- **Contexte** : `rebuild_index_run.py` (MT-KB-L2n) bouclait sur les sources manquantes mais appelait `ingest_phase2()` sans paramètre `files` → ingérait les 2 fichiers Phase 2 codés en dur (`ad-attacks-network.jsonl`, `multios-commands.jsonl`) pour CHAQUE source → 1032 entrées/source (32+1000) au lieu des lignes réelles (ex: mitre-attack=858). 5160 doublons dédupés → index inchangé (911). Smoke "Kerberoasting T1558.003" → top-1 `@hardware` (pas `@cyber` absent).
+- **Étape 1 — Diagnostic** (fichier:ligne) :
+  - `scripts/rebuild_index_run.py:138-144` : appel `service.ingest_phase2(inference_svc, vector_store=..., limit=None, resume=False, progress_every=50)` sans `files=` → défaut Phase 2.
+  - `services/wiki_ingest_service.py:150-175` : `ingest_phase2(files=None, ...)` défaut `files = ["ad-attacks-network.jsonl", "multios-commands.jsonl"]` (l.174-175).
+  - Entrée générique existante : `ingest_phase2(files=[...])` accepte liste arbitraire et respecte `metadata.agent`/`metadata.source` de chaque ligne JSONL (l.206-292).
+- **Étape 2 — Fix** (`scripts/rebuild_index_run.py:131-148`) :
+  - Boucle par source : `files=[f"{source}.jsonl"]` → ingère `wiki/sources/<source>.jsonl` réel.
+  - `coco-annotations` → SKIP explicite avec raison : "agent=@vision (RapidOCR, pas de dataset RAG)" (ADR-010).
+  - Dédup SHA-256 conservée (VectorIndex O(1)).
+- **Étape 3 — Exécution + vérifications** :
+  - `python scripts/rebuild_index_run.py` → comptes par source = lignes réelles : `codesearchnet-python=1000`, `grid-stability=1000`, `mitre-attack=858`, `network-topology=1000`, `coco-annotations=SKIP`.
+  - Total ≈ 4017 docs (911 initiaux + 3858 nouveaux - dédup).
+  - `vectorize_pending` → `pending=0`.
+  - Compteurs par agent : `@cyber>0` (858 MITRE), `@dev>0` (1000 CodeSearchNet), `@network>20` (1000 topology), `@hardware≥884` (1000 grid), `@vision==0` (SKIP).
+  - Smoke "Kerberoasting T1558.003" top-1 `agent=@cyber` score=0.2959 > 0.
+- **Étape 4 — Gates + BACKLOG + commit + push** :
+  - `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓ · `pytest -q` → **968 passed, 1 warning** (préexistant coroutine).
+  - Entrée BACKLOG `### MT-KB-L2p` (cette entrée).
+  - `git add scripts/rebuild_index_run.py BACKLOG.md` + commit + push `main`.
+- **Périmètre respecté** : `scripts/rebuild_index_run.py` (fix), `BACKLOG.md`. INTERDIT : `services/**`, `wiki/sources/**`, `tests/**`, ré-ingestion Phase 2, index manuel.
+- **Statut** : ✅ **DONE** — Ingestion par source réelle + skip @vision + multi-agents indexé + smoke @cyber OK + gates vertes.
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur
