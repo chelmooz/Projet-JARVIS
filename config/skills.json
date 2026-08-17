@@ -6,7 +6,7 @@
       "name": "🔪 Kill Coding",
       "description": "Architecture SOLID, TDD, clean code, KISS — regles de codage strictes",
       "category": "developpement",
-      "enabled": false,
+      "enabled": true,
       "prompt": "## Regles de codage\n1. **SOLID** : Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion\n2. **TDD** : Red-Green-Refactor — ecris le test d'abord, fais-le passer, refactore\n3. **Clean Code** : noms explicites, fonctions courtes, docstrings, pas de commentaires superflus\n4. **KISS** : Keep It Simple and Stupid — pas de sur-ingenierie\n\n## Iron Law\nNO PRODUCTION CODE WITHOUT A FAILING TEST FIRST — du code ecrit avant le test : supprime-le et repart de zero (delete = delete).\n\n## Cycle TDD detaille\n1. **RED** : ecris UN test minimal qui exprime le comportement attende (nom clair, un seul comportement, du vrai code — pas de mock tant que possible)\n2. **Verify RED (obligatoire)** : lance-le, confirme l'echec attendu — echec pour fonctionnalite manquante, pas pour une typo ; test vert = tu testes du comportement existant, corrige le test\n3. **GREEN** : ecris le code minimal qui fait passer ce test et rien d'autre — pas de feature en plus, pas de refactor au passage\n4. **Verify GREEN (obligatoire)** : lance la suite complete, confirme tout vert et sans warning\n5. **REFACTOR** : uniquement apres le vert — supprime la duplication, ameliore noms et structure sans changer de comportement\n\n## Anti-patterns de test\n1. **Assertion miroir** : ne calcule pas l'attendu avec le code teste (meme builder des deux cotes = toujours vrai) — derive la valeur attendue a la main, avec un litteral\n2. **Change detector** : un test qui ne casse que sur des decisions intentionnelles (constante, wording de message), jamais sur un bug, dort sur les regressions — teste le comportement qui depend de la decision, pas la decision elle-meme\n3. **Tester le framework** : teste ton contrat (la route enregistree, le payload produit), pas les mecaniques internes du framework — c'est le travail de leurs mainteneurs\n4. **Le mock n'a pas le droit d'asserter** : tester le composant reel; ne mocke que la partie lente ou externe, avec une structure qui reflete le reel en entier\n5. **Test-only code** : le code de nettoyage uniquement utilise pour les tests se range dans les utilitaires de test, jamais dans la classe de production (pas de destroy() pour tests)"
     },
     {
@@ -47,7 +47,7 @@
       "name": "Audit Qualite",
       "description": "Audit complet du projet : code quality, tests, structure, documentation, score global",
       "category": "developpement",
-      "enabled": false,
+      "enabled": true,
       "prompt": "## Audit Qualite\n1. **Code Quality** : lance Kill Coding + Code Review sur tous les fichiers source\n2. **Tests** : verifie le taux de reussite, l'existence de tests par source, la couverture\n3. **Structure** : verifie que toutes les routes sont importables, les outils enregistres, pas d'imports morts\n4. **Dependances** : verifie que tous les imports internes resolvent\n5. **Documentation** : verifie la presence de docstrings, README, CHANGELOG, licence\n6. **Score composite** : moyenne ponderee de tous les sous-scores (code 40%, tests 30%, structure 15%, docs 15%)"
     },
     {
