@@ -241,6 +241,24 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - **Serveur** : NON redémarré (Étape 7 respectée). Note pour l'utilisateur : relancer `launchers\JARVIS.bat` après ce commit pour recharger l'index vectorisé (907 docs, 0 pending).
 - **Statut** : ✅ **DONE** — Gate pytest verte (965 passed/0 failed), index Phase 2 vectorisé et préservé au run pytest, isolation `test_analytics` alignée sur L2j. Commit/push `main`.
 
+### MT-KB-L2m (extension cohérence) — Isoler aussi `test_analytics_stats_basic` (2026-08-17) ✅
+- **Contexte** : le premier passage L2m (commit `33747d7`) n'avait isolé que `test_analytics_no_queries` en laissant `class TestAnalyticsStats(unittest.TestCase)::test_analytics_stats_basic` couplé au vrai `memory/analytics.json`. Test passait par hasard (vérifie présence de clés uniquement, pas valeurs), mais restait fragilité latente (casserait si la structure de sortie changeait). Le lead a explicitement demandé l'isolation des deux (L2m Étape 2 : « Isoler aussi `test_analytics_stats_basic` de la même façon (cohérence) »).
+- **GREEN (extension)** (`tests/test_analytics.py`, 59 → 71 lignes) — refactor cohérent sur les 2 tests :
+  - `class TestAnalyticsStats(unittest.TestCase)` supprimée → `unittest` et `import unittest` retirés (inutilisés).
+  - Helper `_isolated_analytics(tmp_path, monkeypatch) -> AnalyticsService` factorisé (DRY) : `fake_path = tmp_path / "analytics.json"`, `fake_path.write_text("{}", encoding="utf-8")`, `monkeypatch.setattr(analytics_module, "ANALYTICS_PATH", str(fake_path))`, `return AnalyticsService()`. Le `{}` migre via `_migrate()` (`services/analytics.py:55-62`) vers `{"queries": [], "agents": {}, "models": {}}`.
+  - `test_analytics_stats_basic(tmp_path, monkeypatch) -> None` : signature pytest typée, `analytics = _isolated_analytics(...)`, assertions `assertIn/"total_conversations" not in stats` (5 clés présentes + 1 absente) — préserves l'intention originelle.
+  - `test_analytics_no_queries(tmp_path, monkeypatch) -> None` : refactored pour utiliser le helper `_isolated_analytics` (suppression de la duplication de setup).
+  - `if __name__ == "__main__":` → `sys.exit("Run via pytest...")` (fixtures requises, pareil que `test_vector_corrupted.py:69-72` en L2j).
+  - Imports ruff-triés (I001 fix appliqué) : `from __future__ import annotations` + stdlib (`os, sys, pathlib.Path`) + tierce (`pytest`) + locale (`services.analytics` + `AnalyticsService`).
+  - Module docstring documente les 2 tests historiques + référence L2j pattern.
+- **Vérifications** :
+  - `pytest tests/test_analytics.py -v` → **2 passed** avec `memory/analytics.json` pollué à **14 queries** (preuve d'isolation — l'ancienne version échouait à 6 queries).
+- **Gates** : `ruff check .` ✓ · `ruff format --check .` ✓ · `mypy` ✓ (148 source files) · `pytest -q` → **965 passed, 0 failed**, 1 warning préexistant (`coroutine '_shutdown_sequence' was never awaited` dans `test_warmup_shutdown.py:26`).
+- **Régression L2j (preuve pytest n'a pas détruit l'index)** : PRE_PYTEST `total=911 embedded=907 pending=4 size=15173389` → POST_PYTEST `total=911 embedded=907 pending=4 size=15173389` (**identique**). `memory/vector_index.json` survit au run pytest complet — isolation L2j tient.
+  - NB : `total=911 pending=4` reflète une activité dashboard entre les sessions (8 nouvelles queries → 4 nouveaux docs ingérés par serveur JARVIS live, embeddings `null`) — hors scope L2m/L2n (`memory/**` interdit de modification). Les preuves historiques de L2l (`907/907/0` au moment de son exécution) restent valides pour leur contexte.
+- **Périmètre respecté** : aucun `services/**`, `scripts/**`, `wiki/sources/**` modifié. Fichiers modifiés : `tests/test_analytics.py` (extension isolation), `BACKLOG.md` (cette entrée). Pas de ré-ingestion, pas de vectorisation (script `vectorize_pending_run.py` non ré-exécuté — `pending=4` laissé tel quel par serveur live).
+- **Statut** : ✅ **DONE** — 2/2 tests isolés (cohérence L2j), gate pytest verte (965/0), index intact. Prêt pour commit/push `main` (MT-KB-L2n).
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur
