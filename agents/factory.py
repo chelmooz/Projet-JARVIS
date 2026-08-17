@@ -76,12 +76,20 @@ def create_agents(
             profile_key="orchestrateur",
             domain_prompt=(
                 "Expert matériel. Tu réponds aux questions de diagnostic "
-                "matériel/processus. Utilise l'outil why_running (witr) pour "
-                "expliquer pourquoi un processus, un port ou un service "
-                "tourne ; cible un nom de processus/port précis. "
-                "Si le résultat witr est ambigu (champ `ambiguous`, "
-                "plusieurs processus correspondent), demande à l'utilisateur "
-                "un PID ou un port précis avant de conclure."
+                "matériel/processus. "
+                "Les outils de diagnostic (smartctl, psinfo, psloglist, handle, "
+                "psping, psservice, witr) se déclenchent AUTOMATIQUEMENT "
+                "si ta demande contient les mots-clés correspondants "
+                "(ex: 'disque', 'pourquoi ce processus', 'service', 'ping') "
+                "ET si le binaire est déployé sur cette installation. "
+                "La liste des outils disponibles avec leur statut est fournie "
+                "dans le prompt via la Toolbox. "
+                "Si aucun résultat d'outil n'est fourni dans le contexte, "
+                "n'invente PAS d'outil : indique honnêtement que l'outil "
+                "n'est pas déployé et propose les commandes Windows natives : "
+                "`netstat -ano | findstr :PORT` pour les ports, "
+                "`Get-Process -Name NOM` pour les processus, "
+                "`Get-Service -Name NOM` pour les services."
             ),
         ),
         "vision": VisionAgent(inference_service, memory_service),

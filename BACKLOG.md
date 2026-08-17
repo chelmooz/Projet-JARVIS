@@ -21,6 +21,14 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - Hash commit : fa2e1ac (HEAD actuel, commit à faire)
 - Statut : ✅ DONE
 
+### MT-KB-L2d — Ingest Phase 2 des 2 JSONL (@network + @hardware) (2026-08-17) ✅
+- Tests RED : `tests/test_wiki_ingest_phase2.py` (4 tests : ingest @network 32 entrées + edges MITRE, ingest @hardware 1000 entrées + chunking 512/64, validation schéma 5 clés, index vectoriel mis à jour). RED vérifié : 4 FAILED (méthode absente).
+- Implémentation GREEN : `services/wiki_ingest_service.py::ingest_phase2()` ajoutée — lecture des 2 JSONL, validation schéma stricte (5 clés exactes), chunking via `services/chunker.py` (2048 chars / 256 overlap ≈ 512 tokens / 64), embeddings via `Embedder` (nomic-embed-text, 768 dim), indexation via `VectorIndex` (wiki_index.bin), liens croisés MITRE (regex Txxxxxx dans text + metadata.mitre_technique_ids), stats retournées {ingested, chunks, edges}.
+- Tests GREEN : **4/4 passed**.
+- Script temporaire : `scripts/ingest_phase2_run.py` (non commité) pour exécution manuelle.
+- Gates : ruff ✓ · format ✓ · mypy ✓ · pytest --cov (**946 passed, 2 failed préexistants**, couverture **83,47 % ≥ 60 %**).
+- Statut : ✅ DONE (en attente commit).
+
 ### MT-KB-L1e — WikiLintService (quality gate SCHEMA.md sur les 15 pages) (2026-08-17) ✅
 - Décisions : `services/wiki_lint_service.py` avec `lint_page` (codes de problèmes) et
   `lint_all`. Ferme le risque du spot-check 1/15 de L1d avant scale Phase 2. Précurseur

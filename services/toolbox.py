@@ -136,16 +136,51 @@ class Toolbox:
         return os.path.join(path, "**/*") if path else "**/*"
 
     # ------------------------------------------------------------------
-    # Description des outils pour le prompt agent
+    # Sonde de capacités : présence réelle des binaires
+    # ------------------------------------------------------------------
+
+    def capability_report(self) -> dict[str, bool]:
+        """
+        Retourne la disponibilité de chaque outil diagnostique déclaré.
+
+        Consulte DiagnosticExtService.list_available() qui vérifie présence
+        binaire + SHA256. Clés = noms d'outils (smartctl, psinfo, witr, etc.),
+        valeurs = True si déployé et vérifié, False sinon.
+        """
+        available = set(self._diagnostic.list_available())
+        report = {}
+        for tool_name in _DIAGNOSTIC_TOOLS.keys():
+            report[tool_name] = tool_name in available
+        return report
+
+    # ------------------------------------------------------------------
+    # Description des outils pour le prompt agent (honorant le déploiement)
     # ------------------------------------------------------------------
 
     def describe_tools(self) -> str:
+        """
+        Liste les outils en annotant ceux non déployés.
+
+        Format : "  - key : description (non disponible sur cette installation)"
+        pour les outils diagnostiques absents. Les outils fichiers sont
+        listés normalement (pas de binaire externe).
+        """
         lines = ["Outils disponibles :"]
         show_files = self._file_system.list_authorized()
+        capability = self.capability_report()
+
         for entry in self._load_all_triggers():
             tool = entry.get("tool")
-            if tool in _DIAGNOSTIC_TOOLS or (show_files and tool in _FILE_TOOLS):
-                lines.append(f"  - {entry.get('key')} : {entry.get('description')}")
+            key = entry.get("key", "")
+            desc = entry.get("description", "")
+
+            if tool in _DIAGNOSTIC_TOOLS:
+                if capability.get(tool, False):
+                    lines.append(f"  - {key} : {desc}")
+                else:
+                    lines.append(f"  - {key} : {desc} (non disponible sur cette installation)")
+            elif show_files and tool in _FILE_TOOLS:
+                lines.append(f"  - {key} : {desc}")
         return "\n".join(lines)
 
     # ------------------------------------------------------------------

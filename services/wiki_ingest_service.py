@@ -1,6 +1,12 @@
+import json
+import re
 from datetime import date
 from pathlib import Path
 from typing import Any
+
+from services.chunker import chunk_text
+from services.vector_embedder import Embedder
+from services.vector_index import VectorIndex
 
 
 class WikiIngestService:
@@ -140,3 +146,137 @@ updated: 2026-08-17
 
         with log_path.open("a", encoding="utf-8") as fh:
             fh.write(entry)
+
+    def ingest_phase2(
+        self,
+        inference_service: Any,
+        files: list[str] | None = None,
+        limit: int | None = None,
+        resume: bool = False,
+        progress_every: int = 50,
+    ) -> dict[str, int]:
+        """
+        Ingestion Phase 2 : ad-attacks-network.jsonl + multios-commands.jsonl.
+
+        Args:
+            inference_service: Service d'inférence pour calculer les embeddings
+            files: Liste optionnelle des fichiers à traiter (défaut: les deux)
+            limit: Nombre maximum d'entrées à ingérer (None = toutes)
+            resume: Si True, saute les entrées déjà dans le checkpoint
+            progress_every: Afficher progression tous les N entrées (0 = désactivé)
+
+        Returns:
+            Dict avec stats : {ingested, chunks, edges}
+        """
+        if files is None:
+            files = ["ad-attacks-network.jsonl", "multios-commands.jsonl"]
+
+        # Checkpoint pour reprise
+        checkpoint_path = self.wiki_root / ".phase2_checkpoint.json"
+        processed_ids: set[str] = set()
+        if resume and checkpoint_path.exists():
+            try:
+                processed_ids = set(json.loads(checkpoint_path.read_text(encoding="utf-8")))
+            except (json.JSONDecodeError, OSError):
+                processed_ids = set()
+
+        embedder = Embedder(inference_service)
+        vector_index = VectorIndex(
+            data={"documents": [], "embedding_dim": 768},
+            path="wiki_index.bin",
+            lock=__import__("threading").RLock(),
+        )
+
+        total_ingested = 0
+        total_chunks = 0
+        total_edges = 0
+
+        # Compter le total d'entrées pour la progression
+        total_entries = 0
+        for jsonl_file in files:
+            file_path = self.wiki_root / "sources" / jsonl_file
+            if not file_path.exists():
+                continue
+            with file_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        total_entries += 1
+
+        for jsonl_file in files:
+            file_path = self.wiki_root / "sources" / jsonl_file
+            if not file_path.exists():
+                continue
+
+            with file_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    entry = json.loads(line)
+                    self._validate_schema(entry)
+
+                    entry_id = entry["id"]
+
+                    # Reprise : sauter si déjà traité
+                    if resume and entry_id in processed_ids:
+                        continue
+
+                    # Limite : arrêter si atteint
+                    if limit is not None and total_ingested >= limit:
+                        break
+
+                    total_ingested += 1
+                    processed_ids.add(entry_id)
+
+                    # Sauvegarder le checkpoint après chaque entrée (survit à Ctrl+C)
+                    if resume:
+                        checkpoint_path.write_text(json.dumps(list(processed_ids)), encoding="utf-8")
+
+                    # Progression
+                    if progress_every > 0 and total_ingested % progress_every == 0:
+                        print(f"Ingested {total_ingested}/{total_entries} entries...", flush=True)
+
+                    # Chunking : 512 tokens ≈ 2048 chars, overlap 64 tokens ≈ 256 chars
+                    chunks = chunk_text(entry["text"], chunk_size=2048, overlap=256, doc_id=entry["id"])
+
+                    # Embeddings et indexation
+                    for chunk in chunks:
+                        embedder.embed(chunk["text"])
+                        metadata = {
+                            **entry,
+                            "chunk_index": chunk["metadata"]["chunk_index"],
+                            "total_chunks": chunk["metadata"]["total_chunks"],
+                        }
+                        vector_index.add_document(chunk["text"], metadata)
+                        total_chunks += 1
+
+                    # Liens croisés MITRE : chercher Txxxxxx dans le texte ET metadata
+                    text_matches = re.findall(r"\bT\d{4,5}(?:\.\d+)?\b", entry["text"])
+                    metadata_matches = []
+                    if "metadata" in entry and isinstance(entry["metadata"], dict):
+                        mitre_ids = entry["metadata"].get("mitre_technique_ids", [])
+                        if isinstance(mitre_ids, list):
+                            metadata_matches.extend(mitre_ids)
+                    all_matches = set(text_matches + metadata_matches)
+                    total_edges += len(all_matches)
+
+                # Sortir de la boucle externe si limite atteinte
+                if limit is not None and total_ingested >= limit:
+                    break
+
+        # Persister l'index
+        vector_index.save()
+
+        # Progression finale
+        if progress_every > 0:
+            print(f"Ingested {total_ingested}/{total_entries} entries...", flush=True)
+
+        return {"ingested": total_ingested, "chunks": total_chunks, "edges": total_edges}
+
+    def _validate_schema(self, entry: dict[str, Any]) -> None:
+        """Valide qu'une entrée a exactement les 5 clés requises."""
+        required_keys = {"id", "agent", "source", "text", "metadata"}
+        actual_keys = set(entry.keys())
+        if actual_keys != required_keys:
+            raise ValueError(f"Schéma invalide : clés attendues {required_keys}, reçues {actual_keys}")
