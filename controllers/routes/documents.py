@@ -162,11 +162,15 @@ def search_documents(
     q: str = "",
     limit: int = 20,
     offset: int = 0,
+    agent: str = "",
     context: AppContext = Depends(get_app_context),
 ) -> Any:
     """Recherche sémantique dans le store vectoriel avec pagination et cache.
 
     Laisse sync : recherche vectorielle CPU-bound (bloquerait la boucle d'événements en async).
+
+    ``agent`` : filtre optionnel sur ``metadata.agent`` (ex: "@cyber").
+    La forme sans '@' (ex: "cyber") est normalisée automatiquement.
     """
     assert context.vector is not None
     if not q.strip():
@@ -174,9 +178,10 @@ def search_documents(
     # Bornes de pagination : limite plafonnée à 100, offset et limite >= 0.
     limit = min(max(int(limit), 0), SEARCH_MAX_LIMIT)
     offset = max(int(offset), 0)
+    agent_filter = f"@{agent.strip().lstrip('@')}" if agent.strip() else None
     # Recherche une seule fois avec top_k fixe (SEARCH_MAX_LIMIT) pour tirer parti du cache vectoriel.
     # La clé de cache dépend de (query, top_k) — utiliser top_k constant évite les re-recherches par page.
-    results = context.vector.search(q, top_k=SEARCH_MAX_LIMIT)
+    results = context.vector.search(q, top_k=SEARCH_MAX_LIMIT, agent=agent_filter)
     total = len(results)
     page = results[offset : offset + limit]
     # Scrub PII sur les textes renvoyés (emails, IPs, credentials) — jamais en clair.

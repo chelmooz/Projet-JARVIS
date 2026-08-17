@@ -29,6 +29,24 @@ TRUNCATE_CONV_ID = 64
 router = APIRouter()
 
 
+def _attach_chunk_ids(result: dict[str, Any]) -> dict[str, Any]:
+    """Expose les ``chunk_ids`` des chunks retrievés dans la réponse chat (ADR-008).
+
+    Extrait ``metadata.chunk_id`` de ``context.similar_cases`` : le frontend
+    peut ainsi rétropropager le feedback 👍/👎 sur les bons chunks.
+    """
+    cases = result.get("context", {}).get("similar_cases", [])
+    chunk_ids: list[str] = []
+    for case in cases if isinstance(cases, list) else []:
+        if not isinstance(case, dict):
+            continue
+        chunk_id = case.get("metadata", {}).get("chunk_id")
+        if chunk_id:
+            chunk_ids.append(chunk_id)
+    result["chunk_ids"] = chunk_ids
+    return result
+
+
 def _save_conv(
     conv_id: str | None,
     task: str,
@@ -163,6 +181,7 @@ async def _run_and_record(
 ) -> dict[str, Any]:
     """Exécute l'orchestrateur (chemin non-streamé) puis journalise métriques + conversation."""
     result = await orchestrator.handle_request(task, image, conv_id)
+    result = _attach_chunk_ids(result)
 
     agent_key = result.get("agent", "unknown")
     model_name = result.get("model", "auto")
@@ -250,6 +269,7 @@ async def _handle_request_streamed(
         result: dict[str, Any] | None = None
         try:
             result = await orchestrator.handle_request(task, image, conv_id)
+            result = _attach_chunk_ids(result)
             agent_key = result.get("agent", "unknown")
             model_name = result.get("model", "auto")
             await asyncio.to_thread(

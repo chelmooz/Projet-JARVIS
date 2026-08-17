@@ -6,6 +6,39 @@ Journal des micro-tâches + décisions. Mis à jour après chaque micro-tâche.
 Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 (`ROADMAP_CONSOLE.md` supprimé au commit `c987e6e`, contenu absorbé ici).
 
+### MT-KB-L2w — Alignement README + diag retrieval (30,9/100) (2026-08-17) ✅
+- **Fix README** (`README.md:148-158`) : modèles nominaux remplacés par les GGUF réels
+  (source de vérité `services/selector.py:136-141`) :
+  - @cyber → `hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M`
+  - @dev → `hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M`
+  - @network → `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` (pas de Q4_K_M publié, cf. `docs/USAGE.md:217`)
+  - @hardware → `hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M`
+  - @vision → `rapidocr` (inchangé) + note « Modèles quantifiés GGUF (4-bit) pour déploiement local portable via Ollama/HF »
+- **Diag retrieval** :
+  - `services/vector_search.py:44-78` : `rank_matrix(top_k=5)` — similarité **cosine** (L2-normalisé, l.65), pas de dot product.
+  - `services/vector.py:463-530` : `search(top_k=5)` — recherche bornée 3 tentatives (`max(top_k*5,50)`, ×2, non bornée). **Aucun `sim_threshold`** sur le chemin de recherche (seuil réservé à `dedup()`, `vector_weighting.py:59,87`). **Aucun filtrage par `metadata.agent`** (ni dans `VectorService.search` ni dans `/api/search`, `documents.py:160-195` — params `top_k`/`agent` du curl ignorés silencieusement).
+  - `services/vector_weighting.py:117-135` : `score_and_rank` = cosine × weight × recency, tri décroissant, troncature top_k — pas de seuil.
+  - Index (`memory/vector_index.json`) : 4028 docs, 4017 embeddés. Répartition agents : `@hardware` 884, `hardware` 1000, `dev` 1108, `cyber` 998, `@network` **20**, `None` 7 → **incohérence de préfixe @ + @network quasi vide (20 docs)**.
+- **Tests API** (curl bruts, serveur UP) :
+  - `q=kill 97223` : chunk exact « Kill the process with PID 97223 → kill 97223 » **retourné en #1**, score **0.6896** (→ OUI, pertinent, mais < 0.7 sur match exact).
+  - `q=AS 7046 links` : **aucun chunk @network pertinent** — top @hardware 0.3091 / MITRE cyber 0.256 (→ NON).
+- **Hypothèse racine** : (a)+(b) — seuil inexistant + embeddings nomic-embed-text v2 moe faibles sur les commandes terminal courtes (exact match @hardware plafonné à 0.69 ; requête @network noyée par 4000+ docs hors agent) ; (c) prompt injection correcte côté chat (`pipeline_steps.py:123-126` : contexte intégré au prompt), mais `top_k=3` sans filtrage agent.
+- **Proposition MT-KB-L2x** : (1) normaliser `metadata.agent` (`@hardware`→`hardware` ou vice-versa) + ré-ingérer `@network` (20 docs vs 884 @hardware) ; (2) filtrage agent ciblé dans `VectorService.search(agent=...)` + route `/api/search` (paramètre `agent`) ; (3) seuil bas explicite (ex. 0.5) pour éviter les chunks non pertinents, pas 0.7 ; (4) prompt chat avec `top_k=5` + liste explicite `chunk_ids` (boucle ADR-008).
+- Statut : ✅ DONE (lecture seule + README, aucun commit).
+
+### MT-KB-L2x — Correction retrieval (filtrage agent, seuil 0.5, normalisation @, chunk_ids chat) ✅
+- **Fix retrieval** (TDD strict, RED 6 FAILED → GREEN, 10 nouveaux tests) :
+  - `services/vector_search.py:44-98` : `rank_matrix` + `cosine_search` acceptent `sim_threshold=0.5` (filtrage `similarities >= seuil` avant le Top-K, anti-hallucination).
+  - `services/vector.py:463-560` : `search(query, top_k, agent=None, sim_threshold=0.5)` — filtrage `metadata.agent == agent` (matrice + docs alignés) avant scoring ; cache LRU contourné si `agent` fourni ou seuil non défaut (clé `(query, top_k)` non agent-aware).
+  - `services/wiki_ingest_service.py:91-95` : `_normalize_agent` robuste (`" @hardware "` → `"@hardware"`), appliquée aux metadata de `ingest_phase2` (runtime + legacy, `:253-276`) — avant : agent brut non normalisé dans les metadata. Ajout `chunk_id = "<id>:<chunk_index>"` par chunk (ADR-008).
+  - `controllers/routes/documents.py:160-181` : paramètre `agent` sur `/api/search` (forme "cyber" → "@cyber" normalisée).
+  - `controllers/routes/jarvis.py:32-39,187,280` : `_attach_chunk_ids` — la réponse chat (JSON + événement SSE `done`) inclut `chunk_ids` extraits de `context.similar_cases[].metadata.chunk_id`.
+  - `tests/conftest.py:109-122` : `FakeVector.search` aligné sur le port (params `agent`/`sim_threshold`) — 2 régressions API (TypeError) corrigées.
+- **Tests** : `tests/test_vector_agent_filter.py` (filtrage agent réel VectorService, seuil 0.5 défaut, param explicite cosine_search), `tests/test_wiki_ingest_agent_normalization.py` ("cyber"→"@cyber", "@dev" conservé, " @hardware "→"@hardware", chunk_id), `tests/test_jarvis_chunk_ids.py` (helper + route). 1 test de caractérisation mis à jour (L2w : "loin" [0,1] cos 0.1 désormais exclu par le seuil — contrat nouveau).
+- **Gates** : `ruff check` ✓ · `ruff format --check` ✓ · `mypy` → **Success: no issues found in 149 source files** ✓ · `pytest -q` → **997 passed, 4 failed** — les 4 échecs sont **pré-existants** (baseline `git stash` identique : `test_rag_loop_e2e.py` ×3 dont `real_ollama` sans serveur, `test_chat_feedback_loop.py` ×1 — fichiers non suivis, hors scope).
+- **Avocat du diable** : (1) seuil 0.5 — aucun test existant pertinent perdu (seul un doc cosinus 0.1, non pertinent, filtré) ; (2) normalisation `@` — sans effet sur l'index existant (appliquée aux futurs ingests ; migration metadata = script hors scope, signalée) ; (3) `@network` quasi vide (20 docs) : non traité ici (ré-ingestion interdite sans script — voir MT-KB-L2d/L2h).
+- Statut : ✅ DONE (pas de commit).
+
 ### MT-KB-L2c — Diagnostic console + commit JSONL v2 (2026-08-17) ✅
 - Diagnostic console (lecture seule : toolbox.py, console-client.js, console-tab.js, JARVIS.bat/sh) :
   1. Console = interface web vers /api/jarvis (@agent tâche), ZÉRO exécution shell locale.

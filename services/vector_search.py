@@ -46,11 +46,15 @@ def rank_matrix(
     valid_docs: list[dict[str, Any]],
     matrix: np.ndarray | None,
     top_k: int = 5,
+    sim_threshold: float = 0.5,
 ) -> list[dict[str, Any]]:
     """Classe les documents par cosinus contre la matrice déjà normalisée.
 
     Utilise le calcul matriciel vectorisé (C-level BLAS) et ``np.argpartition``
     O(N) pour le Top-K, puis un tri sur le petit sous-ensemble.
+
+    ``sim_threshold`` : les documents dont la similarité est strictement sous
+    ce seuil sont exclus avant le classement (anti-hallucination RAG).
     """
     if top_k <= 0 or matrix is None or matrix.shape[0] == 0:
         return []
@@ -64,22 +68,31 @@ def rank_matrix(
         return []
     similarities = (matrix @ query_vec) / query_norm
 
-    k = min(top_k, matrix.shape[0])
-    top_indices = np.argpartition(-similarities, k - 1)[:k]
-    top_indices = top_indices[np.argsort(-similarities[top_indices])]
+    keep = similarities >= sim_threshold
+    if not keep.any():
+        return []
+    filtered_docs = [doc for doc, ok in zip(valid_docs, keep) if ok]
+    filtered_sim = similarities[keep]
+
+    k = min(top_k, filtered_sim.size)
+    top_indices = np.argpartition(-filtered_sim, k - 1)[:k]
+    top_indices = top_indices[np.argsort(-filtered_sim[top_indices])]
 
     return [
         {
-            "text": valid_docs[i]["text"],
-            "metadata": valid_docs[i].get("metadata", {}),
-            "score": float(round(float(similarities[i]), 4)),
+            "text": filtered_docs[i]["text"],
+            "metadata": filtered_docs[i].get("metadata", {}),
+            "score": float(round(float(filtered_sim[i]), 4)),
         }
         for i in top_indices
     ]
 
 
 def cosine_search(
-    query_vector: list[float] | np.ndarray, documents: list[dict[str, Any]], top_k: int = 5
+    query_vector: list[float] | np.ndarray,
+    documents: list[dict[str, Any]],
+    top_k: int = 5,
+    sim_threshold: float = 0.5,
 ) -> list[dict[str, Any]]:
     """Retourne les top_k documents les plus similaires à la requête.
 
@@ -94,7 +107,7 @@ def cosine_search(
         return []
 
     valid_docs, matrix = build_normalized_matrix(documents, len(query_vec))
-    return rank_matrix(query_vec, valid_docs, matrix, top_k)
+    return rank_matrix(query_vec, valid_docs, matrix, top_k, sim_threshold)
 
 
 __all__ = ["build_normalized_matrix", "rank_matrix", "cosine_search"]

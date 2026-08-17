@@ -460,21 +460,36 @@ class VectorService(VectorPort):
         self._matrix_cache.set((valid_docs, matrix))
         return self._matrix_cache.get()  # type: ignore[return-value]  # garanti par set() ci-dessus
 
-    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        agent: str | None = None,
+        sim_threshold: float = 0.5,
+    ) -> list[dict[str, Any]]:
         """Recherche sémantique avec cache et scoring pondéré.
 
         Utilise une recherche bornée avec relance plafonnée (max 3 tentatives) :
         1. Tentative 1 : borne min(len(docs), max(top_k*5, 50))
         2. Si résultats filtrés < top_k : tentative 2, borne ×2
         3. Si toujours < top_k : tentative finale non bornée + warning
+
+        Args:
+            agent: Restreint aux documents dont ``metadata.agent`` vaut
+                exactement cette valeur (ex: "@cyber"). ``None`` = tous.
+            sim_threshold: Seuil de similarité cosinus appliqué par
+                ``rank_matrix`` : les résultats sous le seuil sont exclus.
         """
         if not query or not self._data.get("documents"):
             return []
 
+        # Le cache n'est fiable que pour la recherche non filtrée (clé query+top_k)
+        cacheable = agent is None and sim_threshold == 0.5
         now = self._now()
-        cached = self._cache.get(query, top_k, now)
-        if cached is not None:
-            return cached
+        if cacheable:
+            cached = self._cache.get(query, top_k, now)
+            if cached is not None:
+                return cached
 
         # Calcul de l'embedding de la requête
         try:
@@ -483,14 +498,31 @@ class VectorService(VectorPort):
             _logger.error("Échec calcul embedding requête : %s", e)
             return []
 
-        return self._run_bounded_search(query, query_vec, top_k, now)
+        return self._run_bounded_search(
+            query, query_vec, top_k, now, agent=agent, sim_threshold=sim_threshold, cacheable=cacheable
+        )
 
-    def _run_bounded_search(self, query: str, query_vec: np.ndarray, top_k: int, now: float) -> list[dict[str, Any]]:
+    def _run_bounded_search(
+        self,
+        query: str,
+        query_vec: np.ndarray,
+        top_k: int,
+        now: float,
+        agent: str | None = None,
+        sim_threshold: float = 0.5,
+        cacheable: bool = True,
+    ) -> list[dict[str, Any]]:
         """Exécute la boucle de recherche bornée avec relance plafonnée (max 3 tentatives)."""
         with self._lock:
             docs = self._data["documents"]
             max_docs = len(docs)
             valid_docs, matrix = self._get_matrix(len(query_vec))
+
+            # Filtrage par agent avant scoring (matrice et documents alignés)
+            if agent is not None and matrix is not None:
+                keep = [doc.get("metadata", {}).get("agent") == agent for doc in valid_docs]
+                valid_docs = [doc for doc, ok in zip(valid_docs, keep) if ok]
+                matrix = matrix[keep]
 
             # Borne initiale : min(len(docs), max(top_k*5, 50))
             bound = min(max_docs, max(top_k * 5, 50))
@@ -502,7 +534,7 @@ class VectorService(VectorPort):
             while attempts < max_attempts:
                 attempts += 1
 
-                all_results = rank_matrix(query_vec, valid_docs, matrix, top_k=bound)
+                all_results = rank_matrix(query_vec, valid_docs, matrix, top_k=bound, sim_threshold=sim_threshold)
 
                 # Filtrage aval : scoring et ranking (pondération + troncature top_k)
                 results = WeightConsolidator(docs).score_and_rank(all_results, top_k, now)
@@ -525,8 +557,9 @@ class VectorService(VectorPort):
                         len(results),
                     )
 
-        # Mise en cache
-        self._cache.put(query, top_k, results, now)
+        # Mise en cache (uniquement pour les recherches non filtrées)
+        if cacheable:
+            self._cache.put(query, top_k, results, now)
         return results
 
     # ==============================================================================

@@ -89,10 +89,11 @@ updated: 2026-08-17
         return str(entry["id"])
 
     def _normalize_agent(self, agent: str) -> str:
-        """Normalise l'agent avec le préfixe '@' (convention SCHEMA.md)."""
-        if agent.startswith("@"):
-            return agent
-        return f"@{agent}"
+        """Normalise l'agent avec un préfixe '@' unique (convention SCHEMA.md).
+
+        Gère les espaces et les '@' redondants : ``" @hardware "`` -> ``"@hardware"``.
+        """
+        return f"@{agent.strip().lstrip('@')}"
 
     def ingest_entry_to_file(self, entry: dict[str, Any]) -> Path:
         """
@@ -255,6 +256,8 @@ updated: 2026-08-17
                         for chunk in chunks:
                             metadata = {
                                 **entry,
+                                "agent": self._normalize_agent(str(entry["agent"])),
+                                "chunk_id": f"{entry_id}:{chunk['metadata']['chunk_index']}",
                                 "chunk_index": chunk["metadata"]["chunk_index"],
                                 "total_chunks": chunk["metadata"]["total_chunks"],
                             }
@@ -266,6 +269,8 @@ updated: 2026-08-17
                             embedder.embed(chunk["text"])
                             metadata = {
                                 **entry,
+                                "agent": self._normalize_agent(str(entry["agent"])),
+                                "chunk_id": f"{entry_id}:{chunk['metadata']['chunk_index']}",
                                 "chunk_index": chunk["metadata"]["chunk_index"],
                                 "total_chunks": chunk["metadata"]["total_chunks"],
                             }
