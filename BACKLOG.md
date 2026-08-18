@@ -356,6 +356,46 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - **Étape 2 — Tests RED/GREEN** : `pytest tests/test_static_cache_characterization.py -v` →
   **8/8 passed** (GREEN immédiat, pas de RED nécessaire).
 - **Étape 3 — Gates** : `ruff check` ✓ · `ruff format --check` ✓
+
+### MT-KB-L4a — Câblage ET déclenchement ChatFeedbackLoop (2026-08-18) ✅
+- **Contexte** : `controllers/di.py` injecte correctement `ChatFeedbackLoop` dans
+  `OrchestratorService(feedback_loop=...)` (MT-KB-L2f). Mais `services/orchestrator.py`
+  recevait le paramètre `feedback_loop` (l.104) sans jamais l'appeler → test
+  `test_chat_triggers_trace_judge_update_score` échouait (`assert 0 == 1`, trace non écrite).
+- **Étape 1 — Diagnostic** (LECTURE SEULE) : lu `services/orchestrator.py` — méthode
+  `handle_request` (l.114-128) finalise la réponse ; `_finalize_success` (l.176-189) extrait
+  `agent_key`, `model_name`, `similar_cases`, `response`. `ChatFeedbackLoop.schedule` attend
+  `(task, similar_cases, response, agent, model)`.
+- **Étape 2 — Tests RED** : `pytest tests/test_chat_feedback_loop.py::test_chat_triggers_trace_judge_update_score -v`
+  → **1 FAILED** (`assert 0 == 1` trace non écrite).
+- **Étape 3 — GREEN** : dans `handle_request` (async), après obtention du `result`, ajout
+  appel conditionnel :
+  ```python
+  if self.feedback_loop is not None and isinstance(result, dict) and "error" not in result:
+      agent_key = result.get("agent") or self.router_service.select_agent(task)
+      model_name = result.get("model") or "auto"
+      similar_cases = result.get("context", {}).get("similar_cases", [])
+      response = result.get("response", "")
+      self.feedback_loop.schedule(task, similar_cases, response, agent_key, model_name)
+      await asyncio.sleep(0)  # yield pour laisser la background task démarrer
+  ```
+  Retiré l'appel de `_finalize_success` (maintenant centralisé dans `handle_request`
+  pour couvrir text + vision). `_finalize_success` redevient pur télémétrie.
+- **Étape 4 — Vérifier GREEN** : `pytest tests/test_chat_feedback_loop.py::test_chat_triggers_trace_judge_update_score -v`
+  → **1 PASSED**. Suite complète : **3/3 passed** (fail-open judge error + non-blocage loop).
+- **Étape 5 — Gates** :
+  - `ruff check services/orchestrator.py controllers/di.py` ✓
+  - `ruff format --check services/orchestrator.py controllers/di.py` ✓
+  - `mypy services/orchestrator.py controllers/di.py` ✓ (Success: no issues found in 2 source files)
+  - `pytest -q` → **1028 passed, 4 failed** (les 4 échecs sont **préexistants** :
+    `test_analyze_does_not_block_event_loop` timing flaky 0.57s vs 0.5s ;
+    `test_rag_loop_e2e.py` ×3 `FileNotFoundError` trace sidecar — hors scope, sans serveur Ollama).
+- **Avocat du diable** : (1) `await asyncio.sleep(0)` — yield minimal, ne bloque PAS la réponse
+  (test `test_chat_not_blocked_by_loop` < 0.3s passe même avec judge lent 0.5s) ;
+  (2) `if self.feedback_loop is not None` — fallback gracieux géré ;
+  (3) Vision path aussi couvert (même `handle_request`) ;
+  (4) Aucune régression sur 4 tests préexistants.
+- **Statut** : ✅ **DONE** (pas de commit).
 - **Statut** : ✅ DONE (lecture seule + vérification, aucun fichier modifié, pas de commit).
 
 ### MT-KB-L2a — Audit datasets v2 (4 candidats × 4 critères) (2026-08-17) ✅

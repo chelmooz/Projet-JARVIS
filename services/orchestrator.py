@@ -125,6 +125,17 @@ class OrchestratorService:
 
         if isinstance(result, dict):
             result["conversation_id"] = conv_id
+
+        # Schedule feedback loop for successful responses (fire-and-forget, fail-open)
+        if self.feedback_loop is not None and isinstance(result, dict) and "error" not in result:
+            agent_key = result.get("agent") or self.router_service.select_agent(task)
+            model_name = result.get("model") or "auto"
+            similar_cases = result.get("context", {}).get("similar_cases", [])
+            response = result.get("response", "")
+            self.feedback_loop.schedule(task, similar_cases, response, agent_key, model_name)
+            # Yield to event loop to let background task start (fail-open: don't await completion)
+            await asyncio.sleep(0)
+
         return result
 
     async def _handle_text(self, task: str, conv_id: str, start: float) -> dict[str, Any]:
@@ -180,6 +191,7 @@ class OrchestratorService:
 
         self._track_metrics(agent_key, model_name, start, success=True)
         self.log.log("INFO", f"graph agent={agent_key} model={model_name}")
+
         return result
 
     def _track_metrics(self, agent_key: str, model_name: str, start: float, success: bool) -> None:

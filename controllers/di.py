@@ -15,9 +15,10 @@ from typing import Any
 from agents.base import BaseAgent
 from agents.factory import create_agents
 from agents.supervisor import AgentSupervisor
-from config.paths import CONFIG_DIR
+from config.paths import CONFIG_DIR, MEMORY_DIR
 from graph.agent_graph import AgentGraph
 from services.analytics import AnalyticsService
+from services.chat_feedback_loop import ChatFeedbackLoop
 from services.conversation import ConversationService
 from services.file_system import FileSystemService
 from services.inference import InferenceService
@@ -30,6 +31,7 @@ from services.rag_judge import LlmResponseJudge
 from services.router import AgentRouter
 from services.selector import select_model, select_vision_model
 from services.toolbox import Toolbox
+from services.trace_sidecar import JsonlTraceStore
 from services.vector import VectorService
 
 _logger = logging.getLogger("jarvis.di")
@@ -116,7 +118,15 @@ class AppContext:
             judge=judge,
         )
 
-        # 5. Orchestrateur (Composition Root finale)
+        # 7.5 ChatFeedbackLoop (ADR-008) — instancié avant l'orchestrateur
+        trace_store = JsonlTraceStore(MEMORY_DIR)
+        self.chat_feedback_loop = ChatFeedbackLoop(
+            judge=judge,
+            trace_store=trace_store,
+            vector_service=self.vector,
+        )
+
+        # 8. Orchestrateur (Composition Root finale)
         self.orchestrator = OrchestratorService(
             inference=self.inference,
             memory=self.memory,
@@ -130,6 +140,7 @@ class AppContext:
             toolbox=self.toolbox,
             agent_graph_factory=self._build_agent_graph,
             vision_model_selector=select_vision_model,
+            feedback_loop=self.chat_feedback_loop,
         )
 
         _logger.info("Tous les services initialisés.")
