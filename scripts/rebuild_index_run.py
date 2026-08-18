@@ -36,6 +36,9 @@ SOURCE_MAP: dict[str, str] = {
     "mitre-attack": "mitre-attack-v19.1",
     "multios-commands": "Eng-Elias/multios-terminal-commands",
     "network-topology": "snap-as-skitter",
+    "psdocs": "powershell-docs",
+    "setuptools": "setuptools",
+    "tldr": "tldr-pages",
 }
 
 
@@ -157,17 +160,17 @@ def main() -> int:
 
     # Vectorisation
     print("=== Vectorisation des documents en attente ===")
-    stats_before = vs.stats()
+    stats_before = vector_store.stats()
     _print_stats("AVANT vectorisation", stats_before)
 
     if stats_before["pending"] > 0:
-        count = vs.vectorize_pending()
-        stats_after = vs.stats()
+        count = vector_store.vectorize_pending()
+        stats_after = vector_store.stats()
         _print_stats("APRÈS vectorisation", stats_after)
         print(f"Vectorisés: {count} documents")
     else:
         print("Rien à vectoriser (pending=0).")
-        stats_after = vs.stats()
+        stats_after = vector_store.stats()
         _print_stats("APRÈS", stats_after)
 
     # Smoke test rapide
