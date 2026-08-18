@@ -2172,3 +2172,20 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - **Résultats (12 questions)** : 4 NO RETRIEVAL (Q1/3/7/10, GAP pur setuptools non ingesté) ; 7 échouent au filtre agent (bug prefix @dev/@cyber/@designer → 0) ; seulement Q4 (taskset, 0,6025 via @hardware) et Q11 (chmod, 0,6480 via @hardware) récupèrent un chunk pertinent — mais taggés @hardware alors que la MT route Q11 vers @cyber (mauvais routage). Q2/5/6/8/9 retrieval faible/off-topic (codesearchnet/mitre). Aucun timeout, aucun crash.
 - **Diagnostic** : GAP DATASET (ingérer `setuptools`/`tldr`/`psdocs`) + BUG RETRIEVAL (normaliser `metadata.agent` sur l'index existant + corriger routage agent PowerShell/chmod). Agent `@designer` totalement absent.
 - **Statut** : ⚠️ DONE (lecture seule, aucun commit) — livrables = `test_rag_relevance.py` + ce rapport.
+
+### MT-KB-L11 — Pont Prof IA (H:\chunks_rag) → JSONL JARVIS (2026-08-18) ✅
+- **Script** : `scripts/bridge_profia_jarvis.py` + `tests/test_bridge_profia_jarvis.py` (24 tests, TDD strict).
+- **Transformation** : 5616 JSON Prof IA → JSONL par agent dans `wiki/sources/` avec `metadata.agent` préfixé `@`.
+- **Règles mapping** :
+  - AIS → @cyber
+  - DevOps → @dev
+  - TSSR → @hardware (sauf mots-clés réseau vlan/bgp/ospf/routage/switch/tcp/ip/vpn/wifi → @network ; filename support/helpdesk/ticket → @designer)
+  - Transverse → @orchestrateur
+- **Filtres** : chunk >= 80 caractères ; dédup MD5 normalisé (casse + espaces).
+- **Sortie** : 1 JSONL par agent, lignes `{"text":..., "metadata":{"agent","topic","source","difficulty","has_code"}}`.
+- **Test échantillon** (`--limit 5` sur H:\chunks_rag) :
+  - 5 fichiers traités → 110 chunks total
+  - Répartition : @hardware 67, @network 29, @orchestrateur 14
+  - Exemple @hardware : 3 lignes affichées (JSON valide, métadonnées complètes)
+- **Gates** : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest (24/24 passed) ✓
+- **Statut** : ✅ DONE (pas de commit).
