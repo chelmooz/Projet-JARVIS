@@ -655,6 +655,145 @@ cd static && npm install && npx vitest run
 
 ---
 
+## 📚 Knowledge Base — Wiki JARVIS (Sources, Architecture, Obsidian Portable)
+
+Cette section documente la **Knowledge Base** qui alimente le RAG de JARVIS : d'où viennent les données, comment elles sont structurées, et comment visualiser/maintenir le wiki `wiki/` avec Obsidian sur clé USB.
+
+### 🔗 Datasets par agent (Sources curatées)
+
+Tous les datasets sont **ouverts**, sous-ensembles audités (≤ 1000 entrées/source), convertis en JSONL dans `wiki/sources/` puis vectorisés localement via Ollama portable (port 11436, modèle `nomic-embed-text-v2-moe-GGUF:Q4_K_M`, 768 dim).
+
+| Agent | Dataset | Source | Licence |
+|-------|---------|--------|---------|
+| `@cyber` | **MITRE ATT&CK Enterprise v19.1** (STIX 2.1) | `mitre-attack/attack-stix-data` — `enterprise-attack-19.1.json` | MITRE Terms of Use |
+| | Software Vulnerabilities | `darkknight25/software_vulnerabilities_dataset` (HF) | Apache-2.0 / MIT / CC-BY-4.0 |
+| | NIST Cybersecurity Training | `ethanlivertroy/nist-cybersecurity-training` (HF) | Apache-2.0 |
+| `@dev` | **CodeSearchNet Python** | `Nan-Do/instructional_code-search-net-python` (HF) | Hétérogène (par repo GitHub) |
+| | **PowerShell-Docs** (cmdlets 7.4) | `MicrosoftDocs/PowerShell-Docs` (clone shallow) | CC-BY-4.0 |
+| | **pkg_resources** (setuptools v81) | `pypa/setuptools` — tag `v81.0.0` | MIT |
+| `@network` | **SNAP AS-Skitter** (graphe d'AS Stanford) | `snap.stanford.edu/data/as-skitter.html` | Libre |
+| | AD Attacks (filtré réseau pur) | `AYI-NEDJIMI/ad-attacks-en` (HF) | Apache-2.0 |
+| | Linux Terminal Commands | `darkknight25/Linux_Terminal_Commands_Dataset` (HF) | Apache-2.0 |
+| `@hardware` | **UCI Grid Stability** | DOI `10.24432/C5PG66` (Arzamasov, 2018) | CC-BY-4.0 |
+| | **tldr-pages** (commandes diagnostic) | `tldr-pages/tldr` (clone shallow) | MIT |
+| | Multios Terminal Commands | `Eng-Elias/multios-terminal-commands` (HF) | MIT |
+| `@vision` | **COCO 2017 annotations** (captions seulement) | `cocodataset/cocoapi` — `captions_val2017.json` | CC-BY-4.0 |
+
+> 💡 **@vision** n'utilise pas de dataset RAG : RapidOCR = ONNX déterministe + Qwen2.5-7B pré-entraîné. Les patterns visuels sont documentés manuellement via Obsidian.
+
+### ⚙️ Pipeline de construction (100% local)
+
+```
+JSONL (wiki/sources/*.jsonl)
+        ↓
+Chunking (512 tokens / 64 overlap)
+        ↓
+Embedding via Ollama portable (port 11436)
+    modèle : nomic-embed-text-v2-moe-GGUF:Q4_K_M (768 dim)
+        ↓
+Index vectoriel : memory/vector_index.json
+```
+
+**Scripts disponibles** :
+- `scripts/rebuild_index_run.py` — reconstruction complète en 1 commande (détection auto des sources manquantes)
+- `scripts/ingest_phase3_run.py` — ingestion ciblée des JSONL non encore indexés
+- `scripts/embed_and_ingest.py` — embedding par batch avec reprise (`--resume`)
+
+> ⚠️ **Prérequis** : Ollama portable doit tourner sur `127.0.0.1:11436` avec les modèles GGUF téléchargés. Sans embedding, le RAG ne fonctionne pas.
+
+### ✍️ Contribuer via Obsidian (Vault `wiki/`)
+
+Le vault **`wiki/`** est le point d'entrée humain de la KB. Chacun peut ajouter des pages manuelles qui seront ré-ingérées dans l'index.
+
+#### 1. Ouvrir le vault
+- **Windows** : `Obsidian.exe` → *Open folder as vault* → `wiki/`
+- **macOS** : `open -a Obsidian wiki/`
+- **Linux** : `obsidian wiki/` (AppImage)
+
+#### 2. Structure des pages (`wiki/pages/`)
+```
+wiki/pages/
+├── concepts/      ← définitions, techniques (ex: MITRE T1558.003)
+├── skills/        ← savoir-faire procéduraux
+└── procedures/    ← runbooks, pas-à-pas
+```
+
+#### 3. Frontmatter YAML obligatoire
+```yaml
+---
+id: mon-concept-001
+title: Titre lisible
+type: concept | skill | procedure
+agent: "@cyber" | "@dev" | "@network" | "@hardware" | "@vision"
+tags: [exemple, test]
+links_to: [[autre-page]]
+---
+```
+
+#### 4. Lier les pages
+- Utiliser les **wikilinks** `[[Page]]` dans la section *Liens*
+- Le plugin **Backlinks** (core plugin activé) affiche les références entrantes
+- Les pages `@vision` sont majoritairement manuelles (patterns OCR FR, descriptions de captures)
+
+#### 5. Ré-ingérer dans l'index
+Après ajout manuel, relancer :
+```bash
+python scripts/rebuild_index_run.py
+```
+Les nouvelles pages sont détectées, chunkées, vectorisées et intégrées au RAG.
+
+### 📦 Installation Obsidian Portable (Clé USB Multiplateforme)
+
+Pour visualiser le vault JARVIS (`wiki/`) sur n'importe quelle machine sans installation système, emportez Obsidian sur la clé USB.
+
+#### Préparation de la clé
+Formatez en **exFAT** (compatibilité lecture/écriture Windows/macOS/Linux + support fichiers > 4 Go).
+
+#### Structure recommandée
+```text
+JARVIS-USB/
+|-- Projet-JARVIS/           <-- Code source + backend Python
+|-- Apps/
+|   |-- Obsidian-Windows/    <-- PortableApps ou binaire extrait
+|   |-- Obsidian-Mac.app     <-- Application macOS
+|   |-- Obsidian-Linux.AppImage <-- Binaire portable Linux
+|-- wiki/                    <-- Vault Obsidian (sources + pages générées)
+    |-- .obsidian/           <-- Config, thèmes, plugins (100% portable)
+    |-- sources/             <-- Raw sources (JSONL)
+    |-- pages/               <-- Wiki généré par le LLM
+```
+
+#### Méthode d'installation par plateforme
+
+**🪟 Windows**
+1. Téléchargez l'installeur `.exe` depuis le site officiel d'Obsidian.
+2. Pour version portable : utilisez **PortableApps.com** ou extrayez les fichiers dans `Apps/Obsidian-Windows/`.
+3. *Note* : Si la lettre de lecteur change (ex: `E:` → `F:`), Obsidian demandera de re-sélectionner le vault.
+
+**🍎 macOS**
+1. Téléchargez le `.dmg` ou `.zip` (Intel ou Apple Silicon).
+2. Glissez `Obsidian.app` dans `Apps/Obsidian-Mac.app` sur la clé.
+3. Au 1er lancement : clic-droit → "Ouvrir" (app non signée localement) ou autorisez via Préférences Système → Confidentialité et sécurité.
+
+**🐧 Linux**
+1. Téléchargez le format **`.AppImage`** depuis le site officiel ou GitHub.
+2. Placez dans `Apps/Obsidian-Linux.AppImage`.
+3. `chmod +x Apps/Obsidian-Linux.AppImage` sur la machine hôte.
+4. Lancez directement — sans installation.
+
+#### Utilisation au quotidien
+1. Branchez la clé USB JARVIS.
+2. Lancez le binaire Obsidian correspondant à l'OS.
+3. Choisissez **"Open folder as vault"** → pointez vers `wiki/` sur la clé.
+4. Lancez le backend JARVIS (`JARVIS.bat` / `JARVIS.sh`).
+5. Vous voyez les modifications du LLM en temps réel dans Obsidian tout en interagissant via l'interface web.
+
+#### Limites
+- **Mobile (iOS/Android)** : Montage clés USB non supporté nativement → privilégiez sync Git ou Syncthing.
+- **Images** : Configurez Obsidian pour stocker attachments dans `wiki/assets/` (dossier local fixe) pour éviter liens cassés.
+
+---
+
 ## 💾 Sauvegarde & restauration
 
 JARVIS embarque des scripts de sauvegarde pour protéger vos conversations, votre mémoire vectorielle et votre configuration (`memory/`, `logs/`, `config/`).

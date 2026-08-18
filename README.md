@@ -143,6 +143,61 @@ Détail architectural complet : [docs/adr/ADR-008-rag-diagnostic-amelioration-co
 
 ---
 
+## 📚 Knowledge Base — Datasets & Architecture "LLM Wiki"
+
+### Pourquoi les datasets sont obligatoires (Anti-Hallucination)
+
+JARVIS tourne sur des **petits modèles locaux (7B–8B paramètres, GGUF quantifiés 4-bit)**. Sans base de connaissances ancrée (RAG), ces modèles **hallucinent massivement** sur des sujets techniques pointus (commandes PowerShell, diagnostic Linux, tactiques MITRE ATT&CK, gestion réseau). Ils n'ont pas la capacité paramétrique de "mémoriser" de vastes encyclopédies techniques.
+
+**Sans datasets curatés, JARVIS n'a aucun intérêt** : l'utilisateur devrait copier-coller son propre contexte à chaque requête, annulant l'autonomie de l'assistant. Les datasets (MITRE, tldr, psdocs, CodeSearchNet, etc.) sont la **mémoire à long terme** et la condition *sine qua non* de la fiabilité du système.
+
+### Pattern "LLM Wiki" (Architecture cible)
+
+Au lieu d'un RAG classique (recherche de chunks bruts à chaque requête), JARVIS adopte le pattern **"LLM Wiki"** — une base de connaissances persistante, structurée et interliée que le LLM maintient incrémentalement.
+
+**3 couches** :
+| Couche | Contenu | Propriétaire |
+|--------|---------|--------------|
+| **Raw Sources** (`wiki/sources/*.jsonl`) | Documents bruts immuables (datasets curatés) | Utilisateur / Scripts d'ingestion |
+| **The Wiki** (`wiki/pages/{concepts,skills,procedures}/*.md`) | Pages Markdown générées/maintenues par le LLM | **Le LLM** (écrit), Utilisateur (lit) |
+| **The Schema** (`wiki/SCHEMA.md`) | Frontmatter YAML obligatoire, sections, types de pages | Configuration (dicte la discipline au LLM) |
+
+> *"Obsidian est l'IDE ; le LLM est le programmeur ; le Wiki est le codebase."*
+
+**Opérations** :
+- **Ingest** : Le LLM lit la source → génère pages Markdown → met à jour index + log
+- **Query** : Moteur vectoriel trouve pages wiki pertinentes → LLM synthétise avec citations
+- **Lint** : Vérification santé wiki (pages orphelines, contradictions) via `WikiLintService`
+
+### Obsidian Portable (Clé USB Multiplateforme)
+
+Le vault `wiki/` se visualise avec **Obsidian**. L'exécutable nécessite des binaires par OS, mais le vault (Markdown + `.obsidian/`) est 100% portable.
+
+**Structure recommandée sur la clé** :
+```text
+JARVIS-USB/
+|-- Projet-JARVIS/          <-- Code source + backend Python
+|-- Apps/
+|   |-- Obsidian-Windows/   <-- PortableApps ou binaire extrait
+|   |-- Obsidian-Mac.app    <-- Application macOS
+|   |-- Obsidian-Linux.AppImage <-- Binaire portable Linux
+|-- wiki/                   <-- Vault Obsidian (sources + pages générées)
+    |-- .obsidian/          <-- Config, thèmes, plugins (portables)
+    |-- sources/            <-- Raw sources (JSONL)
+    |-- pages/              <-- Wiki généré par le LLM
+```
+
+**Installation par OS** :
+- **Windows** : PortableApps.com ou extraire binaire dans `Apps/Obsidian-Windows/`
+- **macOS** : Glisser `Obsidian.app` dans `Apps/Obsidian-Mac.app` (clic-droit → Ouvrir si bloqué)
+- **Linux** : Télécharger `.AppImage` → `chmod +x` → placer dans `Apps/Obsidian-Linux.AppImage`
+
+**Usage** : Brancher clé → Lancer Obsidian correspondant → "Open folder as vault" → `wiki/` → Lancer JARVIS backend (`JARVIS.bat` / `JARVIS.sh`) → Modifications LLM visibles en temps réel dans Obsidian.
+
+---
+
+## 👥 Agents
+
 ## 👥 Agents
 
 | Agent | Rôle | Modèle (GGUF réel, via Ollama/HF) |
