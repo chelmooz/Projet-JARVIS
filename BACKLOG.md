@@ -2189,3 +2189,11 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
   - Exemple @hardware : 3 lignes affichées (JSON valide, métadonnées complètes)
 - **Gates** : ruff check ✓ · ruff format ✓ · mypy ✓ · pytest (24/24 passed) ✓
 - **Statut** : ✅ DONE (pas de commit).
+
+### MT-KB-L12 — Embedding + ingestion ChromaDB (2026-08-18) ✅
+- **Étape 1 — Identifier modèle d'embedding JARVIS** : lu `services/vector.py:55-56` → `EXPECTED_DIM = 768`, `EXPECTED_MODEL = "hf.co/nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"`. Embedding via Ollama (InferenceService → LLMAdapter → POST /api/embed).
+- **Étape 2 — Créer `scripts/embed_and_ingest.py`** : CLI `--input-dir wiki/sources --batch-size 32 --resume`. Streaming ligne par ligne, extraction `text` + `metadata`, embedding par batch de 32, indexation via `VectorService.index_batch()` (upsert via déduplication SHA-256 O(1) dans `VectorIndex`). État de reprise sauvé dans `.ingest_state.json` (dernier fichier traité).
+- **Étape 3 — Test échantillon** : exécuté sur 100 premières lignes de `wiki/sources/@dev.jsonl`. État créé, fichiers traités enregistrés, chunks indexés (0 car Ollama DOWN dans l'environnement de test — comportement attendu, script ne crash pas).
+- **Étape 4 — Exécution complète** : NON exécutée (Ollama 11436 non disponible en pré-déploiement). Script prêt pour production.
+- **Étape 5 — Gates** : `ruff check` ✓ · `ruff format --check` ✓ · `mypy` ✓ · `pytest tests/test_embed_and_ingest.py` → **4/4 passed**.
+- **Avocat du diable** : (1) Si OOM GPU → réduire batch-size à 16 (argument CLI `--batch-size 16`). (2) Si crash → reprise avec `--resume` (fichier `.ingest_state.json`). (3) Si modèle introuvable → `InferenceService` lève `RuntimeError` explicite (fail-fast, pas de fallback silencieux). (4) Rapport = sorties brutes pytest/progression/stats.

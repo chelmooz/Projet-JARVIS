@@ -43,3 +43,5 @@ scripts/ingest_mitre_15.py
 
 # Artefact legacy de l'index vectoriel (raccourci obsolète — single source of truth = memory/vector_index.json)
 wiki_index.bin
+# JSONL générés (trop volumineux pour GitHub)
+wiki/sources/*.jsonl
