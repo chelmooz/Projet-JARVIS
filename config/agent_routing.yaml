@@ -5,7 +5,8 @@ prefix_map:
   "@network": network
   "@hardware": hardware
   "@vision": vision
-  "@orchestrateur": dev
+  "@lead": orchestrateur
+  "@orchestrateur": orchestrateur
   "@techlead": dev
   "@devops": dev
   "@designer": dev

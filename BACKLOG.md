@@ -357,6 +357,24 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
   **8/8 passed** (GREEN immédiat, pas de RED nécessaire).
 - **Étape 3 — Gates** : `ruff check` ✓ · `ruff format --check` ✓
 
+### MT-KB-L7 — Normalisation métadonnées RAG + Routing @lead (2026-08-18) ✅
+- **Contexte** : `memory/vector_index.json` contenait des valeurs `metadata.agent` incohérentes
+  (`dev`, `cyber`, `hardware` sans préfixe `@` + doublons `@hardware`/`hardware`).
+  L'agent `@lead` n'était pas reconnu par le routeur (fallback sur `dev`).
+  Le profil `orchestrateur` existe dans `config/agent_profiles.json` mais n'était pas mappé sur `@lead`.
+- **Étape 1 — Routing @lead** : ajouté `"@lead": "orchestrateur"` dans `config/agent_routing.yaml:8`
+  (profil `orchestrateur` avec system_prompt coordinateur déjà présent dans `agent_profiles.json:4-37`).
+- **Étape 2 — Normalisation métadonnées** : créé `scripts/normalize_agent_metadata.py` qui
+  charge `memory/vector_index.json`, parcourt les 5000 documents, normalise `metadata.agent`
+  (`dev`→`@dev`, `cyber`→`@cyber`, `hardware`→`@hardware`), backup `.bak`, réécrit.
+  **3106 documents modifiés** — agents finaux : `['@cyber', '@dev', '@hardware', '@network']`.
+- **Étape 3 — Vérification** : `memory/vector_index.json` ne contient plus que des agents
+  préfixés `@`. Pas de script `test_rag_relevance.py` existant — vérifié par lecture directe
+  du JSON (agents cohérents).
+- **Étape 4 — Gates** : `ruff check scripts/normalize_agent_metadata.py config/` ✓
+  `ruff format --check` ✓ · `mypy` ✓ · `pytest tests/test_agents_generic_characterization.py tests/test_agents_base_characterization.py tests/test_vector_agent_filter.py tests/test_api_agents.py -v` ✓ (66 passed)
+- **Statut** : ✅ DONE (pas de commit)
+
 ### MT-KB-L6a — Correction filtrage agent metadata (tldr/psdocs/setuptools) (2026-08-18) ✅
 - **Contexte** : Rapport RAG signalait "metadata.agent vaut dev/@hardware/cyber au lieu de @dev/@hardware/@cyber/@network" — mais les 3 convertisseurs (tldr, psdocs, setuptools) avaient déjà le bon préfixe `@` dans `metadata.agent`.
 - **Étape 1 — Diagnostic** : vérifié `scripts/convert_tldr_run.py:64,71`, `scripts/convert_psdocs_run.py:62,69`, `scripts/convert_setuptools_run.py:63,71` → tous utilisent `@hardware` / `@dev` avec préfixe. Fichiers JSONL générés (`wiki/sources/tldr.jsonl`, `psdocs.jsonl`, `setuptools.jsonl`) confirment `metadata.agent == "@hardware"` / `"@dev"`.
