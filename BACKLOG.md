@@ -1868,3 +1868,171 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 
 - **Gates** : vitest ✓ · pytest ✓ (pas de régression)
 - **Statut** : ✅ DONE
+
+### MT-KB-L3z-ter — Backend : renvoyer l'id de message pour les boutons 👍/👎 (2026-08-18) ✅
+- **Problème** : le backend ne renvoyait jamais l'id du message assistant, donc le front
+  retombait sur `enhanceLastAssistant` (fetch conversation) pour afficher les boutons de
+  vote — source de la race condition corrigée côté UI dans MT-KB-L3z.
+
+- **Étape 1 — Diagnostic** : `_save_conv` (`controllers/routes/jarvis.py:63`) appelait
+  `add_message` qui retournait `None` (l'id généré `uuid4().hex[:12]` était perdu à
+  `services/conversation.py:152-153`) ; le dict de réponse n'avait pas de champ `id` ;
+  le contrat front attend `meta.id` (SSE) / `data.id` (non-streaming) ; contrat feedback
+  `FeedbackRequest{conv_id, msg_id, signal}` (`controllers/routes/conversations.py:33-36`).
+
+- **Étape 2 — Tests RED** : `tests/test_api_chat_id.py` (2 tests : id présent en
+  non-streaming ET en streaming SSE). RED vérifié : 2 FAILED (`KeyError: 'id'`).
+
+- **Étape 3 — Implémentation GREEN** :
+  1. `services/conversation.py::add_message` retourne `msg["id"]` (signature `-> str`)
+  2. `ports/__init__.py::ConversationPort.add_message` : `-> str`
+  3. `controllers/routes/jarvis.py` : `_save_conv` retourne `str | None` ; injection
+     `result["id"] = msg_id` dans `_run_and_record` (non-streaming) ET dans `_generate`
+     (SSE, avant `sink.finish`)
+
+- **Étape 4 — Vérification GREEN** : 2 passed (2.09s) ; non-régression ciblée ok ;
+  suite complète : 1016 passed, 4 failed préexistants inchangés.
+- **Gates** : ruff ✓ · format ✓ · mypy ✓ · pytest ✓
+- **Statut** : ✅ DONE
+
+### MT-KB-L3h — Modèles de spécialité figés (source unique, override utilisateur seul) (2026-08-18) ✅
+- **Problème** : deux sources de vérité concurrentes — `agent_profiles.json` (profil) et
+  `model_preferences.json` (model_map/agent_to_profile/default_model, double-écriture via
+  `_sync_agent_model_to_preferences` sur assign) — le sélecteur préférait les préférences
+  et les profils étaient désalignés (techlead→Qwen au lieu de granite, devops→granite au
+  lieu de foundation-sec).
+
+- **Étape 1 — Diagnostic** : lecteurs `agent_profiles.json` = `config/agent_profiles.py:38-57`
+  (→ chat via `graph/agent_graph.py:114`), `controllers/routes/agents.py:73-88` (UI),
+  `agents/base.py:31,87`, `services/adapters/http.py:177` ; lecteurs `model_preferences.json`
+  = `services/selector.py:211-216`, `settings.py` (offline), `jarvis.py:211` ; writer unique
+  = `agents.py:108` + sync double (`:57-70`) ; `model_preferences.json` NON supprimable
+  (offline + timeout/keep_alive + monkeypatch `test_api_agents.py:32`).
+
+- **Étape 2 — Décision** : `agent_profiles.json` = SOURCE DE VÉRITÉ ; `model_preferences.json`
+  conservé mais dépouillé des clés modèles (offline, timeout, keep_alive seulement) ;
+  ordre `select_model` = legacy model_map (déprécié, jamais réécrit — compat
+  `test_selector.py`) → `model_for_agent` → `fallback_models()` → `first_available()` ;
+  jamais d'écriture ; `PREFERENCES_PATH` conservé dans `agents.py` (monkeypatch).
+
+- **Étape 3 — Tests RED** : `tests/test_model_policy.py` (6 tests : dev→granite,
+  spécialités, config source, GET /api/agents, override utilisateur, select_model jamais
+  d'écriture). RED vérifié : 3 FAILED / 3 PASSED.
+
+- **Étape 4 — Implémentation GREEN** :
+  1. `config/agent_profiles.json` aligné : techlead→granite (keep_alive 3600),
+     devops→foundation-sec (keep_alive 600) ; `agent_model_map` aligné
+  2. `config/model_preferences.json` dépouillé (commentaire MT-KB-L3h)
+  3. `services/selector.py::select_model` réécrit (legacy → configuré → spécialité →
+     premier dispo ; ValueError si aucun ; sentinelle vision conservée)
+  4. `controllers/routes/agents.py` : `_sync_agent_model_to_preferences` supprimé
+     (+ `PROFILE_TO_ROUTING` devenu mort), `PREFERENCES_PATH` conservé
+
+- **Étape 5 — Vérification GREEN** : 6 passed ; non-régression 199 passed ; suite
+  complète : 1016 passed, 4 failed préexistants (prouvés inchangés via `git stash`).
+- **Gates** : ruff ✓ · format ✓ · mypy ✓ (strict, 5 modules) · pytest ✓
+- **Statut** : ✅ DONE
+
+### MT-KB-L3h-bis — Config agents figée (source unique agent_profiles.json) ✅
+- **Problème** : la config exacte décidée utilisateur (4 modèles GGUF réels) n'était pas
+  verrouillée par des tests — le chat résolvait via `model_for_agent`
+  (`config/agent_profiles.py:38-57` → `services/pipeline_steps.py::select_model`), mais
+  toute régression du JSON (HEAD 83e10cd : techlead=Qwen2.5 ❌, devops=granite ❌) serait
+  repartie sans être détectée.
+- **Étape 1 — Diagnostic** (LECTURE SEULE) :
+  - `config/agent_profiles.json` (working tree) : `techlead.model` l.42 =
+    `hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M` ✓ ; `devops.model` l.75 =
+    `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` ✓ ; `datasecu.model` l.141 =
+    `hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M` ✓ ; `orchestrateur.model` l.8 =
+    `hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` ✓ ; `designer.model` l.109 inchangé
+    (Qwen2.5) ; `agent_model_map` l.171-177 aligné (4 clés) — **working tree déjà conforme**
+    (correction L3h non commitée, diff vs HEAD = les 2 valeurs WRONG + la map).
+  - `config/agent_profiles.py:29-35` `AGENT_TO_PROFILE` : cyber→datasecu, dev→techlead,
+    network→devops, hardware→orchestrateur, vision→designer — **divergence énoncé/code
+    notée** : `"vision": "designer"` existe (l.34) alors que l'énoncé dit « designer pas dans
+    AGENT_TO_PROFILE » — non bloquant (court-circuit vision prime, mapping non modifié).
+  - `services/selector.py` : `select_model("vision", None)` → l.211-212 court-circuit
+    `VISION_KEY` → `select_vision_model` (l.148-160) → `VISION_OCR_SENTINEL = "rapidocr"`
+    (l.25) — confirmé, aucun profil JSON consulté.
+- **Étape 2 — Tests** : `tests/test_agent_config_frozen.py` (5 tests) : cyber→DeepHat,
+  dev→granite, network→foundation-sec, hardware→Qwen, `select_model("vision", None)` →
+  `"rapidocr"`.
+- **Étape 3 — RED attendu 2 FAILED — ⚠️ DÉVIATION** : **5/5 PASSED d'emblée** (0.19s).
+  Cause : le working tree contient déjà l'alignement L3h (config/agent_profiles.json modifié,
+  non commité) ; HEAD (83e10cd) portait les valeurs WRONG (preuve : diff vs HEAD —
+  techlead=Qwen2.5 / devops=granite / map techlead=Qwen, devops=granite). Aucun tweak
+  artificiel pour forcer un RED (convention projet, cf. MT-KB-L2j) : les tests sont des
+  garde-fous — ils échoueraient si le JSON revenait à l'état HEAD.
+- **Étape 4 — GREEN** : aucune modification nécessaire — `config/agent_profiles.json` déjà
+  conforme aux 4 points de l'énoncé + `agent_model_map` aligné ; `designer` inchangé.
+- **Étape 5 — Vérification** : 5/5 passed ; suite complète : **1020 passed, 4 failed
+  préexistants** (set inchangé : rag_loop_e2e ×2 + real_ollama skip selon Ollama +
+  chat_feedback_loop + cyber_eval_routes flaky timing) + 1 skip, 1 warning préexistant.
+- **Gates** : ruff ✓ (fichier + config, après retrait import pytest inutilisé) · format ✓ ·
+  mypy ✓ (149 source files) · pytest ✓ (non-régression).
+- **Statut** : ✅ DONE (pas de commit).
+
+### MT-KB-L3f — Datasets ciblés @hardware/@dev (tldr + PSdocs + setuptools) 🛑 STOP + RAPPORT
+- **Étape 1 — Diagnostic** (LECTURE SEULE) :
+  - `services/wiki_ingest_service.py` : schéma 5 clés exactes `{id, agent, source, text,
+    metadata}` (`_validate_schema` l.310-315, `entry["agent"]` sans `.get()`) ;
+    `_normalize_agent` l.92-97 (`" @hardware "` → `"@hardware"`) ; `ingest_phase2` l.152
+    copie `**entry` dans `metadata` de l'index (l.258-264) → `metadata.source` du doc indexé
+    = champ top-level `source` du JSONL → SOURCE_MAP value = champ `source` des entrées.
+  - `services/dataset_converter_v2.py` : pattern réutilisé — `_make_base_entry` (5 clés),
+    fonctions pures sans réseau, écriture JSONL dans le script `run`.
+  - `wiki/sources/*.jsonl` : 12 fichiers (7 dans SOURCE_MAP + 5 bruts non mappés :
+    LINUX_TERMINAL_COMMANDS, dataset, train, unix-commands-dataset, vulnerabilities — jamais
+    ingérés, pas de doublon).
+  - `scripts/rebuild_index_run.py::SOURCE_MAP` (l.31-39) : 7 entrées ; `missing_sources`
+    retourne uniquement les stems mappés (filtrage final par SOURCE_MAP).
+- **Étape 2 — Conversion** (3 clones shallow dans temp, réseau OK) :
+  - tldr-pages/tldr : 4608+2027+370 pages ; **24/24 commandes cibles présentes** (kill,
+    taskset, ps, top, lsof, netstat, ss, free, df, du, iostat, vmstat, uname, lscpu, lsblk,
+    smartctl, systemctl, journalctl, dmesg, pkill, killall, nice, renice, time).
+  - MicrosoftDocs/PowerShell-Docs : reference/7.4 = 12 modules, 316 cmdlets .md (CimCmdlets
+    13, Core 64, Diagnostics 4, Management 62, Security 16, Utility 117, PSDiagnostics 11...).
+  - pypa/setuptools : **`pkg_resources` SUPPRIMÉ du HEAD (setuptools 82+)** → clone du tag
+    **v81.0.0** (dernier avec pkg_resources, licence MIT). **`complain` ABSENTE de toutes
+    les versions réelles testées (v31→v81)** — smoke « complain(distribution_name) »
+    impossible sans source inventée → smoke adapté documenté ci-dessous.
+- **Étape 3 — Tests RED/GREEN** : `tests/test_convert_tldr.py` + `test_convert_psdocs.py` +
+  `test_convert_setuptools.py` (3×2 tests) : RED = 3 collection errors ModuleNotFoundError
+  (convertisseurs absents) ; GREEN = **6/6 passed** (1 fix : contenu brut sans `.strip()`,
+  fidélité à la source). Convertisseurs : `scripts/convert_tldr_run.py` (400 pages
+  @hardware, cibles garanties), `scripts/convert_psdocs_run.py` (modules diagnostic →
+  @hardware, reste → @dev, cap 300), `scripts/convert_setuptools_run.py` (fonctions
+  top-level avec docstring, cap 200).
+- **Étape 4 — Ingestion** :
+  - SOURCE_MAP étendu (3 entrées : tldr→"tldr-pages", psdocs→"powershell-docs",
+    setuptools→"setuptools") ; `tests/test_rebuild_index_run.py` : 3/3 passed (non-régression).
+  - JSONL générés (sorties brutes) : `tldr: AVANT=0 APRÈS=400 ajoutés=400` ;
+    `psdocs: AVANT=0 APRÈS=300 ajoutés=300` ; `setuptools: AVANT=0 APRÈS=48 ajoutés=48`.
+    Répartition : tldr 400 @hardware (24/24 cibles ✓) ; psdocs 58 @hardware + 242 @dev ;
+    setuptools 48 @dev. Totaux : **@hardware +458, @dev +290** (attentes énoncé +~700/+~200
+    non atteintes, comptes réels rapportés).
+  - `python scripts/rebuild_index_run.py` → **RÉSULTAT: index DISQUE INCHANGÉ** —
+    `total=4050 embedded=4050 pending=0` (AVANT 4050/4017/33) : ingestion 1748 entrées
+    (network-topology 1000 + psdocs 300 + setuptools 48 + tldr 400, skip coco) exécutée en
+    mémoire sur `vector_store` mais **écrasée** (cause racine ci-dessous).
+- **Cause racine (bug préexistant `scripts/rebuild_index_run.py`)** : l.105 `vs` = 1re
+  instance VectorService (charge 4050 docs dont 33 pending du serveur live) ; l.124
+  `vector_store` = 2e instance (ingestion l.143 → `_save_secure` disque 5798 docs) ; l.160-171
+  `stats_before = vs.stats()` → pending=33>0 → `vs.vectorize_pending()` →
+  `_embed_pending` (`services/vector.py:278-285` : `_dirty=True` + `flush()`) → `_save_secure`
+  écrit **la copie périmée de `vs` (4050 docs)** → **écrase les 5798 docs**. En L2n/L2p le
+  script marchait car pending=0 au départ (pas de flush de `vs`). Fix proposé (MT corrective) :
+  utiliser `vector_store` pour les stats/vectorisation finales (2 lignes l.160-171).
+  Smoke intégré `'Kerberoasting T1558.003'` results=0 : 2e bug préexistant (seuil 0.5 de
+  L2x non répercuté sur le smoke du script ; score réel 0.29 < 0.5).
+- **Décision utilisateur (question posée)** : fix 2 lignes refusé → **STOP + rapport**.
+- **Livré quand même** (scope respecté, rien à défaire) : 3 convertisseurs + 3×2 tests
+  (6/6 verts) + 3 JSONL générés (schéma 5 clés, agents @, licences MIT/CC-BY-4.0) +
+  SOURCE_MAP (détection validée par le run : « Sources manquantes détectées: coco-annotations,
+  network-topology, psdocs, setuptools, tldr »).
+- **Action requise (MT corrective)** : fix `scripts/rebuild_index_run.py` l.160-171
+  (vs → vector_store) puis re-run `python scripts/rebuild_index_run.py` + smokes L3f :
+  `"taskset -p 1 1234"` top-1 @hardware score>0 ; `"get_distribution('setuptools')"` top-1
+  @dev score>0 (smoke « complain » impossible : fonction absente de la source réelle).
+- **Statut** : 🛑 **STOP + RAPPORT** — Étape 4 incomplète (index non ingéré), fix refusé
+  par l'utilisateur. Convertisseurs/tests/JSONL/SOURCE_MAP prêts pour le re-run.

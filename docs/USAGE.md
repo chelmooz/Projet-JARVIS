@@ -594,10 +594,22 @@ Disponible **partout** dans l'interface (overlay) :
 | `GET/POST` | `/api/pipelines` | Pipelines de diagnostic disponibles |
 | `POST` | `/api/pipelines/run` | Exécuter un pipeline |
 | `GET` | `/api/cyber/workflows` | Workflows sécurité NVISO |
-| `GET/POST` | `/api/settings` | Paramètres serveur |
+| `POST` | `/api/cyber/analyze` | Évaluation cyber multi-agents (juge/avocat du diable) |
+| `GET/PUT` | `/api/settings` | Paramètres serveur |
 | `POST` | `/api/files/authorize` | Autoriser un dossier |
 | `GET` | `/api/files/authorized` | Dossiers autorisés |
 | `GET` | `/api/files/browse` \| `/drives` \| `/list` \| `/find` \| `/read` | Navigation fichiers |
+| `GET` | `/api/files/all_drives` | Liste des disques/partitions, y compris non montés |
+| `POST` | `/api/files/mount_ext4` \| `/unmount_ext4` \| `/read_ext4_direct` | Accès étendu aux partitions ext4 non montées |
+| `GET` | `/api/health` | Health check agrégé (monitoring) |
+| `GET` | `/api/status/stream` | Statut en direct (SSE, panneau latéral) |
+| `GET` | `/api/kill-coding/analyze` \| `/project` \| `/check-test` | Skill Kill Coding : audit SOLID/TDD/KISS |
+| `GET` | `/api/code-review/file` \| `/project` | Skill Code Review : sécurité, perf, maintenabilité |
+| `GET/POST` | `/api/quality-audit` | Skill Audit Qualité : inspection complète du projet |
+| `GET` | `/api/vectorize` \| `POST /api/vectorize` | Vectorisation ad hoc (hors conversations) |
+
+> **Beta Dashboard :** `GET /beta-dashboard` n'est monté que si `JARVIS_BETA_DASHBOARD=1`
+> est posé dans `.env` — non actif par défaut, réservé au développement interne.
 
 > **Embeddings :** `/api/embed` n'expose **pas** d'endpoint public. Les embeddings
 > sont calculés en interne par `services/vector_embedder.py` (VectorService) — l'API

@@ -8,7 +8,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![CI](https://github.com/chelmooz/Projet-JARVIS/actions/workflows/ci.yml/badge.svg)
 ![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/chelmooz/Projet-JARVIS/main/coverage-badge.json)
-![Ollama](https://img.shields.io/badge/Ollama-0.30.10-orange)
+![Ollama](https://img.shields.io/badge/Ollama-0.134.0-orange)
 ![Platform](https://img.shields.io/badge/Platform-Windows_|_Linux_|_macOS-lightgrey)
 
 </div>
@@ -123,7 +123,7 @@ Interface Web (static/) → API FastAPI (controllers/) → Ports (Protocols)
 
 **Flux d'une requête** : l'UI appelle `POST /api/jarvis` → `graph/AgentGraph` (orchestrateur
 séquentiel) → résolution du modèle via `selector.py` → `services/inference.py` →
-`adapters/ollama_adapter.py` génère la réponse → la conversation est persistée par
+`services/adapters/ollama_adapter.py` génère la réponse → la conversation est persistée par
 `conversation.py`. Voir [docs/architecture.md](docs/architecture.md) pour le détail
 complet (diagramme Mermaid inclus).
 
