@@ -91,12 +91,26 @@ def _precompress_files(static_dir: str) -> None:
 
 
 def cache_control_for(full_path: str) -> str:
-    """Retourne la directive Cache-Control selon l'extension du fichier."""
+    """Retourne la directive Cache-Control selon l'extension du fichier.
+
+    JS/CSS : ``no-cache`` (pas ``no-store``) — le fichier reste mis en cache
+    par le navigateur, mais une requête conditionnelle (``If-None-Match``)
+    est envoyée à *chaque* chargement. L'ETag (mtime+taille, cf.
+    ``compute_etag``) change dès qu'un fichier est modifié : la nouvelle
+    version est donc servie immédiatement après un simple F5, sans qu'un
+    redémarrage serveur ou un hard-refresh (Ctrl+Shift+R) soit nécessaire.
+    Avant ce correctif, ``max-age=3600`` faisait servir les anciens
+    ``tools.js``/``style.css`` pendant 1h même après restart JARVIS, car les
+    imports ES modules (``import ... from './modules/tools.js'``) n'ont pas
+    de query string versionnée à invalider (cf. historique — bug page Outils).
+    """
     ext = os.path.splitext(full_path)[1].lower()
     if ext not in CACHEABLE_EXT:
         return "no-store"
     if ext in (".html", ".htm"):
         return f"public, max-age={HTML_MAX_AGE}"
+    if ext in (".js", ".css"):
+        return "no-cache"
     return f"public, max-age={ASSET_MAX_AGE}"
 
 

@@ -2036,3 +2036,41 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
   @dev score>0 (smoke « complain » impossible : fonction absente de la source réelle).
 - **Statut** : 🛑 **STOP + RAPPORT** — Étape 4 incomplète (index non ingéré), fix refusé
   par l'utilisateur. Convertisseurs/tests/JSONL/SOURCE_MAP prêts pour le re-run.
+
+### MT-KB-L3f-corrective — Fix bug écrasement index + ingestion terminée ✅
+- **Étape 1 — Diagnostic** : Bug confirmé `scripts/rebuild_index_run.py:160-171` —
+  `vs.stats()` / `vs.vectorize_pending()` utilisent l'instance périmée au lieu de
+  `vector_store` (qui contient les 1748 nouveaux docs : network-topology 1000 + psdocs 300
+  + setuptools 48 + tldr 400).
+- **Étape 2 — Tests RED** : `tests/test_rebuild_index_run.py::test_vectorize_uses_correct_instance`
+  ajouté — échoue (le bug fait que `vs.stats()` retourne `pending=0`, `vectorize_pending`
+  jamais appelé).
+- **Étape 3 — GREEN** : Fix 3 lignes (`scripts/rebuild_index_run.py:163,167,168`) :
+  `vs.stats()` → `vector_store.stats()`, `vs.vectorize_pending()` →
+  `vector_store.vectorize_pending()`. Test passe (GREEN).
+- **Étape 4 — Re-run + vérification** :
+  - JARVIS arrêté (PID 8188) pour éviter flush concurrent.
+  - `python scripts/rebuild_index_run.py` : **AVANT=5000 → APRÈS=7564** (ingestion
+    psdocs 300 + setuptools 48 + tldr 400 = 748 entrées, 2565 chunks).
+  - Smoke L3f validés :
+    - `"taskset -p 1 1234"` → top-1 `@hardware` **score 0.598** ✓
+    - `"get_distribution"` → top-1 `@dev` **score 0.552** ✓
+- **Étape 5 — Gates** : ruff ✓ · format ✓ · mypy ✓ · pytest (4/4 tests
+  `test_rebuild_index_run.py`) ✓
+- **Statut** : ✅ **DONE** — Index reconstruit (7564 docs), 1748 docs récupérés,
+  smokes L3f validés, gates vertes.
+
+### MT-KB-L3g — Politique cache no-cache pour assets JS ✅
+- **Contexte** : `controllers/static_cache.py:112-113` modifié manuellement →
+  `cache_control_for()` retourne `"no-cache"` pour `.js` / `.css` (au lieu de
+  `public, max-age=3600`) pour éviter Ctrl+Shift+R constant en dev (ETag
+  valide à chaque rechargement).
+- **Étape 1 — Diagnostic** : Test `test_static_cache_characterization.py:19`
+  attend ancien comportement `"public, max-age=3600"` pour `.js`.
+- **Étape 2 — Tests RED** : Modifié le test pour attendre `"no-cache"` pour
+  `.js` et `.css` (ligne 19-20).
+- **Étape 3 — GREEN** : `pytest tests/test_static_cache_characterization.py -v`
+  → **8/8 PASSED**.
+- **Étape 4 — Gates** : ruff ✓ · format ✓ · pytest ✓ (mypy : erreurs
+  préexistantes non liées au changement).
+- **Statut** : ✅ **DONE** — Test aligné sur la politique `no-cache` pour JS/CSS.

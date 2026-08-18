@@ -16,7 +16,8 @@ def request_with_headers(headers: dict[str, str]) -> Request:
 
 
 def test_cache_control_and_media_types(tmp_path) -> None:
-    assert cache.cache_control_for("file.js") == "public, max-age=3600"
+    assert cache.cache_control_for("file.js") == "no-cache"
+    assert cache.cache_control_for("file.css") == "no-cache"
     assert cache.cache_control_for("file.html") == "public, max-age=60"
     assert cache.cache_control_for("file.bin") == "no-store"
     assert cache._guess_media_type("file.css") == "text/css"

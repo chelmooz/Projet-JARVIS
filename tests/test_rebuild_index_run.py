@@ -6,7 +6,9 @@ dans l'index par comparaison `metadata.source` (résolue via SOURCE_MAP).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,7 +17,7 @@ import pytest
 # Note: import différé pour éviter l'import du script complet lors de la collecte
 
 
-def _import_missing_sources():
+def _import_missing_sources() -> Callable[[Path, list[dict[str, Any]]], list[str]]:
     """Import lazy de la fonction à tester."""
     import sys
     from pathlib import Path
@@ -27,7 +29,7 @@ def _import_missing_sources():
     return missing_sources
 
 
-def _import_main():
+def _import_main() -> Callable[[], int]:
     """Import lazy de la fonction main pour test d'intégration."""
     import sys
     from pathlib import Path
@@ -54,7 +56,7 @@ def test_missing_sources_all_missing(tmp_path: Path) -> None:
     )
 
     # Index vide
-    index_docs = []
+    index_docs: list[dict[str, Any]] = []
 
     missing = missing_sources(src_dir, index_docs)
     assert set(missing) == {"ad-attacks-network", "multios-commands"}
@@ -110,13 +112,14 @@ def test_vectorize_uses_correct_instance() -> None:
     """
     main = _import_main()
 
-    with patch("scripts.rebuild_index_run.InferenceService") as mock_inference, \
-         patch("scripts.rebuild_index_run.VectorService") as mock_vector_service, \
-         patch("scripts.rebuild_index_run.WikiIngestService") as mock_ingest_service, \
-         patch("scripts.rebuild_index_run.missing_sources", return_value=["test-source"]), \
-         patch("pathlib.Path.is_file", return_value=True), \
-         patch("pathlib.Path.is_dir", return_value=True):
-
+    with (
+        patch("scripts.rebuild_index_run.InferenceService") as mock_inference,
+        patch("scripts.rebuild_index_run.VectorService") as mock_vector_service,
+        patch("scripts.rebuild_index_run.WikiIngestService") as mock_ingest_service,
+        patch("scripts.rebuild_index_run.missing_sources", return_value=["test-source"]),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.is_dir", return_value=True),
+    ):
         # Configuration des mocks
         mock_inference_instance = MagicMock()
         mock_inference_instance.is_healthy.return_value = True
@@ -130,7 +133,7 @@ def test_vectorize_uses_correct_instance() -> None:
         mock_vector_store = MagicMock()
         mock_vector_store.stats.side_effect = [
             {"total": 100, "embedded": 50, "pending": 50},  # AVANT vectorisation (avec nouveaux docs)
-            {"total": 150, "embedded": 150, "pending": 0},   # APRÈS vectorisation
+            {"total": 150, "embedded": 150, "pending": 0},  # APRÈS vectorisation
         ]
         mock_vector_store.vectorize_pending.return_value = 50
 
@@ -138,9 +141,7 @@ def test_vectorize_uses_correct_instance() -> None:
         mock_vector_service.side_effect = [mock_vs_initial, mock_vector_store]
 
         mock_ingest_instance = MagicMock()
-        mock_ingest_instance.ingest_phase2.return_value = {
-            "ingested": 10, "chunks": 50, "edges": 5
-        }
+        mock_ingest_instance.ingest_phase2.return_value = {"ingested": 10, "chunks": 50, "edges": 5}
         mock_ingest_service.return_value = mock_ingest_instance
 
         # Exécuter main

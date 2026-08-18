@@ -300,9 +300,12 @@ textarea:focus-visible,
 .tools-section { margin-bottom: 20px; }
 .tools-section h4 { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
 .tools-items { display: flex; flex-direction: column; gap: 6px; }
-.tools-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; }
-.tools-key { color: var(--text-dim); font-family: monospace; }
-.tools-val { color: var(--text); font-family: monospace; }
+.tools-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; }
+.tools-item--nested { margin-bottom: 0; border-radius: 8px 8px 0 0; border-bottom: none; }
+.tools-key { color: var(--text-dim); font-family: monospace; flex-shrink: 0; }
+.tools-val { color: var(--text); font-family: monospace; word-break: break-all; text-align: right; min-width: 0; }
+.tools-nested { display: flex; flex-direction: column; gap: 4px; padding: 6px 12px 10px 24px; background: var(--panel); border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; margin-top: -6px; }
+.tools-nested .tools-item { background: transparent; border: none; padding: 2px 0; }
 .tools-empty { text-align: center; color: var(--text-mute); padding: 60px; font-size: 14px; }
 .tools-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
 .tool-action-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--t); }
@@ -343,10 +346,10 @@ textarea:focus-visible,
 .agent-card .card-info .name { font-size: 16px; font-weight: 700; color: var(--text); }
 .agent-card .card-info .title { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
 .agent-card .card-info .priority { font-size: 10px; color: var(--text-mute); margin-top: 4px; }
-.agent-card .card-model { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.agent-card .card-model select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+.agent-card .card-model { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.agent-card .card-model select { flex: 1 1 160px; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; text-overflow: ellipsis; }
 .agent-card .card-model select:focus { border-color: var(--accent); outline: none; box-shadow: var(--ring); }
-.agent-card .card-model .assign-btn { background: var(--accent); color: #04121a; border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; transition: var(--t-fast); }
+.agent-card .card-model .assign-btn { flex-shrink: 0; background: var(--accent); color: #04121a; border: none; border-radius: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; transition: var(--t-fast); }
 .agent-card .card-model .assign-btn:hover { filter: brightness(1.1); }
 .agent-card .card-model .assign-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .agent-card .card-model .assign-status { font-size: 11px; color: var(--ok); margin-left: 4px; }
