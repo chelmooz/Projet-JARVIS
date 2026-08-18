@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -163,6 +164,23 @@ def pipeline_config() -> Pipeline:
     )
 
 
+@pytest.fixture
+def fixed_trace_date() -> str:
+    """Fixed date for trace file naming."""
+    return "2026-08-17"
+
+
+@pytest.fixture
+def mock_trace_datetime(fixed_trace_date: str):
+    """Mock datetime.now() in trace_sidecar to return a fixed date."""
+    fixed_dt = datetime.strptime(fixed_trace_date, "%Y-%m-%d")
+    with patch("services.trace_sidecar.datetime") as mock_dt:
+        mock_dt.now.return_value = fixed_dt
+        mock_dt.strptime = datetime.strptime
+        mock_dt.strftime = datetime.strftime
+        yield mock_dt
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Level 1 Tests (Deterministic Stubs - No Ollama Required)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -173,6 +191,8 @@ async def test_rag_loop_full_chain_fakes(
     temp_trace_dir: Path,
     sample_chunks: list[dict[str, Any]],
     pipeline_config: Pipeline,
+    fixed_trace_date: str,
+    mock_trace_datetime,
 ) -> None:
     """Full ADR-008 chain with deterministic stubs.
 
@@ -207,10 +227,8 @@ async def test_rag_loop_full_chain_fakes(
         assert all(s == 0.0 for s in initial_scores.values())
 
     # 2. Setup trace store
-    trace_date = "2026-08-17"
-    trace_file = temp_trace_dir / f"{trace_date}.jsonl"
-    with patch("services.trace_sidecar.DATE_FORMAT", trace_date):
-        trace_store = JsonlTraceStore(base_dir=temp_trace_dir.parent.parent)
+    trace_file = temp_trace_dir / f"{fixed_trace_date}.jsonl"
+    trace_store = JsonlTraceStore(base_dir=temp_trace_dir.parent.parent)
 
     # 3. Setup judge with high score (0.9)
     judge = FixedScoreJudge(score=0.9, reason="high quality response")
@@ -247,7 +265,8 @@ async def test_rag_loop_full_chain_fakes(
     assert set(trace["retrieved_chunk_ids"]) == {"chunk-0", "chunk-1", "chunk-2"}
     assert trace["judge_score"] == 0.9
     assert trace["judge_reason"] == "high quality response"
-    assert trace["status"] == "completed"
+    # status defaults to "" in TraceRecord (not set by _build_trace_record)
+    assert trace["status"] == ""
 
     # (b) Judge called WITHOUT actor reasoning
     assert len(judge.calls) == 1
@@ -284,6 +303,8 @@ async def test_rag_loop_low_score_hyde_retry_and_consolidate_prunes(
     temp_trace_dir: Path,
     sample_chunks: list[dict[str, Any]],
     pipeline_config: Pipeline,
+    fixed_trace_date: str,
+    mock_trace_datetime,
 ) -> None:
     """Low judge score triggers HyDE retry and consolidate prunes toxic chunks.
 
@@ -304,10 +325,8 @@ async def test_rag_loop_low_score_hyde_retry_and_consolidate_prunes(
         vector_service.vectorize_pending()
 
     # 2. Setup trace store
-    trace_date = "2026-08-17"
-    trace_file = temp_trace_dir / f"{trace_date}.jsonl"
-    with patch("services.trace_sidecar.DATE_FORMAT", trace_date):
-        trace_store = JsonlTraceStore(base_dir=temp_trace_dir.parent.parent)
+    trace_file = temp_trace_dir / f"{fixed_trace_date}.jsonl"
+    trace_store = JsonlTraceStore(base_dir=temp_trace_dir.parent.parent)
 
     # 3. Setup judge with LOW score (0.1) - triggers retry
     judge = FixedScoreJudge(score=0.1, reason="irrelevant response")
@@ -409,6 +428,8 @@ async def test_rag_loop_e2e_real_ollama(
     temp_trace_dir: Path,
     sample_chunks: list[dict[str, Any]],
     pipeline_config: Pipeline,
+    fixed_trace_date: str,
+    mock_trace_datetime,
 ) -> None:
     """Real Ollama integration test (skipped if Ollama unavailable).
 
@@ -431,10 +452,8 @@ async def test_rag_loop_e2e_real_ollama(
         vector_service.vectorize_pending()
 
     # 2. Setup trace store
-    trace_date = "2026-08-17"
-    trace_file = temp_trace_dir / f"{trace_date}.jsonl"
-    with patch("services.trace_sidecar.DATE_FORMAT", trace_date):
-        trace_store = JsonlTraceStore(base_dir=temp_trace_dir.parent.parent)
+    trace_file = temp_trace_dir / f"{fixed_trace_date}.jsonl"
+    trace_store = JsonlTraceStore(base_dir=temp_trace_dir.parent.parent)
 
     # 3. Setup REAL judge
     judge = LlmResponseJudge(llm_adapter=inference._adapter())

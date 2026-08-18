@@ -357,6 +357,25 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
   **8/8 passed** (GREEN immédiat, pas de RED nécessaire).
 - **Étape 3 — Gates** : `ruff check` ✓ · `ruff format --check` ✓
 
+### MT-KB-L6a — Correction filtrage agent metadata (tldr/psdocs/setuptools) (2026-08-18) ✅
+- **Contexte** : Rapport RAG signalait "metadata.agent vaut dev/@hardware/cyber au lieu de @dev/@hardware/@cyber/@network" — mais les 3 convertisseurs (tldr, psdocs, setuptools) avaient déjà le bon préfixe `@` dans `metadata.agent`.
+- **Étape 1 — Diagnostic** : vérifié `scripts/convert_tldr_run.py:64,71`, `scripts/convert_psdocs_run.py:62,69`, `scripts/convert_setuptools_run.py:63,71` → tous utilisent `@hardware` / `@dev` avec préfixe. Fichiers JSONL générés (`wiki/sources/tldr.jsonl`, `psdocs.jsonl`, `setuptools.jsonl`) confirment `metadata.agent == "@hardware"` / `"@dev"`.
+- **Étape 2 — Tests RED** : ajout assertions explicites `metadata["agent"]` dans `tests/test_convert_psdocs.py:79` et `tests/test_convert_setuptools.py:58` (déjà présent dans `test_convert_tldr.py:64`).
+- **Étape 3 — GREEN** : tests passent (6/6) — code déjà conforme, assertions valident la non-régression.
+- **Étape 4 — Gates** : `ruff check scripts/` ✓ · `ruff format --check scripts/` ✓ · `mypy` (1 erreur préexistante `convert_tldr_run.py:95` hors scope, non bloquante) · `pytest tests/test_convert_*.py` → **23/23 passed**.
+- **Statut** : ✅ DONE — Les 3 datasets ont `metadata.agent` normalisé (`@hardware`, `@dev`). Problème résolu sans modification des convertisseurs (déjà corrects). Tests renforcés pour non-régression.
+
+### MT-KB-L4c — Fix test cache (PUSH BLOQUÉ) (2026-08-18) ✅
+- **Contexte** : Utilisateur signale 1 FAILED / 7 PASSED sur `test_static_cache_characterization.py`
+  (ligne 19 attendrait `"public, max-age=3600"` pour `.js`).
+- **Étape 1 — Diagnostic (LECTURE SEULE)** : lu `tests/test_static_cache_characterization.py:19-20`
+  → attend **déjà** `"no-cache"` pour `.js` et `.css` (pas d'écart avec implémentation).
+- **Étape 2 — Vérification GREEN** : `pytest tests/test_static_cache_characterization.py -v` →
+  **8/8 passed** (aucune modification nécessaire, test déjà vert).
+- **Conclusion** : Signalement utilisateur basé sur un état antérieur (déjà corrigé par MT-KB-L3g).
+  Pas de modification de fichier requise.
+- **Gates** : `ruff check` ✓ · `ruff format --check` ✓ · `mypy` ✓ · `pytest -q` → 968 passed
+
 ### MT-KB-L4a — Câblage ET déclenchement ChatFeedbackLoop (2026-08-18) ✅
 - **Contexte** : `controllers/di.py` injecte correctement `ChatFeedbackLoop` dans
   `OrchestratorService(feedback_loop=...)` (MT-KB-L2f). Mais `services/orchestrator.py`
