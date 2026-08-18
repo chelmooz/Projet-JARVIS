@@ -124,8 +124,13 @@ class ConversationService(ConversationPort):
         agent: str | None = None,
         model: str | None = None,
         backend: str | None = None,
-    ) -> None:
-        """Ajoute un message à une conversation. Crée la conversation si elle n'existe pas."""
+    ) -> str:
+        """Ajoute un message à une conversation. Crée la conversation si elle n'existe pas.
+
+        Returns:
+            L'id du message ajouté (permet à l'appelant de référencer le
+            message pour le feedback, ex. POST /api/feedback).
+        """
         if not self._validate_conv_id(conv_id):
             raise ValueError(f"conv_id invalide: {conv_id!r}")
 
@@ -139,6 +144,7 @@ class ConversationService(ConversationPort):
         # Hook appelé hors lock pour ne pas bloquer le service si le callback est lent
         if self._on_message:
             self._on_message(conv_id, msg["id"], role, content, msg["ts"])
+        return str(msg["id"])
 
     def _build_message(
         self,

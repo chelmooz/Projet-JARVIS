@@ -53,22 +53,30 @@ def _save_conv(
     result: dict[str, Any],
     agent_key: str,
     conversations_svc: Any,
-) -> None:
-    """Persiste la conversation (user + assistant) si un conv_id est fourni."""
+) -> str | None:
+    """Persiste la conversation (user + assistant) si un conv_id est fourni.
+
+    Returns:
+        L'id du message assistant persisté (celui que POST /api/feedback
+        attend en ``msg_id``), ou ``None`` si pas de conv_id ou si le store
+        ne remonte pas d'id (fake de test).
+    """
     if not conv_id:
-        return
+        return None
     try:
         conversations_svc.add_message(conv_id, "user", task)
         resp = result.get("response") if isinstance(result, dict) else str(result)
-        conversations_svc.add_message(
+        msg_id = conversations_svc.add_message(
             conv_id,
             "assistant",
             resp or "",
             agent=result.get("agent", agent_key),
             model=result.get("model"),
         )
+        return msg_id if isinstance(msg_id, str) and msg_id else None
     except Exception as e:
         _logger.error("save_conv failed: %s", e)
+        return None
 
 
 def _track_query(
@@ -189,7 +197,9 @@ async def _run_and_record(
     await asyncio.to_thread(
         _track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source
     )
-    await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
+    msg_id = await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
+    if msg_id:
+        result["id"] = msg_id
 
     return result
 
@@ -275,7 +285,9 @@ async def _handle_request_streamed(
             await asyncio.to_thread(
                 _track_query, agent_key, model_name, result, start, context.analytics, task=task, source=source
             )
-            await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
+            msg_id = await asyncio.to_thread(_save_conv, conv_id, task, result, agent_key, context.conversations)
+            if msg_id:
+                result["id"] = msg_id
         except Exception as e:  # noqa: BLE001 - l'erreur part dans l'événement done
             _logger.error("handle_request streamed crashed", exc_info=True)
             result = {"response": f"Erreur interne du service: {e}", "agent": "system", "model": "unknown"}
