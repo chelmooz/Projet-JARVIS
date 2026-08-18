@@ -346,6 +346,18 @@ Plan clos (Lots 0→8/H, `ROADMAP.md`). Console Tab + Command Palette livrées
 - Gates : ruff ✓ · format ✓ · mypy ✓ · pytest ✓ (**930 passed**, couverture **83,25 % ≥ 60 %**).
 - Statut : ✅ DONE (en attente commit). Phase 1 close côté code.
 
+### MT-KB-L3g — Alignement politique cache + tests (2026-08-18) ✅
+- **Contexte** : `controllers/static_cache.py:112-113` retourne `"no-cache"` pour `.js` et `.css`
+  (modifié manuellement pour éviter Ctrl+Shift+R constant en dev). Test
+  `tests/test_static_cache_characterization.py:19-20` attend déjà `"no-cache"` pour `.js` et `.css`.
+- **Étape 1 — Diagnostic** : lu `controllers/static_cache.py:112-113` (retourne `"no-cache"` pour
+  `.js`, `.css`) et `tests/test_static_cache_characterization.py:19-20` (attend `"no-cache"` pour
+  les deux). **Aucun écart** — test déjà aligné.
+- **Étape 2 — Tests RED/GREEN** : `pytest tests/test_static_cache_characterization.py -v` →
+  **8/8 passed** (GREEN immédiat, pas de RED nécessaire).
+- **Étape 3 — Gates** : `ruff check` ✓ · `ruff format --check` ✓
+- **Statut** : ✅ DONE (lecture seule + vérification, aucun fichier modifié, pas de commit).
+
 ### MT-KB-L2a — Audit datasets v2 (4 candidats × 4 critères) (2026-08-17) ✅
 - Décisions : audit de 7 datasets candidats (2 @dev, 2 @network, 1 @hardware, 2 @vision)
   avant remplacement des 4 datasets mal adaptés. Zéro téléchargement, vérification
