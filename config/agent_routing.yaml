@@ -14,12 +14,14 @@ prefix_map:
 keyword_map:
   cyber:
     - securite
+    - sécurité
     - security
     - log
     - audit
     - firewall
     - forensic
     - vulnerabilite
+    - vulnérabilité
     - malware
     - virus
     - hack
@@ -36,8 +38,10 @@ keyword_map:
     - programme
     - algorithme
     - developpement
+    - développement
   network:
     - reseau
+    - réseau
     - network
     - ip
     - vlan
@@ -47,8 +51,12 @@ keyword_map:
     - routeur
     - port
     - connectivite
+    - connectivité
     - wifi
     - latence
+    - flooding
+    - syn
+    - ddos
   hardware:
     - driver
     - bios
@@ -56,9 +64,12 @@ keyword_map:
     - cpu
     - disque
     - materiel
+    - matériel
     - temperature
+    - température
     - panne
     - ecran bleu
+    - écran bleu
     - ventilo
     - processus
     - tourne
@@ -72,5 +83,6 @@ keyword_map:
     - photo
     - visuel
     - ecran
+    - écran
 
 fallback: dev

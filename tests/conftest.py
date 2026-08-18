@@ -106,8 +106,17 @@ class FakeVector(VectorPort):
     def vectorize_pending(self) -> int:
         return len(self._docs)
 
-    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
-        return [{"text": text, "metadata": metadata, "score": 1.0} for text, metadata in self._docs[:top_k]]
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        agent: str | None = None,
+        sim_threshold: float = 0.5,
+    ) -> list[dict[str, Any]]:
+        docs = [
+            (text, metadata) for text, metadata in self._docs if agent is None or (metadata or {}).get("agent") == agent
+        ]
+        return [{"text": text, "metadata": metadata, "score": 1.0} for text, metadata in docs[:top_k]]
 
     def stats(self) -> dict[str, Any]:
         return {"count": len(self._docs)}

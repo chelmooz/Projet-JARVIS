@@ -89,6 +89,7 @@ class OrchestratorService:
         toolbox: Any | None = None,
         agent_graph_factory: Callable[[], AgentGraphPort] | None = None,
         vision_model_selector: Callable[[_InferenceLike], str | None] | None = None,
+        feedback_loop: Any | None = None,
     ) -> None:
         self.inference = inference
         self.memory = memory
@@ -100,6 +101,7 @@ class OrchestratorService:
         self.agents = agents
         self.router_service = router_service
         self.toolbox = toolbox
+        self.feedback_loop = feedback_loop
 
         # DIP: Plus d'import concret de AgentGraph ici.
         # La factory doit être injectée par le Composition Root.

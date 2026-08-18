@@ -670,14 +670,22 @@ def test_search_embedding_failure_returns_empty_list(tmp_path: Path, monkeypatch
 
 def test_search_returns_ranked_results_by_cosine_similarity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     inference = FakeInferenceService(
-        embeddings={"proche": [1.0, 0.0], "loin": [0.0, 1.0], "q": [0.9, 0.1]}, default_dim=2
+        embeddings={
+            "proche": [1.0, 0.0],
+            "loin": [0.6, 0.8],
+            "hors-seuil": [0.0, 1.0],
+            "q": [0.9, 0.1],
+        },
+        default_dim=2,
     )
     svc = _make_service(monkeypatch, tmp_path, inference=inference)
     svc.index("proche")
     svc.index("loin")
+    svc.index("hors-seuil")
     svc.vectorize_pending()
 
-    results = svc.search("q", top_k=2)
+    results = svc.search("q", top_k=3)
+    # MT-KB-L2x : seuil 0.5 — "hors-seuil" (cosinus 0.1) est exclu, l'ordre par cosinus est conservé.
     assert [r["text"] for r in results] == ["proche", "loin"]
 
 

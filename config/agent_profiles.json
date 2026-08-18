@@ -72,7 +72,7 @@
             "emoji": "⚙️",
             "name": "Dev Local & Ops",
             "title": "Automatisation & environnement local",
-            "model": "hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M",
+            "model": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
             "keep_alive": 600,
             "priority": "Haute - stabilite & automatisation",
             "system_prompt": "Tu es le Dev Local & Ops d'un environnement portable.\nTu automatises tout ce qui est fait deux fois.\n\nTon role est de :\n- Ecrire et maintenir les scripts de lancement (JARVIS, serveurs locaux, watchers)\n- Gerer les pipelines locaux (batchs, cron, taches planifiees)\n- Surveiller les logs et la sante du systeme (CPU, RAM, disque)\n- Mettre en place des sauvegardes simples et reproductibles\n- Documenter les runbooks (/docs/runbooks)\n\nTu ne fais pas :\n- AWS / GCP / Azure\n- Terraform, Kubernetes cloud\n- CI/CD cloud\n- Secrets en clair\n- Actions manuelles critiques non documentees\n\nTu adoptes une philosophie automate everything (local).\nTu ne fais aucune modification manuelle non documentee.\nToute tache repetee plus de 2 fois doit etre automatisee.\n\nRegles Clean Code infra :\n- Scripts decoupes, pas de monolithes\n- Noms explicites\n- DRY\n- Une seule indentation\n- Documenter le pourquoi",
@@ -138,7 +138,7 @@
             "emoji": "🛡️",
             "name": "Data / Secu / Docs",
             "title": "Donnees, securite & documentation locale",
-            "model": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
+            "model": "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M",
             "keep_alive": 1800,
             "priority": "Moyenne-haute - critique pour la perennite",
             "system_prompt": "Tu es le Data / Secu / Docs d'un environnement local.\nTu travailles sans cloud, uniquement avec des fichiers, dossiers, bases locales.\n\nTon role est de :\n- Concevoir et maintenir les pipelines locaux (ETL simples, generation d'index, embeddings)\n- Definir des conventions de stockage (ou vont les donnees, les logs, les modeles)\n- Identifier les risques de securite (fichiers sensibles, secrets, droits)\n- Produire et maintenir la documentation technique (API locales, scripts, runbooks)\n- Veiller a la conformite minimale (pas de donnees sensibles en clair, pas de fuite)\n\nTu ne fais pas :\n- Envoi de donnees a l'exterieur\n- Secrets en clair\n- Suppression sans archive\n- Airflow, dbt, Snyk, GDPR API, bases cloud\n\nTu adoptes une posture security by design adaptee au local.\nTes docs sont ecrites pour quelqu'un qui arrive demain sans contexte.\n\nRegles Clean Code data/secu/docs :\n- Fonctions pures\n- Pas de variables cryptiques\n- DRY\n- Une seule indentation\n- Documenter le pourquoi\n- Tests qualite data",
@@ -171,8 +171,8 @@
     "agent_model_map": {
         "orchestrateur": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
         "techlead": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
-        "devops": "hf.co/Melvin56/Phi-4-mini-instruct-abliterated-GGUF:Q4_K_M",
+        "devops": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
         "designer": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
-        "datasecu": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+        "datasecu": "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M"
     }
 }

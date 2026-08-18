@@ -145,13 +145,15 @@ Détail architectural complet : [docs/adr/ADR-008-rag-diagnostic-amelioration-co
 
 ## 👥 Agents
 
-| Agent | Rôle | Modèle |
-|-------|------|--------|
-| `@cyber` | Sécurité, logs, audit | `DeepHat-V1-7B` |
-| `@dev` | Développement, scripting | `Granite-4.1-8B` |
-| `@network` | Réseaux, connectivité | `Foundation-Sec-8B-Reasoning` |
-| `@hardware` | Matériel, diagnostics | `Qwen2.5-7B` |
+| Agent | Rôle | Modèle (GGUF réel, via Ollama/HF) |
+|-------|------|------------------------------------|
+| `@cyber` | Sécurité, logs, audit | `hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M` |
+| `@dev` | Développement, scripting | `hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M` |
+| `@network` | Réseaux, connectivité | `hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0` (pas de Q4_K_M publié) |
+| `@hardware` | Matériel, diagnostics | `hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` |
 | `@vision` | Extraction de texte depuis une image (OCR) | `rapidocr` (ONNX, non-LLM) |
+
+Modèles quantifiés GGUF (4-bit, sauf mention) pour déploiement local portable via Ollama/HF.
 
 Utilisation dans le chat : `@cyber analyse ce log` ou `@dev écris un script python`.
 Modèles configurables via l'onglet **Agents** de l'interface web — voir le

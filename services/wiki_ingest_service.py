@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from services.chunker import chunk_text
+from services.inference import InferenceService
 from services.vector_embedder import Embedder
 from services.vector_index import VectorIndex
 
@@ -312,3 +313,179 @@ updated: 2026-08-17
         actual_keys = set(entry.keys())
         if actual_keys != required_keys:
             raise ValueError(f"Schéma invalide : clés attendues {required_keys}, reçues {actual_keys}")
+
+    def compile_entry(self, entry: dict[str, Any], inference: InferenceService | None) -> str:
+        """
+        Compile une entrée JSONL en markdown via LLM (ou fallback déterministe).
+
+        Args:
+            entry: Entrée JSONL avec clés id, agent, source, text, metadata
+            inference: Service d'inférence pour génération LLM (None = fallback Phase 1)
+
+        Returns:
+            Markdown compilé conforme SCHEMA.md
+        """
+        entry_id = entry["id"]
+        source = entry["source"]
+        text = entry["text"]
+
+        title = self._extract_title(entry)
+        agent = self._normalize_agent(str(entry["agent"]))
+
+        # Frontmatter YAML
+        frontmatter = f"""---
+id: {entry_id}
+title: "{title}"
+type: concept
+agent: "{agent}"
+tags: []
+sources: ["{source}:{entry_id}"]
+links_to: []
+created: 2026-08-17
+updated: 2026-08-17
+---"""
+
+        if inference is None:
+            # Fallback déterministe (comportement Phase 1 préservé)
+            summary = text[:150] + "..." if len(text) > 150 else text
+            markdown = f"""{frontmatter}
+
+# {title}
+
+## Résumé
+{summary}
+
+## Contenu
+{text}
+
+## Liens
+(Aucun lien pour l'instant — sera enrichi par LLM)
+
+## Sources
+- `{source}#{entry_id}`
+"""
+            return markdown
+
+        # Génération LLM avec prompt structuré
+        prompt = self._build_compile_prompt(entry, title, agent, source)
+        model = self._resolve_compile_model(inference)
+        compiled_content = inference.query(prompt, model)
+
+        # Le LLM doit retourner le contenu SANS frontmatter (juste les sections)
+        # On préfixe le frontmatter
+        markdown = f"{frontmatter}\n\n{compiled_content}"
+
+        # Validation via lint
+        from services.wiki_lint_service import WikiLintService
+
+        linter = WikiLintService(wiki_root=self.wiki_root)
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
+            f.write(markdown)
+            temp_path = Path(f.name)
+        try:
+            problems = linter.lint_page(temp_path)
+            if problems:
+                # Log warning mais on continue (fail-open)
+                import logging
+
+                logging.getLogger("jarvis.wiki_ingest").warning(
+                    "Compiled page lint issues for %s: %s", entry_id, problems
+                )
+        finally:
+            temp_path.unlink(missing_ok=True)
+
+        return markdown
+
+    def _build_compile_prompt(self, entry: dict[str, Any], title: str, agent: str, source: str) -> str:
+        """Construit le prompt pour la compilation LLM."""
+        text = entry["text"]
+        metadata = entry.get("metadata", {})
+        mitre_ids = metadata.get("mitre_technique_ids", [])
+
+        wikilink_hints = ""
+        if mitre_ids:
+            wikilink_hints = (
+                f"\nMITRE technique IDs disponibles pour wikilinks: {', '.join(mitre_ids)}. "
+                "Incluez des wikilinks [[Txxxx]] vers ces techniques dans la section Liens."
+            )
+
+        return f"""Compile une entrée JSONL en page Wiki structurée (SCHEMA.md).
+
+Entrée:
+- id: {entry["id"]}
+- agent: {agent}
+- source: {source}
+- title: {title}
+- text: {text}
+{wikilink_hints}
+
+Génère UNIQUEMENT le corps markdown (SANS frontmatter) avec ces sections exactes:
+## Résumé
+<résumé 150 mots max>
+
+## Contenu
+<contenu détaillé>
+
+## Liens
+<wikilinks [[...]] vers techniques liées + description>
+
+## Sources
+- `{source}#{entry["id"]}`
+"""
+
+    def _resolve_compile_model(self, inference: Any) -> str:
+        """Résout le modèle à utiliser pour la compilation (fallback Qwen2.5-7B)."""
+        default_model = "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+        # Vérifier si inference a les méthodes (FakeInference n'en a pas)
+        if hasattr(inference, "resolve_model"):
+            resolved = inference.resolve_model(default_model)
+            if resolved:
+                return str(resolved)
+        if hasattr(inference, "first_available"):
+            available = inference.first_available()
+            if available:
+                return str(available)
+        return default_model
+
+    def compile_batch(self, entries: list[dict[str, Any]], inference: InferenceService | None) -> None:
+        """
+        Compile un lot d'entrées et régénère wiki/pages/index.md.
+
+        Args:
+            entries: Liste d'entrées JSONL à compiler
+            inference: Service d'inférence (None = fallback déterministe)
+        """
+        # Compiler chaque entrée
+        for entry in entries:
+            markdown = self.compile_entry(entry, inference)
+            file_path = self.pages_dir / f"{entry['id']}.md"
+            file_path.write_text(markdown, encoding="utf-8")
+
+        # Régénérer index.md
+        self._regenerate_index(entries)
+
+    def _regenerate_index(self, entries: list[dict[str, Any]]) -> None:
+        """Régénère wiki/pages/index.md avec liens wikilinks vers toutes les pages."""
+        index_path = self.wiki_root / "pages" / "index.md"
+
+        lines = [
+            "# Index Wiki JARVIS",
+            "",
+            "Cet index est généré automatiquement par `compile_batch`.",
+            "",
+            "## Pages",
+            "",
+        ]
+
+        for entry in entries:
+            entry_id = entry["id"]
+            title = self._extract_title(entry)
+            agent = self._normalize_agent(str(entry["agent"]))
+            lines.append(f"- [[{entry_id}]] — {title} ({agent})")
+
+        lines.append("")
+        lines.append(f"*Généré le {date.today().isoformat()} — {len(entries)} pages*")
+
+        index_path.write_text("\n".join(lines), encoding="utf-8")

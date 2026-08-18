@@ -129,7 +129,11 @@ export function buildFeedbackRow(convId, msg) {
                 btn.style.color = '#66ee88';
             } else {
                 sendFeedback(convId, msg.id, act === 'up' ? 1 : -1);
-                btn.style.opacity = '0.5';
+                btn.classList.add('voted');
+                btn.disabled = true;
+                row.querySelectorAll('.fb-btn:not([data-act="copy"])').forEach(b => {
+                    if (b !== btn) { b.classList.add('voted'); b.disabled = true; }
+                });
             }
         });
     });
@@ -157,26 +161,35 @@ export async function sendImplicit(convId, msgId, type) {
     } catch (e) {}
 }
 
-export async function enhanceLastAssistant(convId) {
+export async function enhanceLastAssistant(convId, retries = 3) {
     if (!convId) return;
-    try {
-        const resp = await fetch('/api/conversations/' + convId);
-        const conv = await resp.json();
-        const c = conv.data || conv;
-        if (c.error) return;
+    for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+            const resp = await fetch('/api/conversations/' + convId);
+            const conv = await resp.json();
+            const c = conv.data || conv;
+            if (c.error) return;
 
-        const msgs = c.messages || [];
-        let target = null;
-        for (let i = msgs.length - 1; i >= 0; i--) {
-            if (msgs[i].role === 'assistant' && msgs[i].id) { target = msgs[i]; break; }
-        }
-        if (!target) return;
+            const msgs = c.messages || [];
+            let target = null;
+            for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].role === 'assistant' && msgs[i].id) { target = msgs[i]; break; }
+            }
+            if (!target) {
+                if (attempt < retries - 1) await new Promise(r => setTimeout(r, 150 * (attempt + 1)));
+                continue;
+            }
 
-        const last = state.chat?.lastElementChild;
-        if (last && last.classList.contains('assistant')) {
-            last.replaceWith(renderAssistantMsg(convId, target));
+            const last = state.chat?.lastElementChild;
+            if (last && last.classList.contains('assistant')) {
+                last.replaceWith(renderAssistantMsg(convId, target));
+            }
+            return;
+        } catch (e) {
+            if (attempt === retries - 1) return;
+            await new Promise(r => setTimeout(r, 150 * (attempt + 1)));
         }
-    } catch (e) {}
+    }
 }
 
 export function maybeRevisit(conv) {
@@ -329,6 +342,10 @@ export async function send() {
                     m.innerHTML = pair.map(([k, v]) => '<span class="badge badge-' + utils.escHtml(k) + '">' + utils.escHtml(v) + '</span>').join('');
                     div.appendChild(m);
                 }
+                // Add feedback row immediately if message ID is available
+                if (meta.id && state.currentConvId) {
+                    div.appendChild(buildFeedbackRow(state.currentConvId, { id: meta.id, content: meta.response || acc }));
+                }
                 status.updateBadges(meta.agent, meta.model, meta.backend);
                 if (meta.suggested_skill) skills.refreshSkills();
             }
@@ -339,7 +356,13 @@ export async function send() {
             const data = await resp.json();
 
             const response = data.response || JSON.stringify(data, null, 2);
-            addMsg('assistant', response, { agent: data.agent, model: data.model, backend: data.backend });
+            const msgMeta = { agent: data.agent, model: data.model, backend: data.backend };
+            addMsg('assistant', response, msgMeta);
+            // Add feedback row immediately if message ID is available
+            const lastMsg = chatEl.lastElementChild;
+            if (data.id && lastMsg && lastMsg.classList.contains('assistant')) {
+                lastMsg.appendChild(buildFeedbackRow(state.currentConvId, { id: data.id, content: response }));
+            }
             status.updateBadges(data.agent, data.model, data.backend);
 
             if (data.suggested_skill) skills.refreshSkills();
