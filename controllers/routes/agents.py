@@ -33,7 +33,6 @@ from services.selector import select_vision_analysis_model
 
 _logger = logging.getLogger(__name__)
 
-PREFERENCES_PATH = CONFIG_DIR / "model_preferences.json"
 TOKEN_ESTIMATE_DIVISOR = 4  # estimation grossière : ~4 caractères par token
 
 # Exposition de services au niveau module (Étape 9 fusionnée)
@@ -42,32 +41,12 @@ analytics = _ctx.analytics
 
 router = APIRouter()
 
-
-PROFILE_TO_ROUTING = {
-    "orchestrateur": "dev",
-    "techlead": "dev",
-    "devops": "network",
-    "designer": "vision",
-    "datasecu": "cyber",
-}
+# Conservée pour compat tests (monkeypatch de test_api_agents.py) : la
+# synchro des modèles vers model_preferences.json a été supprimée (MT-KB-L3h,
+# source unique = agent_profiles.json).
+PREFERENCES_PATH = CONFIG_DIR / "model_preferences.json"
 
 ROUTING_PREFIXES = list(load_routing_config().prefix_map.keys())
-
-
-def _sync_agent_model_to_preferences(profile_key: str, model_name: str) -> None:
-    """Synchronise le modèle assigné (agent_profiles.json → model_preferences.json)."""
-    try:
-        with open(PREFERENCES_PATH, encoding="utf-8") as f:
-            prefs = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
-        _logger.warning("model_preferences.json illisible/absent, repart de zéro: %s", e)
-        prefs = {}
-    routing_key = PROFILE_TO_ROUTING.get(profile_key, profile_key)
-    prefs.setdefault("model_map", {})[routing_key] = model_name
-    prefs.setdefault("agent_to_profile", {})[routing_key] = profile_key
-    prefs["default_model"] = model_name
-    with open(PREFERENCES_PATH, "w", encoding="utf-8") as f:
-        json.dump(prefs, f, indent=4, ensure_ascii=False)
 
 
 @router.get("/api/agents")
@@ -107,7 +86,6 @@ def assign_profile(body: AssignRequest) -> Any:
     profiles["agent_model_map"][profile_key] = model_name
     with open(PROFILES_FILE, "w", encoding="utf-8") as f:
         json.dump(profiles, f, indent=4, ensure_ascii=False)
-    _sync_agent_model_to_preferences(profile_key, model_name)
     _logger.info("Profile assigned: %s -> %s", profile_key, model_name)
     return ok({"profile": profile_key, "model": model_name})
 

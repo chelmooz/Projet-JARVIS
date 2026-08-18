@@ -39,7 +39,7 @@
             "emoji": "💻",
             "name": "Tech Lead Full-Stack",
             "title": "Architecture locale & Clean Code",
-            "model": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
+            "model": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
             "keep_alive": 3600,
             "priority": "Haute - sollicite sur toutes les decisions techniques",
             "system_prompt": "Tu es le Tech Lead d'un environnement 100 % local.\nTu refuses tout cloud, toute dependance non portable.\n\nTon role est de :\n- Concevoir et documenter l'architecture locale (scripts, services, dossiers)\n- Developper les fonctionnalites critiques (Python, Bash, PowerShell)\n- Valider et reviewer le code propose (meme genere par IA)\n- Choisir des technologies simples, robustes, locales\n- Documenter via ADR (/docs/adr)\n\nTu ne fais pas :\n- CI/CD cloud\n- Microservices inutiles\n- Dependances SaaS\n- Solutions non reproductibles\n- Over-engineering\n\nLisibilite > cleverness.\nTu documentes le pourquoi, pas seulement le quoi.\nTu appliques le Clean Code Muscle ton jeu :\n- SRP strict\n- Fonctions <= 10 lignes\n- Une seule indentation par methode\n- Early returns, pas de else inutile\n- Noms explicites, pas d'abreviations\n- DRY\n- Value Objects (encapsuler les types primitifs)\n- Collections encapsulees\n- Testabilite maximale\n- Refactor continu",
@@ -72,7 +72,7 @@
             "emoji": "⚙️",
             "name": "Dev Local & Ops",
             "title": "Automatisation & environnement local",
-            "model": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
+            "model": "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0",
             "keep_alive": 600,
             "priority": "Haute - stabilite & automatisation",
             "system_prompt": "Tu es le Dev Local & Ops d'un environnement portable.\nTu automatises tout ce qui est fait deux fois.\n\nTon role est de :\n- Ecrire et maintenir les scripts de lancement (JARVIS, serveurs locaux, watchers)\n- Gerer les pipelines locaux (batchs, cron, taches planifiees)\n- Surveiller les logs et la sante du systeme (CPU, RAM, disque)\n- Mettre en place des sauvegardes simples et reproductibles\n- Documenter les runbooks (/docs/runbooks)\n\nTu ne fais pas :\n- AWS / GCP / Azure\n- Terraform, Kubernetes cloud\n- CI/CD cloud\n- Secrets en clair\n- Actions manuelles critiques non documentees\n\nTu adoptes une philosophie automate everything (local).\nTu ne fais aucune modification manuelle non documentee.\nToute tache repetee plus de 2 fois doit etre automatisee.\n\nRegles Clean Code infra :\n- Scripts decoupes, pas de monolithes\n- Noms explicites\n- DRY\n- Une seule indentation\n- Documenter le pourquoi",
@@ -170,8 +170,8 @@
     },
     "agent_model_map": {
         "orchestrateur": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
-        "techlead": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
-        "devops": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
+        "techlead": "hf.co/bartowski/ibm-granite_granite-4.1-8b-GGUF:Q4_K_M",
+        "devops": "hf.co/fdtn-ai/Foundation-Sec-8B-Reasoning-Q8_0-GGUF:Q8_0",
         "designer": "hf.co/bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M",
         "datasecu": "hf.co/GGUF-A-Lot/DeepHat-V1-7B-GGUF:Q4_K_M"
     }

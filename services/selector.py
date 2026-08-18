@@ -8,6 +8,7 @@ import os
 import threading
 from typing import Any
 
+from config.agent_profiles import model_for_agent
 from config.constants import PROJECT_DIR
 
 _logger = logging.getLogger("jarvis.selector")
@@ -184,12 +185,20 @@ def select_vision_analysis_model(inference: Any) -> str:
 def select_model(agent_key: str, inference: Any, log_service: Any | None = None) -> str:
     """Sélectionne le meilleur modèle pour un agent donné.
 
-    Stratégie :
-      1. Court-circuit vision
-      2. Préférences utilisateur
-      3. Fallback par agent
-      4. Premier modèle générique disponible
-      5. Chaîne vide si aucun modèle (l'appelant doit gérer l'erreur)
+    Politique (MT-KB-L3h, source unique) :
+      1. Court-circuit vision (sentinelle RapidOCR)
+      2. Override hérité ``model_map`` des préférences — DÉPRÉCIÉ : le système
+         ne l'écrit plus (seule ``agent_profiles.json`` est écrite par la
+         route /api/agents/assign). Conservé uniquement pour compatibilité
+         avec d'anciennes préférences utilisateur.
+      3. Modèle configuré par profil dans ``config/agent_profiles.json``
+         (SOURCE DE VÉRITÉ — aligné sur les spécialités).
+      4. Modèle de spécialité par défaut (``fallback_models()``).
+      5. Premier modèle générique disponible sur le backend.
+      6. Chaîne vide/ValueError si aucun modèle (l'appelant gère l'erreur).
+
+    Ne persiste JAMAIS : la sélection est purement déterministe, seul
+    l'utilisateur (onglet Agents) peut changer les modèles.
 
     Args:
         agent_key: Clé de l'agent (ex: 'cyber', 'dev', 'vision').
@@ -209,14 +218,19 @@ def select_model(agent_key: str, inference: Any, log_service: Any | None = None)
         )
 
     prefs = read_preferences()
-    model_map = prefs.get("model_map", fallback_models())
 
-    # Construit la liste des candidats : modèle spécifique à l'agent + modèles génériques
-    generic_values = [m for m in model_map.values() if m != VISION_OCR_SENTINEL]
-    candidates = [model_map.get(agent_key)] + generic_values
+    # Override hérité (déprécié : plus jamais écrit par le système).
+    legacy_map = prefs.get("model_map")
+    legacy = legacy_map.get(agent_key) if isinstance(legacy_map, dict) else None
 
-    seen = set()
-    for model in candidates:
+    # Source de vérité : modèle configuré par profil (agent_profiles.json).
+    configured = model_for_agent(agent_key)
+
+    # Spécialité par défaut (fallback si rien n'est configuré).
+    specialty = fallback_models().get(agent_key)
+
+    seen: set[str] = set()
+    for model in (legacy, configured, specialty):
         if model and model not in seen:
             seen.add(model)
             resolved = inference.resolve_model(model)
