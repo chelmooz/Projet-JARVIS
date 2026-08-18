@@ -2145,3 +2145,12 @@ Les TODO restants sont basculés ici (plus dans le code) — voir ROADMAP Lot 5.
 - **Étape 4 — Gates** : ruff ✓ · format ✓ · pytest ✓ (mypy : erreurs
   préexistantes non liées au changement).
 - **Statut** : ✅ **DONE** — Test aligné sur la politique `no-cache` pour JS/CSS.
+
+### MT-KB-L5a-test — Évaluation pertinence RAG (4 agents × 3 questions) ⚠️
+- **Script** : `test_rag_relevance.py` (lecture seule : copie temporaire de `memory/vector_index.json`, index réel non modifié ; embeddings requête via Ollama réel 11436 UP).
+- **Index live = 5000 docs / 5000 embeddés** — **contradiction avec MT-KB-L3g qui déclarait 7564** (le rebuild n'est pas persisté sur le fichier disque, ou ré-indexé à 5000 depuis). À investiguer.
+- **`metadata.agent` incohérent** : `dev`(1108) `hardware`(1000) `cyber`(998) **sans @** vs `@network`(970) `@hardware`(884) **avec @** ; **aucun `@dev`/`@cyber`/`@designer`**. → tout filtrage `search(agent="@dev"/"@cyber"/"@designer")` renvoie 0 (normalisation @ de MT-KB-L2x sans effet sur l'index existant, conforme à sa note (2)).
+- **Index sans sources `setuptools`/`tldr`/`psdocs`** : bâti sur `codesearchnet`/`multios-terminal`/`mitre-attack`/… Les fichiers JSONL `wiki/sources/{setuptools,tldr,psdocs}.jsonl` existent mais **non ingestés** (contiennent pourtant `pkg_resources`×6, `entry_points`×2, `pyproject`×1, `taskset`×1).
+- **Résultats (12 questions)** : 4 NO RETRIEVAL (Q1/3/7/10, GAP pur setuptools non ingesté) ; 7 échouent au filtre agent (bug prefix @dev/@cyber/@designer → 0) ; seulement Q4 (taskset, 0,6025 via @hardware) et Q11 (chmod, 0,6480 via @hardware) récupèrent un chunk pertinent — mais taggés @hardware alors que la MT route Q11 vers @cyber (mauvais routage). Q2/5/6/8/9 retrieval faible/off-topic (codesearchnet/mitre). Aucun timeout, aucun crash.
+- **Diagnostic** : GAP DATASET (ingérer `setuptools`/`tldr`/`psdocs`) + BUG RETRIEVAL (normaliser `metadata.agent` sur l'index existant + corriger routage agent PowerShell/chmod). Agent `@designer` totalement absent.
+- **Statut** : ⚠️ DONE (lecture seule, aucun commit) — livrables = `test_rag_relevance.py` + ce rapport.

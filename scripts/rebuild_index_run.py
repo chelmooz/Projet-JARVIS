@@ -11,6 +11,7 @@ Fail-open propre si Ollama indisponible : message clair, index inchangé.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -47,10 +48,32 @@ def _resolve_source(stem: str) -> str:
     return SOURCE_MAP.get(stem, stem)
 
 
+def _resolve_source_from_file(path: Path) -> str | None:
+    """Lit la source HF réelle (champ `metadata.source`) depuis la 1re ligne du JSONL."""
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                src = entry.get("metadata", {}).get("source") if isinstance(entry, dict) else None
+                if src:
+                    return str(src)
+                # Repli : source déjà au niveau racine
+                if isinstance(entry, dict) and entry.get("source"):
+                    return str(entry["source"])
+                break
+    except (OSError, json.JSONDecodeError):
+        return None
+    return None
+
+
 def missing_sources(sources_dir: Path, index_docs: list[dict[str, Any]]) -> list[str]:
     """
     Retourne la liste des noms de sources JSONL présentes dans `sources_dir`
-    mais absentes de l'index (comparaison par `metadata.source` réel).
+    mais absentes de l'index (comparaison par `metadata.source` réel lu dans
+    le fichier, et non limitée à SOURCE_MAP — ingest toutes les sources disque).
 
     Args:
         sources_dir: Répertoire contenant les fichiers *.jsonl sources.
@@ -62,20 +85,20 @@ def missing_sources(sources_dir: Path, index_docs: list[dict[str, Any]]) -> list
     if not sources_dir.is_dir():
         return []
 
-    # Sources présentes sur disque (résolues vers source HF réelle)
-    disk_sources = set()
-    for p in sources_dir.glob("*.jsonl"):
-        real_source = _resolve_source(p.stem)
-        disk_sources.add(real_source)
-
     # Sources déjà présentes dans l'index
     indexed_sources = {doc.get("metadata", {}).get("source") for doc in index_docs}
     indexed_sources.discard(None)
 
-    # Sources manquantes = sur disque mais pas dans l'index
-    missing = sorted(disk_sources - indexed_sources)
-    # Retourner les stems (noms de fichiers) pour l'affichage et l'ingestion
-    return sorted([stem for stem, real in SOURCE_MAP.items() if real in missing])
+    # Toutes les sources disque (résolues via le fichier lui-même)
+    missing: list[str] = []
+    for p in sorted(sources_dir.glob("*.jsonl")):
+        if p.stem == "coco-annotations":
+            continue  # SKIP @vision (RapidOCR, pas de dataset RAG)
+        real_source = _resolve_source_from_file(p) or _resolve_source(p.stem)
+        if real_source not in indexed_sources:
+            missing.append(p.stem)
+
+    return missing
 
 
 # ---------------------------------------------------------------------------
@@ -85,6 +108,79 @@ def missing_sources(sources_dir: Path, index_docs: list[dict[str, Any]]) -> list
 
 def _print_stats(label: str, stats: dict[str, Any]) -> None:
     print(f"{label}: total={stats['total']} embedded={stats['embedded']} pending={stats['pending']}")
+
+
+# Schéma strict attendu par wiki_ingest_service.ingest_phase2 (_validate_schema)
+_REQUIRED_KEYS = {"id", "agent", "source", "text", "metadata"}
+
+
+def _ensure_five_key_schema(path: Path) -> None:
+    """Réécrit un JSONL source en schéma strict 5 clés si besoin (idempotent).
+
+    Certains convertisseurs (convert_hf_sources_run.py) produisent un schéma
+    ``{"text", "metadata"}`` à 2 clés, rejeté par ``ingest_phase2``. On promut
+    ``id``/``agent``/``source`` (présents dans ``metadata``) au niveau racine.
+    """
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            lines = [ln for ln in fh if ln.strip()]
+    except OSError:
+        return
+
+    needs_fix = False
+    out: list[str] = []
+    for ln in lines:
+        try:
+            entry = json.loads(ln)
+        except json.JSONDecodeError:
+            out.append(ln)
+            continue
+        if isinstance(entry, dict) and set(entry.keys()) == _REQUIRED_KEYS:
+            out.append(ln)  # déjà conforme
+            continue
+        meta = entry.get("metadata", {}) if isinstance(entry, dict) else {}
+        if not isinstance(meta, dict):
+            meta = {}
+        new_entry = {
+            "id": meta.get("id", entry.get("id", "")),
+            "agent": str(meta.get("agent", entry.get("agent", ""))),
+            "source": meta.get("source", entry.get("source", "")),
+            "text": entry.get("text", ""),
+            "metadata": meta,
+        }
+        out.append(json.dumps(new_entry, ensure_ascii=False))
+        needs_fix = True
+
+    if needs_fix:
+        with path.open("w", encoding="utf-8") as fh:
+            fh.write("\n".join(out) + "\n")
+        print(f"  Schéma normalisé (5 clés) : {path.name}")
+
+
+def _normalize_index_agents(vector_store: Any) -> int:
+    """Force le préfixe '@' sur tous les ``metadata.agent`` de l'index en mémoire.
+
+    Corrige l'incohérence historique (``dev``/``hardware``/``cyber`` sans '@').
+    Ne touche pas les valeurs déjà préfixées ni les valeurs non-agent (None).
+    """
+    docs = vector_store._data.get("documents") if hasattr(vector_store, "_data") else None
+    if not isinstance(docs, list):
+        return 0
+    changed = 0
+    for doc in docs:
+        if not isinstance(doc, dict):
+            continue
+        meta = doc.get("metadata")
+        if not isinstance(meta, dict):
+            continue
+        agent = meta.get("agent")
+        if isinstance(agent, str) and agent and not agent.startswith("@"):
+            meta["agent"] = "@" + agent.strip().lstrip("@")
+            changed += 1
+    if changed:
+        vector_store._dirty = True
+        vector_store.flush()
+    return changed
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +238,9 @@ def main() -> int:
             print(f"SKIP {source}: agent=@vision (RapidOCR, pas de dataset RAG)")
             continue
 
+        # Normalise le schéma source (2 clés -> 5 clés) si besoin
+        _ensure_five_key_schema(jsonl_path)
+
         print(f"Ingestion de {source}...")
         stats = service.ingest_phase2(
             inference_svc,
@@ -173,13 +272,18 @@ def main() -> int:
         stats_after = vector_store.stats()
         _print_stats("APRÈS", stats_after)
 
+    # Normalisation stricte des metadata.agent (force '@' pour tous)
+    normalized = _normalize_index_agents(vector_store)
+    print(f"Agents normalisés (préfixe '@' forcé) : {normalized}")
+
     # Smoke test rapide
-    smoke = vs.search("Kerberoasting T1558.003", top_k=1)
+    smoke = vector_store.search("Kerberoasting T1558.003", top_k=1)
     print(f"Smoke test 'Kerberoasting T1558.003' (top_k=1): results={len(smoke)}")
     for r in smoke:
         meta = r.get("metadata", {})
         print(f"  id={meta.get('id')} agent={meta.get('agent')} score={r.get('score')}")
 
+    _print_stats("FINAL", stats_after)
     print("=== Index KB reconstruit avec succès ===")
     return 0
 

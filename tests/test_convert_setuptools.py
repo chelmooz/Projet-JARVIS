@@ -54,6 +54,7 @@ class TestSetuptoolsConverter:
         assert set(entry.keys()) == {"id", "agent", "source", "text", "metadata"}
         assert entry["agent"] == "@dev"
         assert entry["source"] == "setuptools"
+        assert entry["metadata"]["agent"] == "@dev"
         assert entry["metadata"]["license"] == "MIT"
         assert "Distribution" in entry["text"]
         assert "deprecated" in entry["text"].lower()

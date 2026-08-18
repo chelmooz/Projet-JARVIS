@@ -77,6 +77,7 @@ class TestPsDocsConverter:
             "Microsoft.PowerShell.Utility",
         )
         assert dev_entry["agent"] == "@dev"
+        assert dev_entry["metadata"]["agent"] == "@dev"
 
     def test_tree_unique_ids_and_hardware_priority(self, tmp_path: Path) -> None:
         """Id uniques, cap respecté, cmdlets diagnostic @hardware incluses."""
